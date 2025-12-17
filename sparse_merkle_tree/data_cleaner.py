@@ -61,4 +61,80 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(df, columns=['A', 'B'])
     print("\nCleaned DataFrame:")
-    print(cleaned)
+    print(cleaned)import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate dtype and handling errors.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns.
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    return df
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that DataFrame contains required columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns are present.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+def process_dataframe(df, required_cols=None, numeric_cols=None):
+    """
+    Main function to process and clean a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        required_cols (list, optional): Required columns for validation.
+        numeric_cols (list, optional): Numeric columns to clean.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame or None if validation fails.
+    """
+    if required_cols:
+        if not validate_dataframe(df, required_cols):
+            return None
+    
+    df = remove_duplicates(df)
+    
+    if numeric_cols:
+        df = clean_numeric_columns(df, numeric_cols)
+    
+    return df
