@@ -76,4 +76,52 @@ def main():
     print(cleaned)
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Clean a CSV file by removing duplicates, handling missing values,
+    and standardizing column names.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Handle missing values for numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        
+        # Handle missing values for categorical columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        df[categorical_cols] = df[categorical_cols].fillna('unknown')
+        
+        # Remove rows where critical columns are null
+        critical_columns = ['id', 'timestamp']
+        existing_critical = [col for col in critical_columns if col in df.columns]
+        if existing_critical:
+            df = df.dropna(subset=existing_critical)
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Output saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    clean_data('raw_data.csv', 'cleaned_data.csv')
