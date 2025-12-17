@@ -1,90 +1,82 @@
 
-import numpy as np
 import pandas as pd
 
-def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+def clean_dataset(df, remove_duplicates=True, fill_method=None):
     """
-    Remove outliers using IQR method
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Args:
+        df: pandas DataFrame to clean
+        remove_duplicates: Boolean indicating whether to remove duplicate rows
+        fill_method: Method to fill missing values ('mean', 'median', 'mode', or None)
+    
+    Returns:
+        Cleaned pandas DataFrame
     """
-    if column not in dataframe.columns:
-        raise ValueError(f"Column '{column}' not found in dataframe")
+    cleaned_df = df.copy()
     
-    q1 = dataframe[column].quantile(0.25)
-    q3 = dataframe[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - multiplier * iqr
-    upper_bound = q3 + multiplier * iqr
+    # Handle missing values
+    if fill_method:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        
+        if fill_method == 'mean':
+            for col in numeric_cols:
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+        elif fill_method == 'median':
+            for col in numeric_cols:
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+        elif fill_method == 'mode':
+            for col in cleaned_df.columns:
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
     
-    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
-                           (dataframe[column] <= upper_bound)]
-    return filtered_df
-
-def normalize_minmax(dataframe, columns=None):
-    """
-    Normalize data using min-max scaling
-    """
-    if columns is None:
-        columns = dataframe.select_dtypes(include=[np.number]).columns
+    # Remove duplicates if specified
+    if remove_duplicates:
+        cleaned_df.drop_duplicates(inplace=True)
     
-    normalized_df = dataframe.copy()
-    for col in columns:
-        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
-            min_val = dataframe[col].min()
-            max_val = dataframe[col].max()
-            if max_val != min_val:
-                normalized_df[col] = (dataframe[col] - min_val) / (max_val - min_val)
-    
-    return normalized_df
-
-def clean_dataset(dataframe, numeric_columns=None, outlier_multiplier=1.5):
-    """
-    Complete data cleaning pipeline
-    """
-    if numeric_columns is None:
-        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns
-    
-    cleaned_df = dataframe.copy()
-    
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_multiplier)
-    
-    cleaned_df = normalize_minmax(cleaned_df, numeric_columns)
-    
-    cleaned_df = cleaned_df.dropna()
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
     
     return cleaned_df
 
-def validate_dataframe(dataframe, required_columns=None):
+def validate_dataset(df, required_columns=None):
     """
-    Validate dataframe structure and content
-    """
-    if not isinstance(dataframe, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    Validate a DataFrame for basic data quality checks.
     
-    if dataframe.empty:
-        raise ValueError("DataFrame is empty")
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
     
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in dataframe.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+        validation_results['all_required_columns_present'] = len(missing_columns) == 0
     
-    return True
+    return validation_results
 
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(50, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    })
+def export_cleaned_data(df, output_path, format='csv'):
+    """
+    Export cleaned DataFrame to a file.
     
-    print("Original data shape:", sample_data.shape)
-    print("Original data stats:")
-    print(sample_data.describe())
-    
-    cleaned_data = clean_dataset(sample_data, ['feature1', 'feature2'])
-    
-    print("\nCleaned data shape:", cleaned_data.shape)
-    print("Cleaned data stats:")
-    print(cleaned_data.describe())
+    Args:
+        df: pandas DataFrame to export
+        output_path: Path where to save the file
+        format: File format ('csv', 'excel', 'json')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}. Use 'csv', 'excel', or 'json'.")
