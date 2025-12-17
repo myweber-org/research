@@ -104,3 +104,96 @@ if __name__ == "__main__":
     
     print("Cleaned DataFrame:")
     print(cleaned)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    column (int): Column index to process
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise ValueError("Column index out of bounds")
+    
+    column_data = data[:, column]
+    
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    
+    return data[mask]
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    column (int): Column index to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    if data.size == 0:
+        return {}
+    
+    column_data = data[:, column]
+    
+    stats = {
+        'mean': np.mean(column_data),
+        'median': np.median(column_data),
+        'std': np.std(column_data),
+        'min': np.min(column_data),
+        'max': np.max(column_data),
+        'count': len(column_data)
+    }
+    
+    return stats
+
+def clean_dataset(data, columns_to_clean=None):
+    """
+    Clean multiple columns in a dataset by removing outliers.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    columns_to_clean (list): List of column indices to clean
+    
+    Returns:
+    numpy.ndarray: Cleaned dataset
+    """
+    if columns_to_clean is None:
+        columns_to_clean = list(range(data.shape[1]))
+    
+    cleaned_data = data.copy()
+    
+    for column in columns_to_clean:
+        if column < data.shape[1]:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    sample_data = np.random.randn(100, 3)
+    sample_data[0, 0] = 100
+    sample_data[1, 1] = -50
+    
+    print("Original data shape:", sample_data.shape)
+    
+    cleaned = clean_dataset(sample_data, [0, 1])
+    print("Cleaned data shape:", cleaned.shape)
+    
+    stats = calculate_statistics(cleaned, 0)
+    print("Statistics for column 0:", stats)
