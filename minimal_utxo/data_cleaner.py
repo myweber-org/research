@@ -130,4 +130,45 @@ if __name__ == "__main__":
     cleaned_data = cleaner.get_cleaned_data()
     print(f"\nCleaned data shape: {cleaned_data.shape}")
     print("First 5 rows of cleaned data:")
-    print(cleaned_data.head())
+    print(cleaned_data.head())import re
+
+def normalize_string(input_string):
+    """
+    Normalizes a given string by:
+    1. Converting to lowercase.
+    2. Removing leading/trailing whitespace.
+    3. Replacing multiple spaces with a single space.
+    4. Removing any non-alphanumeric characters except basic punctuation.
+    """
+    if not isinstance(input_string, str):
+        return ""
+
+    # Convert to lowercase and strip whitespace
+    normalized = input_string.lower().strip()
+
+    # Replace multiple spaces/newlines/tabs with a single space
+    normalized = re.sub(r'\s+', ' ', normalized)
+
+    # Remove any character that is not alphanumeric, space, or basic punctuation
+    normalized = re.sub(r'[^a-z0-9\s.,!?-]', '', normalized)
+
+    return normalized
+
+def clean_data_list(data_list):
+    """
+    Takes a list of strings and returns a new list with normalized strings.
+    Filters out any entries that become empty after normalization.
+    """
+    cleaned_list = []
+    for item in data_list:
+        cleaned_item = normalize_string(item)
+        if cleaned_item:
+            cleaned_list.append(cleaned_item)
+    return cleaned_list
+
+if __name__ == "__main__":
+    # Example usage
+    test_data = ["  Hello, World!  ", "Python--is--great", "   Multiple   spaces   ", "123-456-7890", ""]
+    cleaned_data = clean_data_list(test_data)
+    for original, cleaned in zip(test_data, cleaned_data):
+        print(f"Original: '{original}' -> Cleaned: '{cleaned}'")
