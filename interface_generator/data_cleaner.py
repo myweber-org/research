@@ -79,4 +79,47 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(input_path, output_path)
     
     if cleaned_df is not None:
-        validate_dataframe(cleaned_df)
+        validate_dataframe(cleaned_df)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val == min_val:
+        return df[column].apply(lambda x: 0.0)
+    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    if std_val == 0:
+        return df[column].apply(lambda x: 0.0)
+    return df[column].apply(lambda x: (x - mean_val) / std_val)
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col + '_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[col + '_standardized'] = standardize_zscore(cleaned_df, col)
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': [10, 12, 12, 13, 12, 50, 11, 12, 9, 10],
+        'feature_b': [100, 120, 130, 110, 115, 500, 105, 125, 95, 100]
+    }
+    df = pd.DataFrame(sample_data)
+    result = clean_dataset(df, ['feature_a', 'feature_b'])
+    print("Original shape:", df.shape)
+    print("Cleaned shape:", result.shape)
+    print(result.head())
