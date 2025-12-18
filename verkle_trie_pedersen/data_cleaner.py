@@ -103,3 +103,11 @@ def validate_data(df, required_columns=None, min_rows=1):
 #     if is_valid:
 #         print("\nCleaned DataFrame is ready for analysis")
 #         print(cleaned)
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
