@@ -1,133 +1,47 @@
+
 import pandas as pd
-import numpy as np
-from typing import List, Union
+import re
 
-def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
+def clean_dataframe(df, text_column):
     """
-    Remove duplicate rows from DataFrame.
-    
-    Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
-    
-    Returns:
-        DataFrame with duplicates removed
+    Remove duplicate rows and normalize text in specified column.
     """
-    return df.drop_duplicates(subset=subset, keep='first')
+    # Remove duplicates
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase and remove extra whitespace
+    df_clean[text_column] = df_clean[text_column].apply(
+        lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+    )
+    
+    return df_clean
 
-def convert_column_types(df: pd.DataFrame, 
-                         column_types: dict) -> pd.DataFrame:
+def validate_email_column(df, email_column):
     """
-    Convert columns to specified data types.
-    
-    Args:
-        df: Input DataFrame
-        column_types: Dictionary mapping column names to target types
-    
-    Returns:
-        DataFrame with converted column types
+    Validate email format in specified column.
     """
-    df_copy = df.copy()
-    for column, dtype in column_types.items():
-        if column in df_copy.columns:
-            try:
-                df_copy[column] = df_copy[column].astype(dtype)
-            except (ValueError, TypeError):
-                df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
-    return df_copy
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['valid_email'] = df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x)))
+    )
+    return df
 
-def handle_missing_values(df: pd.DataFrame, 
-                          strategy: str = 'mean',
-                          columns: List[str] = None) -> pd.DataFrame:
-    """
-    Handle missing values in DataFrame.
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie'],
+        'email': ['alice@example.com', 'bob@test.org', 'alice@example.com', 'invalid-email'],
+        'notes': ['  Hello  World  ', 'TEST data', '  hello  world  ', 'Another note']
+    }
     
-    Args:
-        df: Input DataFrame
-        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop')
-        columns: Specific columns to process
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
     
-    Returns:
-        DataFrame with handled missing values
-    """
-    df_copy = df.copy()
+    cleaned_df = clean_dataframe(df, 'notes')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
     
-    if columns is None:
-        columns = df_copy.columns
-    
-    for column in columns:
-        if column in df_copy.columns and df_copy[column].isnull().any():
-            if strategy == 'mean':
-                df_copy[column].fillna(df_copy[column].mean(), inplace=True)
-            elif strategy == 'median':
-                df_copy[column].fillna(df_copy[column].median(), inplace=True)
-            elif strategy == 'mode':
-                df_copy[column].fillna(df_copy[column].mode()[0], inplace=True)
-            elif strategy == 'drop':
-                df_copy = df_copy.dropna(subset=[column])
-    
-    return df_copy
-
-def normalize_data(df: pd.DataFrame,
-                   columns: List[str],
-                   method: str = 'minmax') -> pd.DataFrame:
-    """
-    Normalize specified columns in DataFrame.
-    
-    Args:
-        df: Input DataFrame
-        columns: Columns to normalize
-        method: Normalization method ('minmax' or 'zscore')
-    
-    Returns:
-        DataFrame with normalized columns
-    """
-    df_copy = df.copy()
-    
-    for column in columns:
-        if column in df_copy.columns:
-            if method == 'minmax':
-                min_val = df_copy[column].min()
-                max_val = df_copy[column].max()
-                if max_val != min_val:
-                    df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
-            elif method == 'zscore':
-                mean_val = df_copy[column].mean()
-                std_val = df_copy[column].std()
-                if std_val != 0:
-                    df_copy[column] = (df_copy[column] - mean_val) / std_val
-    
-    return df_copy
-
-def clean_dataframe(df: pd.DataFrame,
-                    deduplicate: bool = True,
-                    type_conversions: dict = None,
-                    missing_strategy: str = 'mean',
-                    normalize_cols: List[str] = None) -> pd.DataFrame:
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        df: Input DataFrame
-        deduplicate: Whether to remove duplicates
-        type_conversions: Dictionary of column type conversions
-        missing_strategy: Strategy for handling missing values
-        normalize_cols: Columns to normalize
-    
-    Returns:
-        Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    if deduplicate:
-        cleaned_df = remove_duplicates(cleaned_df)
-    
-    if type_conversions:
-        cleaned_df = convert_column_types(cleaned_df, type_conversions)
-    
-    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
-    
-    if normalize_cols:
-        cleaned_df = normalize_data(cleaned_df, normalize_cols)
-    
-    return cleaned_df
+    validated_df = validate_email_column(cleaned_df, 'email')
+    print("\nDataFrame with email validation:")
+    print(validated_df[['name', 'email', 'valid_email']])
