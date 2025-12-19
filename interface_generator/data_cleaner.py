@@ -122,4 +122,103 @@ if __name__ == "__main__":
     result = clean_dataset(df, ['feature_a', 'feature_b'])
     print("Original shape:", df.shape)
     print("Cleaned shape:", result.shape)
-    print(result.head())
+    print(result.head())import pandas as pd
+import numpy as np
+
+def detect_outliers_iqr(data, column):
+    """
+    Detect outliers using the Interquartile Range method.
+    Returns a boolean Series where True indicates an outlier.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return (data[column] < lower_bound) | (data[column] > upper_bound)
+
+def remove_outliers(data, columns):
+    """
+    Remove rows containing outliers in specified columns.
+    """
+    clean_data = data.copy()
+    for col in columns:
+        outliers = detect_outliers_iqr(clean_data, col)
+        clean_data = clean_data[~outliers]
+    return clean_data.reset_index(drop=True)
+
+def normalize_minmax(data, columns):
+    """
+    Apply Min-Max normalization to specified columns.
+    """
+    normalized_data = data.copy()
+    for col in columns:
+        min_val = normalized_data[col].min()
+        max_val = normalized_data[col].max()
+        normalized_data[col] = (normalized_data[col] - min_val) / (max_val - min_val)
+    return normalized_data
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None):
+    """
+    Main function to clean dataset by removing outliers and normalizing.
+    """
+    if outlier_columns is None:
+        outlier_columns = []
+    if normalize_columns is None:
+        normalize_columns = []
+    
+    cleaned_data = data.copy()
+    
+    if outlier_columns:
+        cleaned_data = remove_outliers(cleaned_data, outlier_columns)
+    
+    if normalize_columns:
+        cleaned_data = normalize_minmax(cleaned_data, normalize_columns)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns):
+    """
+    Validate that required columns exist and have no null values.
+    """
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = data[required_columns].isnull().sum()
+    if null_counts.any():
+        raise ValueError(f"Null values found in columns: {null_counts[null_counts > 0].to_dict()}")
+    
+    return True
+
+def sample_usage():
+    """
+    Example usage of the data cleaning utilities.
+    """
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.uniform(0, 1, 100)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    
+    cleaned = clean_dataset(
+        sample_data,
+        outlier_columns=['feature_a', 'feature_b'],
+        normalize_columns=['feature_c']
+    )
+    
+    print("Cleaned data shape:", cleaned.shape)
+    print("Cleaned data summary:")
+    print(cleaned.describe())
+    
+    try:
+        validate_data(cleaned, ['feature_a', 'feature_b', 'feature_c'])
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
+
+if __name__ == "__main__":
+    sample_usage()
