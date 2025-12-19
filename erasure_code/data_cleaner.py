@@ -1,0 +1,120 @@
+
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, duplicate_threshold=0.8, fill_strategy='median'):
+    """
+    Clean dataset by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    duplicate_threshold (float): Threshold for considering rows as duplicates
+    fill_strategy (str): Strategy for filling missing values ('median', 'mean', 'mode')
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    
+    original_shape = df.shape
+    print(f"Original dataset shape: {original_shape}")
+    
+    # Remove exact duplicates
+    df_cleaned = df.drop_duplicates()
+    print(f"Removed {original_shape[0] - df_cleaned.shape[0]} exact duplicates")
+    
+    # Remove approximate duplicates based on threshold
+    if duplicate_threshold < 1.0:
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            similarity_matrix = df_cleaned[numeric_cols].corr().abs()
+            high_corr_pairs = np.where(similarity_matrix > duplicate_threshold)
+            high_corr_pairs = [(numeric_cols[i], numeric_cols[j]) 
+                              for i, j in zip(*high_corr_pairs) 
+                              if i < j]
+            
+            if high_corr_pairs:
+                cols_to_drop = set()
+                for col1, col2 in high_corr_pairs:
+                    if col1 not in cols_to_drop and col2 not in cols_to_drop:
+                        cols_to_drop.add(col2)
+                
+                df_cleaned = df_cleaned.drop(columns=list(cols_to_drop))
+                print(f"Removed {len(cols_to_drop)} highly correlated columns")
+    
+    # Handle missing values
+    missing_count = df_cleaned.isnull().sum().sum()
+    if missing_count > 0:
+        print(f"Found {missing_count} missing values")
+        
+        for column in df_cleaned.columns:
+            if df_cleaned[column].isnull().any():
+                if fill_strategy == 'median' and pd.api.types.is_numeric_dtype(df_cleaned[column]):
+                    fill_value = df_cleaned[column].median()
+                elif fill_strategy == 'mean' and pd.api.types.is_numeric_dtype(df_cleaned[column]):
+                    fill_value = df_cleaned[column].mean()
+                elif fill_strategy == 'mode':
+                    fill_value = df_cleaned[column].mode()[0] if not df_cleaned[column].mode().empty else None
+                else:
+                    fill_value = None
+                
+                if fill_value is not None:
+                    df_cleaned[column] = df_cleaned[column].fillna(fill_value)
+                    print(f"Filled missing values in '{column}' with {fill_strategy}: {fill_value}")
+                else:
+                    # Drop rows with missing values if no valid fill strategy
+                    df_cleaned = df_cleaned.dropna(subset=[column])
+        
+        remaining_missing = df_cleaned.isnull().sum().sum()
+        print(f"Remaining missing values after cleaning: {remaining_missing}")
+    
+    # Remove constant columns
+    constant_cols = [col for col in df_cleaned.columns if df_cleaned[col].nunique() <= 1]
+    if constant_cols:
+        df_cleaned = df_cleaned.drop(columns=constant_cols)
+        print(f"Removed {len(constant_cols)} constant columns: {constant_cols}")
+    
+    final_shape = df_cleaned.shape
+    print(f"Final dataset shape: {final_shape}")
+    print(f"Removed {original_shape[0] - final_shape[0]} rows and {original_shape[1] - final_shape[1]} columns")
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_dataframe': isinstance(df, pd.DataFrame),
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'has_duplicates': df.duplicated().any(),
+        'missing_values': df.isnull().sum().sum(),
+        'data_types': {col: str(dtype) for col, dtype in df.dtypes.items()},
+        'memory_usage_mb': df.memory_usage(deep=True).sum() / 1024**2
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None],
+        'B': [1.1, 2.2, 2.2, 4.4, 5.5, 6.6],
+        'C': [1, 1, 1, 1, 1, 1],  # Constant column
+        'D': ['a', 'b', 'b', 'c', 'd', 'e']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Initial validation:")
+    print(validate_dataframe(df))
+    
+    cleaned_df = clean_dataset(df, duplicate_threshold=0.9, fill_strategy='median')
+    
+    print("\nFinal validation:")
+    print(validate_dataframe(cleaned_df))
