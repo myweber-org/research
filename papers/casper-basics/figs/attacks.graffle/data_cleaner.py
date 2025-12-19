@@ -1,68 +1,72 @@
-
 import pandas as pd
+import numpy as np
 
-def clean_dataframe(df, drop_na=True, rename_columns=True):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing null values and standardizing column names.
+    Remove outliers from a DataFrame column using the IQR method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_na (bool): Whether to drop rows with null values
-        rename_columns (bool): Whether to rename columns to lowercase with underscores
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to clean. If None, uses all numeric columns.
     
     Returns:
         pd.DataFrame: Cleaned DataFrame
     """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
     cleaned_df = df.copy()
     
-    if drop_na:
-        cleaned_df = cleaned_df.dropna()
-    
-    if rename_columns:
-        cleaned_df.columns = (
-            cleaned_df.columns
-            .str.lower()
-            .str.replace(r'[^a-z0-9]+', '_', regex=True)
-            .str.strip('_')
-        )
+    for col in columns:
+        if col in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
     
     return cleaned_df
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and required columns.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        bool: True if validation passes, False otherwise
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
-    
-    return True
-
 if __name__ == "__main__":
     sample_data = {
-        'User ID': [1, 2, None, 4],
-        'First Name': ['Alice', 'Bob', 'Charlie', None],
-        'Email Address': ['alice@test.com', 'bob@test.com', 'charlie@test.com', 'david@test.com']
+        'id': range(1, 21),
+        'value': [10, 12, 11, 13, 10, 9, 100, 12, 11, 13, 
+                  10, 9, 8, 12, 11, 13, 10, 9, 8, 12],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B',
+                     'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print("\nCleaned DataFrame:")
-    cleaned = clean_dataframe(df)
-    print(cleaned)
+    print(f"\nOriginal shape: {df.shape}")
     
-    is_valid = validate_dataframe(cleaned, required_columns=['user_id', 'email_address'])
-    print(f"\nDataFrame validation: {is_valid}")
+    cleaned_df = clean_numeric_data(df, columns=['value'])
+    print(f"\nCleaned shape: {cleaned_df.shape}")
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
