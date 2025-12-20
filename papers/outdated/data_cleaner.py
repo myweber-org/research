@@ -104,4 +104,49 @@ if __name__ == "__main__":
         print(cleaned_df['value'].describe())
         
     except Exception as e:
-        print(f"Error during data cleaning: {e}")
+        print(f"Error during data cleaning: {e}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, clean missing values, and save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                median_val = df[col].median()
+                df[col] = df[col].fillna(median_val)
+                print(f"Filled missing values in {col} with median: {median_val}")
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                mode_val = df[col].mode()[0]
+                df[col] = df[col].fillna(mode_val)
+                print(f"Filled missing values in {col} with mode: {mode_val}")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"Error during cleaning: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    clean_csv_data('raw_data.csv', 'cleaned_data.csv')
