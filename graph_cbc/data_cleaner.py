@@ -248,3 +248,108 @@ if __name__ == "__main__":
     for col in cleaned_df.columns:
         stats = calculate_summary_statistics(cleaned_df, col)
         print(f"{col}: {stats}")
+import csv
+import re
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values,
+    stripping whitespace, and standardizing date formats.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            # Skip rows with any empty values
+            if any(value.strip() == '' for value in row.values()):
+                continue
+            
+            # Clean each field
+            cleaned_row = {}
+            for key, value in row.items():
+                # Strip whitespace
+                cleaned_value = value.strip()
+                
+                # Standardize date format if field name contains 'date'
+                if 'date' in key.lower():
+                    cleaned_value = standardize_date(cleaned_value)
+                
+                cleaned_row[key] = cleaned_value
+            
+            cleaned_rows.append(cleaned_row)
+    
+    # Write cleaned data to output file
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows)
+
+def standardize_date(date_string):
+    """
+    Attempt to standardize date strings to YYYY-MM-DD format.
+    """
+    # Common date patterns
+    patterns = [
+        (r'(\d{2})/(\d{2})/(\d{4})', r'\3-\1-\2'),  # MM/DD/YYYY
+        (r'(\d{4})-(\d{2})-(\d{2})', r'\1-\2-\3'),  # YYYY-MM-DD
+        (r'(\d{2})-(\d{2})-(\d{4})', r'\3-\1-\2'),  # DD-MM-YYYY
+    ]
+    
+    for pattern, replacement in patterns:
+        if re.match(pattern, date_string):
+            return re.sub(pattern, replacement, date_string)
+    
+    # Return original if no pattern matches
+    return date_string
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file, key_fields):
+    """
+    Remove duplicate rows based on specified key fields.
+    """
+    seen = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            # Create a tuple of key field values
+            key_tuple = tuple(row[field] for field in key_fields)
+            
+            if key_tuple not in seen:
+                seen.add(key_tuple)
+                unique_rows.append(row)
+    
+    # Write unique rows to output file
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_rows)
+    
+    return len(unique_rows)
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    try:
+        rows_cleaned = clean_csv(input_csv, output_csv)
+        print(f"Cleaned {rows_cleaned} rows. Output saved to {output_csv}")
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_csv}' not found.")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
