@@ -117,3 +117,66 @@ def example_usage():
 
 if __name__ == "__main__":
     result_df = example_usage()
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(file_path, columns_to_clean):
+    """
+    Load a dataset from a CSV file and remove outliers from specified columns.
+    
+    Parameters:
+    file_path (str): Path to the CSV file.
+    columns_to_clean (list): List of column names to clean.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original dataset shape: {df.shape}")
+        
+        for column in columns_to_clean:
+            if column in df.columns:
+                original_count = len(df)
+                df = remove_outliers_iqr(df, column)
+                removed_count = original_count - len(df)
+                print(f"Removed {removed_count} outliers from column '{column}'")
+            else:
+                print(f"Warning: Column '{column}' not found in dataset")
+        
+        print(f"Cleaned dataset shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return pd.DataFrame()
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_data = clean_dataset('sample_data.csv', ['age', 'salary', 'score'])
+    
+    if not cleaned_data.empty:
+        cleaned_data.to_csv('cleaned_data.csv', index=False)
+        print("Cleaned data saved to 'cleaned_data.csv'")
