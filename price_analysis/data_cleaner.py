@@ -206,3 +206,41 @@ def get_data_summary(df):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path):
+    try:
+        data = pd.read_csv(file_path)
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            data = remove_outliers_iqr(data, col)
+            data = normalize_minmax(data, col)
+        
+        cleaned_path = file_path.replace('.csv', '_cleaned.csv')
+        data.to_csv(cleaned_path, index=False)
+        return cleaned_path
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    result = clean_dataset('sample_data.csv')
+    if result:
+        print(f"Cleaned data saved to: {result}")
