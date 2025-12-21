@@ -316,3 +316,43 @@ def clean_dataset(df, numeric_columns=None, outlier_removal=True, normalization=
                 df_clean = normalize_column(df_clean, col)
     
     return df_clean
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove duplicate rows and fill missing values with column mean.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values with column mean for numeric columns
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill missing values with mode for categorical columns
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def main():
+    # Example usage
+    data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 10, 40, 50],
+        'C': ['x', 'y', 'x', None, 'z']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
