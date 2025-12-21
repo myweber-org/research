@@ -279,3 +279,106 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData valid: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    
+    if drop_duplicates:
+        df = df.drop_duplicates()
+        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows")
+    
+    if fill_missing:
+        for column in df.columns:
+            if df[column].isnull().any():
+                if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
+                    df[column] = df[column].fillna(df[column].mean())
+                elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(df[column]):
+                    df[column] = df[column].fillna(df[column].median())
+                elif fill_missing == 'mode':
+                    df[column] = df[column].fillna(df[column].mode()[0])
+                elif fill_missing == 'zero':
+                    df[column] = df[column].fillna(0)
+                elif fill_missing == 'ffill':
+                    df[column] = df[column].fillna(method='ffill')
+                elif fill_missing == 'bfill':
+                    df[column] = df[column].fillna(method='bfill')
+                else:
+                    df[column] = df[column].fillna(fill_missing)
+    
+    print(f"Dataset cleaned. Original shape: {original_shape}, New shape: {df.shape}")
+    return df
+
+def validate_data(df, required_columns=None, numeric_columns=None):
+    """
+    Validate the dataset for required columns and numeric data types.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if numeric_columns:
+        for column in numeric_columns:
+            if column in df.columns and not pd.api.types.is_numeric_dtype(df[column]):
+                raise ValueError(f"Column '{column}' must be numeric")
+    
+    return True
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using IQR or Z-score method.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric for outlier removal")
+    
+    original_len = len(df)
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        from scipy import stats
+        z_scores = np.abs(stats.zscore(df[column].dropna()))
+        df = df[z_scores < threshold]
+    
+    print(f"Removed {original_len - len(df)} outliers from column '{column}'")
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10, 20, np.nan, 40, 50, 50, 1000],
+        'category': ['A', 'B', 'C', None, 'A', 'A', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, fill_missing='mode')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_data(cleaned_df, required_columns=['id', 'value'])
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
+    
+    cleaned_df = remove_outliers(cleaned_df, 'value', method='iqr')
+    print("\nDataFrame after outlier removal:")
+    print(cleaned_df)
