@@ -150,3 +150,11 @@ if __name__ == "__main__":
           normalized_data['feature_b_normalized'].min(), 
           "to", 
           normalized_data['feature_b_normalized'].max())
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
