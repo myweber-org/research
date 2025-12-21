@@ -96,4 +96,41 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned summary statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    print(calculate_summary_statistics(cleaned_df, 'A'))import numpy as np
+import pandas as pd
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column]
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df
+
+def summary_statistics(df, numeric_columns):
+    stats = {}
+    for col in numeric_columns:
+        if col in df.columns:
+            stats[col] = {
+                'mean': df[col].mean(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max()
+            }
+    return pd.DataFrame(stats).T
