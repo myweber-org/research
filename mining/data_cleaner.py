@@ -224,4 +224,88 @@ def clean_dataset(data, columns_to_clean=None):
             removed_count = original_count - len(cleaned_data)
             print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return cleaned_data
+    return cleaned_dataimport pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_value: Value to use for filling missing data.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+def normalize_column_names(df):
+    """
+    Normalize column names to lowercase with underscores.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame with columns to normalize.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column names.
+    """
+    df_copy = df.copy()
+    df_copy.columns = [col.lower().replace(' ', '_') for col in df_copy.columns]
+    return df_copy
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, 40],
+        'Score': [85.5, 92.0, 85.5, None, 78.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    normalized = normalize_column_names(cleaned)
+    print("Normalized DataFrame:")
+    print(normalized)
+    print("\n")
+    
+    is_valid, message = validate_data(normalized, required_columns=['name', 'age'])
+    print(f"Validation: {is_valid} - {message}")
