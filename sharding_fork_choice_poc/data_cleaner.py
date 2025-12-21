@@ -199,4 +199,44 @@ if __name__ == "__main__":
     clean_data = cleaner.get_clean_data()
     print(f"\nClean data shape: {clean_data.shape}")
     print("First 5 rows of cleaned data:")
-    print(clean_data.head())
+    print(clean_data.head())def remove_duplicates(input_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(string_list):
+    """
+    Clean a list of strings by removing non-numeric characters
+    and converting to integers where possible.
+    """
+    cleaned = []
+    for s in string_list:
+        try:
+            numeric_part = ''.join(filter(str.isdigit, s))
+            if numeric_part:
+                cleaned.append(int(numeric_part))
+        except ValueError:
+            continue
+    return cleaned
+
+def validate_email_list(email_list):
+    """
+    Basic email validation for a list of email addresses.
+    Returns a list of valid emails.
+    """
+    import re
+    valid_emails = []
+    email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    
+    for email in email_list:
+        if email_pattern.match(email):
+            valid_emails.append(email)
+    return valid_emails
