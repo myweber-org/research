@@ -205,3 +205,58 @@ if __name__ == "__main__":
         print(f"\nStatistics for {col}:")
         for stat_name, value in col_stats.items():
             print(f"  {stat_name}: {value:.2f}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates()
+
+def fill_missing_values(df, strategy='mean'):
+    """Fill missing values using specified strategy."""
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.fillna(0)
+
+def normalize_column(df, column_name):
+    """Normalize a column to range [0,1]."""
+    if column_name in df.columns:
+        col_min = df[column_name].min()
+        col_max = df[column_name].max()
+        if col_max != col_min:
+            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    return df
+
+def detect_outliers_iqr(df, column_name):
+    """Detect outliers using IQR method."""
+    if column_name in df.columns:
+        Q1 = df[column_name].quantile(0.25)
+        Q3 = df[column_name].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = df[(df[column_name] < lower_bound) | (df[column_name] > upper_bound)]
+        return outliers
+    return pd.DataFrame()
+
+def clean_dataframe(df, remove_na=True, normalize_cols=None):
+    """Perform comprehensive cleaning on DataFrame."""
+    cleaned_df = df.copy()
+    
+    cleaned_df = remove_duplicates(cleaned_df)
+    
+    if remove_na:
+        cleaned_df = cleaned_df.dropna()
+    else:
+        cleaned_df = fill_missing_values(cleaned_df)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
