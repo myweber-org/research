@@ -299,3 +299,123 @@ if __name__ == "__main__":
     
     validation = validate_dataframe(cleaned_df, required_columns=['id', 'value', 'category'])
     print(f"Validation results: {validation}")
+import csv
+import os
+
+def clean_csv(input_path, output_path, delimiter=',', quotechar='"'):
+    """
+    Clean a CSV file by removing rows with missing values and trimming whitespace.
+    
+    Args:
+        input_path (str): Path to the input CSV file.
+        output_path (str): Path to save the cleaned CSV file.
+        delimiter (str): CSV delimiter character.
+        quotechar (str): CSV quote character.
+    
+    Returns:
+        int: Number of rows in the cleaned file.
+    """
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    
+    cleaned_rows = []
+    
+    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile, delimiter=delimiter, quotechar=quotechar)
+        
+        for row in reader:
+            # Skip rows with any empty or whitespace-only cells
+            if any(cell.strip() == '' for cell in row):
+                continue
+            
+            # Trim whitespace from each cell
+            cleaned_row = [cell.strip() for cell in row]
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile, delimiter=delimiter, quotechar=quotechar, quoting=csv.QUOTE_MINIMAL)
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows)
+
+def validate_csv_headers(file_path, required_headers, delimiter=','):
+    """
+    Validate that a CSV file contains all required headers.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        required_headers (list): List of required header names.
+        delimiter (str): CSV delimiter character.
+    
+    Returns:
+        bool: True if all required headers are present.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    with open(file_path, 'r', newline='', encoding='utf-8') as file:
+        reader = csv.reader(file, delimiter=delimiter)
+        headers = next(reader, [])
+    
+    headers = [header.strip().lower() for header in headers]
+    required_lower = [header.strip().lower() for header in required_headers]
+    
+    missing_headers = [header for header in required_lower if header not in headers]
+    
+    if missing_headers:
+        print(f"Missing headers: {missing_headers}")
+        return False
+    
+    return True
+
+def get_csv_stats(file_path, delimiter=','):
+    """
+    Get basic statistics about a CSV file.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        delimiter (str): CSV delimiter character.
+    
+    Returns:
+        dict: Dictionary containing row count, column count, and sample data.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    with open(file_path, 'r', newline='', encoding='utf-8') as file:
+        reader = csv.reader(file, delimiter=delimiter)
+        rows = list(reader)
+    
+    if not rows:
+        return {
+            'row_count': 0,
+            'column_count': 0,
+            'headers': [],
+            'sample_rows': []
+        }
+    
+    row_count = len(rows) - 1  # Exclude header
+    column_count = len(rows[0]) if rows else 0
+    headers = rows[0] if rows else []
+    sample_rows = rows[1:6] if len(rows) > 1 else []  # First 5 data rows
+    
+    return {
+        'row_count': row_count,
+        'column_count': column_count,
+        'headers': headers,
+        'sample_rows': sample_rows
+    }
+
+if __name__ == "__main__":
+    # Example usage
+    try:
+        stats = get_csv_stats('sample_data.csv')
+        print(f"CSV Statistics: {stats}")
+        
+        if validate_csv_headers('sample_data.csv', ['id', 'name', 'email']):
+            cleaned_count = clean_csv('sample_data.csv', 'cleaned_data.csv')
+            print(f"Cleaned {cleaned_count} rows")
+        else:
+            print("CSV validation failed")
+    except Exception as e:
+        print(f"Error: {e}")
