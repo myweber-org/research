@@ -169,3 +169,38 @@ if __name__ == "__main__":
     print(f"Cleaned rows: {len(cleaned_data)}")
     print(f"Removal statistics: {stats}")
     print(f"Validation results: {validation}")
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean a list of numeric values by converting non-numeric entries to default.
+    Returns a list of floats.
+    """
+    cleaned = []
+    for val in values:
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            cleaned.append(float(default))
+    return cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    print("Original:", sample_data)
+    print("Cleaned:", remove_duplicates(sample_data))
+    
+    numeric_mixed = [1, "2", "invalid", 3.5, None]
+    print("Mixed data:", numeric_mixed)
+    print("Cleaned numeric:", clean_numeric_data(numeric_mixed))
