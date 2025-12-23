@@ -156,4 +156,99 @@ def clean_data(input_file, output_file):
     return df
 
 if __name__ == "__main__":
-    cleaned_df = clean_data('raw_data.csv', 'cleaned_data.csv')
+    cleaned_df = clean_data('raw_data.csv', 'cleaned_data.csv')import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    Returns a cleaned DataFrame.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    cleaned_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return cleaned_data
+
+def normalize_column(data, column, method='minmax'):
+    """
+    Normalize a column in the DataFrame.
+    Supports 'minmax' and 'zscore' normalization methods.
+    Returns a new DataFrame with the normalized column.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    
+    if method == 'minmax':
+        min_val = data_copy[column].min()
+        max_val = data_copy[column].max()
+        if max_val == min_val:
+            data_copy[column] = 0.5
+        else:
+            data_copy[column] = (data_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = data_copy[column].mean()
+        std_val = data_copy[column].std()
+        if std_val == 0:
+            data_copy[column] = 0
+        else:
+            data_copy[column] = (data_copy[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return data_copy
+
+def clean_dataset(data, numeric_columns, outlier_threshold=1.5, normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline.
+    Removes outliers and normalizes specified numeric columns.
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            # Remove outliers
+            Q1 = cleaned_data[col].quantile(0.25)
+            Q3 = cleaned_data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - outlier_threshold * IQR
+            upper_bound = Q3 + outlier_threshold * IQR
+            
+            mask = (cleaned_data[col] >= lower_bound) & (cleaned_data[col] <= upper_bound)
+            cleaned_data = cleaned_data[mask]
+            
+            # Normalize
+            cleaned_data = normalize_column(cleaned_data, col, method=normalize_method)
+    
+    return cleaned_data.reset_index(drop=True)
+
+def validate_dataframe(data, required_columns=None, allow_nan=False):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if not allow_nan and data.isnull().any().any():
+        return False, "DataFrame contains NaN values"
+    
+    return True, "DataFrame validation passed"
