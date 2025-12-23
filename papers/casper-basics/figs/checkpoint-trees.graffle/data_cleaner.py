@@ -148,4 +148,66 @@ def clean_dataset(df, missing_threshold=0.3, outlier_columns=None):
             if col in cleaned_df.columns:
                 cleaned_df = cap_outliers(cleaned_df, col, method='iqr')
     
+    return cleaned_dfimport pandas as pd
+
+def clean_dataframe(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values and standardizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        text_columns (list): List of column names to standardize (lowercase, strip whitespace)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove rows with any null values
+    cleaned_df = cleaned_df.dropna()
+    
+    # Standardize text columns if specified
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+    
+    # Reset index after dropping rows
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
     return cleaned_df
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list): Columns to consider for identifying duplicates
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of columns that must be present
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
