@@ -1,57 +1,72 @@
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+def load_data(filepath):
+    """Load data from a CSV file."""
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+
+def remove_outliers_iqr(df, column):
+    """Remove outliers from a column using the IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    removed_count = len(df) - len(filtered_df)
+    print(f"Removed {removed_count} outliers from column '{column}'")
+    return filtered_df
 
-def remove_outliers_zscore(data, column, threshold=3):
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
+def normalize_column(df, column):
+    """Normalize a column to range [0, 1]."""
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        print(f"Warning: Column '{column}' has constant values. Normalization skipped.")
+        return df
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    print(f"Normalized column '{column}' to range [0, 1]")
+    return df
 
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def normalize_zscore(data, column):
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    return data
-
-def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    cleaned_df = df.copy()
+def clean_data(df, numeric_columns):
+    """Main data cleaning pipeline."""
+    if df is None:
+        return None
+    
+    original_shape = df.shape
+    print(f"Starting data cleaning. Original shape: {original_shape}")
     
     for col in numeric_columns:
-        if outlier_method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif outlier_method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
-        
-        if normalize_method == 'minmax':
-            cleaned_df = normalize_minmax(cleaned_df, col)
-        elif normalize_method == 'zscore':
-            cleaned_df = normalize_zscore(cleaned_df, col)
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
     
-    return cleaned_df
-
-def get_summary_statistics(df, numeric_columns):
-    summary = {}
     for col in numeric_columns:
-        summary[col] = {
-            'mean': df[col].mean(),
-            'median': df[col].median(),
-            'std': df[col].std(),
-            'min': df[col].min(),
-            'max': df[col].max(),
-            'count': df[col].count(),
-            'missing': df[col].isnull().sum()
-        }
-    return pd.DataFrame(summary).T
+        if col in df.columns:
+            df = normalize_column(df, col)
+    
+    print(f"Data cleaning complete. Final shape: {df.shape}")
+    print(f"Rows removed: {original_shape[0] - df.shape[0]}")
+    return df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned data to a CSV file."""
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    else:
+        print("No data to save.")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    numeric_cols = ['age', 'income', 'score']
+    
+    raw_data = load_data(input_file)
+    cleaned_data = clean_data(raw_data, numeric_cols)
+    save_cleaned_data(cleaned_data, output_file)
