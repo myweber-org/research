@@ -209,4 +209,124 @@ def validate_dataset(df, check_duplicates=True, check_missing=True):
         validation_results['missing_values_total'] = missing_total
         validation_results['missing_by_column'] = missing_counts[missing_counts > 0].to_dict()
     
-    return validation_results
+    return validation_resultsimport pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            print(f"Loaded data with shape: {self.df.shape}")
+            return True
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        if columns is None:
+            columns = self.df.columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0] if not self.df[col].mode().empty else np.nan
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                    continue
+                else:
+                    fill_value = 0 if pd.api.types.is_numeric_dtype(self.df[col]) else 'Unknown'
+                
+                self.df[col].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{col}' using {strategy} strategy")
+    
+    def remove_duplicates(self, subset=None, keep='first'):
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return removed
+    
+    def normalize_numeric_columns(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
+                col_min = self.df[col].min()
+                col_max = self.df[col].max()
+                if col_max > col_min:
+                    self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+                    print(f"Normalized column '{col}' to range [0, 1]")
+    
+    def save_cleaned_data(self, output_path=None):
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        self.df.to_csv(output_path, index=False)
+        print(f"Saved cleaned data to: {output_path}")
+        return output_path
+    
+    def get_summary(self):
+        if self.df is None:
+            return "No data loaded"
+        
+        summary = {
+            'rows': len(self.df),
+            'columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicates': len(self.df) - len(self.df.drop_duplicates()),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def process_csv_file(input_file, output_dir='cleaned_data'):
+    cleaner = DataCleaner(input_file)
+    
+    if not cleaner.load_data():
+        return None
+    
+    print("Initial data summary:", cleaner.get_summary())
+    
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_duplicates()
+    cleaner.normalize_numeric_columns()
+    
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True)
+    
+    output_path = cleaner.save_cleaned_data(output_dir / f"cleaned_{Path(input_file).name}")
+    
+    print("Final data summary:", cleaner.get_summary())
+    return output_path
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', None, 'David', 'Eve', 'Eve'],
+        'age': [25, 30, None, 35, 40, 40],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 88.0]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_file = 'test_data.csv'
+    test_df.to_csv(test_file, index=False)
+    
+    result = process_csv_file(test_file)
+    
+    if result:
+        print(f"Processing complete. Cleaned file saved to: {result}")
+    
+    Path(test_file).unlink(missing_ok=True)
