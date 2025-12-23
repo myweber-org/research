@@ -126,3 +126,84 @@ def get_data_summary(df):
         }
     
     return summary
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_normalize=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing specified string columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        columns_to_normalize: list of column names to normalize (default: all object columns)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates()
+    removed_duplicates = initial_rows - len(cleaned_df)
+    
+    # Normalize string columns
+    if columns_to_normalize is None:
+        columns_to_normalize = cleaned_df.select_dtypes(include=['object']).columns.tolist()
+    
+    for column in columns_to_normalize:
+        if column in cleaned_df.columns and cleaned_df[column].dtype == 'object':
+            cleaned_df[column] = cleaned_df[column].apply(_normalize_string)
+    
+    return cleaned_df
+
+def _normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters from the edges.
+    
+    Args:
+        text: string to normalize
+    
+    Returns:
+        Normalized string
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    text = text.lower()
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    
+    return text
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for basic data quality checks.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of column names that must be present
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'unique_counts': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    for column in df.columns:
+        validation_results['null_counts'][column] = df[column].isnull().sum()
+        validation_results['unique_counts'][column] = df[column].nunique()
+    
+    return validation_results
