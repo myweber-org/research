@@ -261,3 +261,121 @@ def validate_dataframe(df, required_columns):
         raise ValueError("DataFrame is empty")
     
     return True
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if not self.file_path.exists():
+            raise FileNotFoundError(f"File not found: {self.file_path}")
+        
+        if self.file_path.suffix == '.csv':
+            self.df = pd.read_csv(self.file_path)
+        elif self.file_path.suffix in ['.xlsx', '.xls']:
+            self.df = pd.read_excel(self.file_path)
+        else:
+            raise ValueError("Unsupported file format. Use CSV or Excel files.")
+        
+        return self.df
+    
+    def remove_duplicates(self):
+        if self.df is None:
+            self.load_data()
+        
+        initial_rows = len(self.df)
+        self.df = self.df.drop_duplicates()
+        removed = initial_rows - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self.df
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            self.load_data()
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                else:
+                    raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+        
+        return self.df
+    
+    def remove_outliers(self, columns=None, method='iqr', threshold=1.5):
+        if self.df is None:
+            self.load_data()
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                if method == 'iqr':
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - threshold * IQR
+                    upper_bound = Q3 + threshold * IQR
+                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self.df
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            raise ValueError("No data to save. Load and clean data first.")
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        if self.file_path.suffix == '.csv':
+            self.df.to_csv(output_path, index=False)
+        elif self.file_path.suffix in ['.xlsx', '.xls']:
+            self.df.to_excel(output_path, index=False)
+        
+        print(f"Cleaned data saved to: {output_path}")
+        return output_path
+    
+    def get_summary(self):
+        if self.df is None:
+            self.load_data()
+        
+        summary = {
+            'total_rows': len(self.df),
+            'total_columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicate_rows': self.df.duplicated().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        
+        return summary
+
+def clean_dataset(input_file, output_file=None):
+    cleaner = DataCleaner(input_file)
+    cleaner.load_data()
+    cleaner.remove_duplicates()
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_outliers()
+    
+    if output_file:
+        cleaner.save_cleaned_data(output_file)
+    else:
+        cleaner.save_cleaned_data()
+    
+    summary = cleaner.get_summary()
+    print(f"Data cleaning completed. Summary: {summary}")
+    
+    return cleaner.df
