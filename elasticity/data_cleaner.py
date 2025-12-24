@@ -504,3 +504,109 @@ if __name__ == "__main__":
     
     cleaned_df = clean_csv_data(input_file, strategy='median')
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
+    return cleaned_df
+
+def get_cleaning_report(original_df, cleaned_df):
+    """
+    Generate a report comparing original and cleaned DataFrames.
+    
+    Parameters:
+    original_df (pd.DataFrame): Original DataFrame
+    cleaned_df (pd.DataFrame): Cleaned DataFrame
+    
+    Returns:
+    dict: Dictionary containing cleaning statistics
+    """
+    report = {
+        'original_rows': len(original_df),
+        'cleaned_rows': len(cleaned_df),
+        'rows_removed': len(original_df) - len(cleaned_df),
+        'removal_percentage': ((len(original_df) - len(cleaned_df)) / len(original_df)) * 100
+    }
+    
+    return report
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    
+    # Create sample data with outliers
+    data = {
+        'id': range(100),
+        'value': np.concatenate([
+            np.random.normal(100, 10, 90),
+            np.random.normal(300, 50, 10)  # Outliers
+        ]),
+        'score': np.concatenate([
+            np.random.normal(50, 5, 95),
+            np.random.normal(200, 30, 5)  # Outliers
+        ])
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    
+    # Clean the data
+    cleaned_df = clean_numeric_data(df, columns=['value', 'score'])
+    
+    print("Cleaned DataFrame shape:", cleaned_df.shape)
+    
+    # Generate report
+    report = get_cleaning_report(df, cleaned_df)
+    print("\nCleaning Report:")
+    for key, value in report.items():
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
