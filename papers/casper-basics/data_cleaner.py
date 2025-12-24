@@ -320,4 +320,88 @@ def validate_dataset(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Dataset is valid."
+    return True, "Dataset is valid."import csv
+import re
+from typing import List, Optional
+
+def remove_duplicates(data: List[List[str]]) -> List[List[str]]:
+    """Remove duplicate rows from the data."""
+    seen = set()
+    unique_data = []
+    for row in data:
+        row_tuple = tuple(row)
+        if row_tuple not in seen:
+            seen.add(row_tuple)
+            unique_data.append(row)
+    return unique_data
+
+def clean_numeric_column(data: List[List[str]], column_index: int) -> List[List[str]]:
+    """Clean a numeric column by removing non-numeric characters."""
+    cleaned_data = []
+    for row in data:
+        if column_index < len(row):
+            original_value = row[column_index]
+            numeric_only = re.sub(r'[^\d.]', '', original_value)
+            row[column_index] = numeric_only if numeric_only else '0'
+        cleaned_data.append(row)
+    return cleaned_data
+
+def filter_by_threshold(data: List[List[str]], column_index: int, threshold: float) -> List[List[str]]:
+    """Filter rows where the numeric value in the specified column is greater than the threshold."""
+    filtered_data = []
+    for row in data:
+        if column_index < len(row):
+            try:
+                value = float(row[column_index])
+                if value > threshold:
+                    filtered_data.append(row)
+            except ValueError:
+                continue
+    return filtered_data
+
+def load_csv(filepath: str) -> Optional[List[List[str]]]:
+    """Load data from a CSV file."""
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            return [row for row in reader]
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+
+def save_csv(data: List[List[str]], filepath: str) -> bool:
+    """Save data to a CSV file."""
+    try:
+        with open(filepath, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error saving file: {e}")
+        return False
+
+def process_csv(input_file: str, output_file: str, clean_column: int = 1, threshold: float = 100.0) -> None:
+    """Main function to process CSV data with cleaning and filtering."""
+    data = load_csv(input_file)
+    if data is None:
+        return
+    
+    if len(data) > 1:
+        header = data[0]
+        body = data[1:]
+        
+        body = remove_duplicates(body)
+        body = clean_numeric_column(body, clean_column)
+        body = filter_by_threshold(body, clean_column, threshold)
+        
+        processed_data = [header] + body
+    else:
+        processed_data = data
+    
+    if save_csv(processed_data, output_file):
+        print(f"Processed data saved to '{output_file}'")
+    else:
+        print("Failed to save processed data.")
