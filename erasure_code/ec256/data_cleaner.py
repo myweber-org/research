@@ -574,4 +574,139 @@ def clean_dataset(dataframe, outlier_columns=None, normalize=True, handle_skewne
     if normalize:
         cleaned_df = normalize_minmax(cleaned_df)
     
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    original_shape = df.shape
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = original_shape[0] - cleaned_df.shape[0]
+    print(f"Removed {removed_count} duplicate rows")
+    
     return cleaned_df
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): 'mean', 'median', 'mode', or 'drop'
+    columns (list, optional): Specific columns to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_copy = df.copy()
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            continue
+            
+        missing_count = df_copy[col].isnull().sum()
+        if missing_count == 0:
+            continue
+            
+        if strategy == 'drop':
+            df_copy = df_copy.dropna(subset=[col])
+        elif strategy == 'mean':
+            df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+        elif strategy == 'median':
+            df_copy[col].fillna(df_copy[col].median(), inplace=True)
+        elif strategy == 'mode':
+            df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+    
+    return df_copy
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): Columns that must be present
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def clean_data_pipeline(df, cleaning_steps=None):
+    """
+    Execute a series of data cleaning steps.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    cleaning_steps (list, optional): List of cleaning functions to apply
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if not validate_dataframe(df):
+        return df
+    
+    if cleaning_steps is None:
+        cleaning_steps = [
+            lambda x: remove_duplicates(x),
+            lambda x: handle_missing_values(x, strategy='mean')
+        ]
+    
+    cleaned_df = df.copy()
+    
+    for step in cleaning_steps:
+        cleaned_df = step(cleaned_df)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'value': [10, 20, 20, np.nan, 40, 40, 50],
+        'category': ['A', 'B', 'B', 'C', 'D', 'D', 'E']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    cleaned_df = clean_data_pipeline(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nShape:", cleaned_df.shape)
