@@ -154,3 +154,90 @@ def clean_dataset(df: pd.DataFrame, operations: List[str] = None) -> pd.DataFram
             cleaner.handle_missing_values(strategy='fill')
     
     return cleaner.get_cleaned_data()
+import pandas as pd
+import numpy as np
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.columns
+
+        for col in columns:
+            if self.df[col].dtype in ['int64', 'float64']:
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = 0
+                self.df[col].fillna(fill_value, inplace=True)
+            else:
+                self.df[col].fillna('Unknown', inplace=True)
+        return self
+
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+
+        for col in columns:
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        return self
+
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val != min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val > 0:
+                self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+
+    def get_cleaned_data(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        return self.df
+
+def create_sample_data():
+    dates = pd.date_range('2023-01-01', periods=100, freq='D')
+    data = {
+        'date': dates,
+        'value': np.random.randn(100) * 100 + 500,
+        'category': np.random.choice(['A', 'B', 'C', None], 100),
+        'count': np.random.randint(1, 1000, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[np.random.choice(df.index, 10), 'value'] = np.nan
+    df.loc[np.random.choice(df.index, 5), 'count'] = np.nan
+    df.loc[10:15, 'value'] = df['value'].max() * 10
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    cleaned_df = (cleaner
+                 .handle_missing_values(strategy='mean', columns=['value', 'count'])
+                 .handle_missing_values(strategy='mode', columns=['category'])
+                 .remove_outliers_iqr(columns=['value', 'count'])
+                 .normalize_column('value', method='minmax')
+                 .normalize_column('count', method='zscore')
+                 .get_cleaned_data())
+    
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_df.head())
