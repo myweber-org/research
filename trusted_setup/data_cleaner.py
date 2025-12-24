@@ -130,3 +130,130 @@ if __name__ == "__main__":
     print("\nNormalized DataFrame (minmax):")
     normalized_df = normalize_data(cleaned_df.select_dtypes(include=[np.number]))
     print(normalized_df)
+import pandas as pd
+import numpy as np
+
+def detect_outliers_iqr(dataframe, column):
+    """
+    Detect outliers in a specified column using the IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): The input dataframe
+    column (str): Column name to check for outliers
+    
+    Returns:
+    pd.DataFrame: DataFrame containing outlier rows
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = dataframe[(dataframe[column] < lower_bound) | (dataframe[column] > upper_bound)]
+    
+    return outliers
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): The input dataframe
+    column (str): Column name to remove outliers from
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_summary_statistics(dataframe, column):
+    """
+    Calculate summary statistics for a specified column.
+    
+    Parameters:
+    dataframe (pd.DataFrame): The input dataframe
+    column (str): Column name to calculate statistics for
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    stats = {
+        'mean': dataframe[column].mean(),
+        'median': dataframe[column].median(),
+        'std': dataframe[column].std(),
+        'min': dataframe[column].min(),
+        'max': dataframe[column].max(),
+        'count': dataframe[column].count(),
+        'missing': dataframe[column].isnull().sum()
+    }
+    
+    return stats
+
+def clean_numeric_data(dataframe, columns=None):
+    """
+    Clean numeric data by removing NaN values and converting to appropriate types.
+    
+    Parameters:
+    dataframe (pd.DataFrame): The input dataframe
+    columns (list): List of column names to clean. If None, all numeric columns are cleaned.
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    cleaned_df = dataframe.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+            cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): The input dataframe
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if dataframe.empty:
+        return False, "DataFrame is empty"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
