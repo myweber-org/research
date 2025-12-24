@@ -370,4 +370,55 @@ if __name__ == "__main__":
     print("\nCleaned statistics:")
     for col in cleaned_df.columns:
         stats = calculate_summary_statistics(cleaned_df, col)
-        print(f"{col}: {stats}")
+        print(f"{col}: {stats}")import csv
+import sys
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values
+    and trimming whitespace from all string fields.
+    """
+    try:
+        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+            reader = csv.DictReader(infile)
+            fieldnames = reader.fieldnames
+            
+            cleaned_rows = []
+            for row in reader:
+                # Skip rows with any empty values
+                if any(value is None or str(value).strip() == '' for value in row.values()):
+                    continue
+                
+                # Trim whitespace from all string fields
+                cleaned_row = {
+                    key: value.strip() if isinstance(value, str) else value 
+                    for key, value in row.items()
+                }
+                cleaned_rows.append(cleaned_row)
+        
+        if cleaned_rows:
+            with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+                writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(cleaned_rows)
+            
+            print(f"Successfully cleaned {len(cleaned_rows)} rows")
+            print(f"Output saved to: {output_file}")
+        else:
+            print("No valid rows found after cleaning")
+            
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv(input_file, output_file)
