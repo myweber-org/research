@@ -80,4 +80,51 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nData validation: {'Passed' if is_valid else 'Failed'}")
+    print(f"\nData validation: {'Passed' if is_valid else 'Failed'}")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def filter_by_column(df, column_name, min_value=None, max_value=None):
+    """
+    Filter DataFrame based on column value range.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to filter.
+        min_value: Minimum value for filtering (inclusive).
+        max_value: Maximum value for filtering (inclusive).
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    filtered_df = df.copy()
+    
+    if min_value is not None:
+        filtered_df = filtered_df[filtered_df[column_name] >= min_value]
+    
+    if max_value is not None:
+        filtered_df = filtered_df[filtered_df[column_name] <= max_value]
+    
+    return filtered_df
