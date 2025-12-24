@@ -449,4 +449,58 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(df, ['value', 'score'])
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("Cleaned summary stats:", calculate_summary_stats(cleaned_df, 'value'))
+    print("Cleaned summary stats:", calculate_summary_stats(cleaned_df, 'value'))import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, strategy='mean', columns=None):
+    """
+    Clean a CSV file by handling missing values.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        strategy (str): Strategy for imputation ('mean', 'median', 'mode', 'drop').
+        columns (list): List of column names to apply cleaning to. If None, applies to all numeric columns.
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    df = pd.read_csv(filepath)
+    
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if strategy == 'drop':
+            df = df.dropna(subset=[col])
+        elif strategy == 'mean':
+            df[col] = df[col].fillna(df[col].mean())
+        elif strategy == 'median':
+            df[col] = df[col].fillna(df[col].median())
+        elif strategy == 'mode':
+            df[col] = df[col].fillna(df[col].mode()[0])
+        else:
+            raise ValueError(f"Unsupported strategy: {strategy}")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    
+    Args:
+        df (pandas.DataFrame): Cleaned DataFrame.
+        output_path (str): Path to save the cleaned CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, strategy='median')
+    save_cleaned_data(cleaned_df, output_file)
