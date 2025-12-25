@@ -70,4 +70,43 @@ if __name__ == "__main__":
     stats = calculate_basic_stats(cleaned_df, 'values')
     print("\nBasic Statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # If specific columns are provided, clean only those; otherwise, clean all object columns
+    if columns_to_clean is None:
+        columns_to_clean = cleaned_df.select_dtypes(include=['object']).columns
+    
+    for col in columns_to_clean:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+    
+    return cleaned_df
+
+def _normalize_string(s):
+    """
+    Normalize a string: lowercase, strip whitespace, and remove extra spaces.
+    """
+    if isinstance(s, str):
+        s = s.lower()
+        s = s.strip()
+        s = re.sub(r'\s+', ' ', s)
+    return s
+
+def validate_email(email):
+    """
+    Simple email validation using regex.
+    """
+    if not isinstance(email, str):
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
