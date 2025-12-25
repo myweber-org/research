@@ -709,4 +709,43 @@ if __name__ == "__main__":
     cleaned_df = clean_data_pipeline(df)
     print("\nCleaned DataFrame:")
     print(cleaned_df)
-    print("\nShape:", cleaned_df.shape)
+    print("\nShape:", cleaned_df.shape)import pandas as pd
+import re
+
+def clean_dataframe(df, text_column='text'):
+    """
+    Clean a DataFrame by removing duplicates and normalizing text in a specified column.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Define a function to normalize text
+    def normalize_text(text):
+        if pd.isna(text):
+            return text
+        # Convert to lowercase
+        text = str(text).lower()
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Remove special characters (keep alphanumeric and spaces)
+        text = re.sub(r'[^a-z0-9\s]', '', text)
+        return text
+    
+    # Apply normalization to the specified column
+    df_clean[text_column] = df_clean[text_column].apply(normalize_text)
+    
+    return df_clean
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'text': ['Hello World!', '  hello world  ', 'HELLO WORLD', 'Test', 'Test', 'Another test.']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, text_column='text')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
