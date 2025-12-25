@@ -2,100 +2,92 @@
 import pandas as pd
 import numpy as np
 
-def clean_dataset(df, text_columns=None, fill_na=True):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a pandas DataFrame by handling missing values and standardizing text.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Args:
-        df: pandas DataFrame to clean
-        text_columns: list of column names containing text data
-        fill_na: boolean indicating whether to fill missing values
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default 'mean'.
     
     Returns:
-        Cleaned pandas DataFrame
+    pd.DataFrame: Cleaned DataFrame.
     """
-    df_clean = df.copy()
+    cleaned_df = df.copy()
     
-    # Handle missing values
-    if fill_na:
-        for col in df_clean.columns:
-            if df_clean[col].dtype in ['int64', 'float64']:
-                df_clean[col].fillna(df_clean[col].median(), inplace=True)
-            elif df_clean[col].dtype == 'object':
-                df_clean[col].fillna('Unknown', inplace=True)
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
     
-    # Standardize text columns
-    if text_columns:
-        for col in text_columns:
-            if col in df_clean.columns:
-                df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Dropped rows with missing values.")
+    elif fill_missing in ['mean', 'median', 'mode']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[col].median()
+                elif fill_missing == 'mode':
+                    fill_value = cleaned_df[col].mode()[0]
+                cleaned_df[col].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{col}' with {fill_missing} value: {fill_value:.2f}")
     
-    # Remove duplicate rows
-    df_clean.drop_duplicates(inplace=True)
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if cleaned_df[col].isnull().any():
+            cleaned_df[col].fillna('Unknown', inplace=True)
+            print(f"Filled missing values in categorical column '{col}' with 'Unknown'")
     
-    # Reset index after cleaning
-    df_clean.reset_index(drop=True, inplace=True)
-    
-    return df_clean
+    print(f"Data cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
 
 def validate_dataframe(df, required_columns=None):
     """
-    Validate DataFrame structure and content.
+    Validate a DataFrame for basic integrity checks.
     
-    Args:
-        df: pandas DataFrame to validate
-        required_columns: list of required column names
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
     
     Returns:
-        Dictionary with validation results
+    bool: True if validation passes, False otherwise.
     """
-    validation_results = {
-        'is_valid': True,
-        'missing_columns': [],
-        'null_counts': {},
-        'data_types': {}
-    }
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame.")
+        return False
     
-    # Check required columns
+    if df.empty:
+        print("Warning: DataFrame is empty.")
+        return False
+    
     if required_columns:
-        missing = [col for col in required_columns if col not in df.columns]
-        if missing:
-            validation_results['missing_columns'] = missing
-            validation_results['is_valid'] = False
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
     
-    # Count null values
-    for col in df.columns:
-        null_count = df[col].isnull().sum()
-        if null_count > 0:
-            validation_results['null_counts'][col] = null_count
-    
-    # Record data types
-    for col in df.columns:
-        validation_results['data_types'][col] = str(df[col].dtype)
-    
-    return validation_results
+    print("DataFrame validation passed.")
+    return True
 
-# Example usage
 if __name__ == "__main__":
-    # Create sample data
     sample_data = {
-        'name': ['Alice', 'Bob', None, 'Charlie', 'Alice'],
-        'age': [25, 30, np.nan, 35, 25],
-        'city': ['New York', 'los angeles', 'Chicago', None, 'New York']
+        'A': [1, 2, 2, 3, np.nan],
+        'B': [5, 6, 6, np.nan, 8],
+        'C': ['x', 'y', 'y', 'z', None],
+        'D': [10, 20, 20, 30, 40]
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print("\n")
     
-    # Clean the data
-    cleaned_df = clean_dataset(df, text_columns=['name', 'city'])
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    print("\n")
-    
-    # Validate the cleaned data
-    validation = validate_dataframe(cleaned_df, required_columns=['name', 'age', 'city'])
-    print("Validation Results:")
-    print(validation)
+    if validate_dataframe(df):
+        cleaned = clean_dataset(df, fill_missing='median')
+        print("\nCleaned DataFrame:")
+        print(cleaned)
