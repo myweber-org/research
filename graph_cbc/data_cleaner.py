@@ -616,4 +616,51 @@ def example_usage():
 
 if __name__ == "__main__":
     result_df = example_usage()
-    print(f"\nOutliers removed: {100 - len(result_df)}")
+    print(f"\nOutliers removed: {100 - len(result_df)}")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing column names to lowercase with underscores.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names
+    df_cleaned.columns = (
+        df_cleaned.columns
+        .str.lower()
+        .str.replace(' ', '_')
+        .str.replace('-', '_')
+    )
+    
+    return df_cleaned
+
+def filter_numeric_columns(df):
+    """
+    Return only numeric columns from the DataFrame.
+    """
+    numeric_df = df.select_dtypes(include=['number'])
+    return numeric_df
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from the DataFrame.
+    If subset is provided, only consider certain columns for duplication.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def validate_dataframe(df):
+    """
+    Perform basic validation on the DataFrame.
+    Returns a dictionary with validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_names': list(df.columns),
+        'dtypes': df.dtypes.to_dict()
+    }
+    return validation_results
