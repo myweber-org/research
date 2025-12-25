@@ -1,152 +1,77 @@
-
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-def remove_outliers_iqr(dataframe, column, threshold=1.5):
+def detect_outliers_iqr(data, column, threshold=1.5):
     """
-    Remove outliers from a DataFrame column using IQR method.
-    
-    Args:
-        dataframe: pandas DataFrame
-        column: column name to process
-        threshold: IQR multiplier (default 1.5)
-    
-    Returns:
-        DataFrame with outliers removed
+    Detect outliers using IQR method
     """
-    if column not in dataframe.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    q1 = dataframe[column].quantile(0.25)
-    q3 = dataframe[column].quantile(0.75)
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
     iqr = q3 - q1
-    
     lower_bound = q1 - threshold * iqr
     upper_bound = q3 + threshold * iqr
-    
-    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
-                           (dataframe[column] <= upper_bound)]
-    
-    return filtered_df
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
 
-def normalize_minmax(dataframe, columns=None):
+def remove_outliers_zscore(data, column, threshold=3):
     """
-    Normalize specified columns using min-max scaling.
-    
-    Args:
-        dataframe: pandas DataFrame
-        columns: list of column names to normalize (default: all numeric columns)
-    
-    Returns:
-        DataFrame with normalized columns
+    Remove outliers using Z-score method
     """
-    if columns is None:
-        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize=False):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
     
-    normalized_df = dataframe.copy()
-    
-    for col in columns:
-        if col not in normalized_df.columns:
-            raise ValueError(f"Column '{col}' not found in DataFrame")
+    for col in numeric_columns:
+        if outlier_method == 'iqr':
+            outliers = detect_outliers_iqr(cleaned_df, col)
+            if not outliers.empty:
+                cleaned_df = cleaned_df.drop(outliers.index)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
         
-        if not np.issubdtype(normalized_df[col].dtype, np.number):
-            raise TypeError(f"Column '{col}' must be numeric")
-        
-        col_min = normalized_df[col].min()
-        col_max = normalized_df[col].max()
-        
-        if col_max != col_min:
-            normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+        if normalize:
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
         else:
-            normalized_df[col] = 0
+            cleaned_df[col] = standardize_data(cleaned_df, col)
     
-    return normalized_df
+    return cleaned_df
 
-def detect_skewed_columns(dataframe, skew_threshold=0.5):
+def validate_data(df, required_columns, allow_nan=False):
     """
-    Detect columns with skewed distributions.
-    
-    Args:
-        dataframe: pandas DataFrame
-        skew_threshold: absolute skewness threshold (default 0.5)
-    
-    Returns:
-        Dictionary with skewness values for columns exceeding threshold
+    Validate dataset structure and content
     """
-    skewed_cols = {}
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
     
-    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    if not allow_nan:
+        nan_count = df.isnull().sum().sum()
+        if nan_count > 0:
+            raise ValueError(f"Dataset contains {nan_count} NaN values")
     
-    for col in numeric_cols:
-        skewness = stats.skew(dataframe[col].dropna())
-        if abs(skewness) > skew_threshold:
-            skewed_cols[col] = skewness
-    
-    return skewed_cols
-
-def clean_dataset(dataframe, outlier_columns=None, normalize=True, skew_threshold=0.5):
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        dataframe: pandas DataFrame to clean
-        outlier_columns: list of columns for outlier removal (default: all numeric)
-        normalize: whether to normalize numeric columns
-        skew_threshold: skewness detection threshold
-    
-    Returns:
-        Tuple of (cleaned DataFrame, cleaning statistics)
-    """
-    df_cleaned = dataframe.copy()
-    stats_dict = {
-        'original_shape': dataframe.shape,
-        'outliers_removed': 0,
-        'skewed_columns': {}
-    }
-    
-    if outlier_columns is None:
-        outlier_columns = list(dataframe.select_dtypes(include=[np.number]).columns)
-    
-    for col in outlier_columns:
-        if col in df_cleaned.columns:
-            original_len = len(df_cleaned)
-            df_cleaned = remove_outliers_iqr(df_cleaned, col)
-            stats_dict['outliers_removed'] += original_len - len(df_cleaned)
-    
-    if normalize:
-        df_cleaned = normalize_minmax(df_cleaned)
-        stats_dict['normalized'] = True
-    else:
-        stats_dict['normalized'] = False
-    
-    skewed_cols = detect_skewed_columns(df_cleaned, skew_threshold)
-    stats_dict['skewed_columns'] = skewed_cols
-    stats_dict['final_shape'] = df_cleaned.shape
-    
-    return df_cleaned, stats_dict
-
-def save_cleaning_report(stats_dict, output_path='cleaning_report.txt'):
-    """
-    Save cleaning statistics to a text file.
-    
-    Args:
-        stats_dict: dictionary containing cleaning statistics
-        output_path: path to save the report
-    """
-    with open(output_path, 'w') as f:
-        f.write("Data Cleaning Report\n")
-        f.write("=" * 50 + "\n\n")
-        
-        f.write(f"Original dataset shape: {stats_dict['original_shape']}\n")
-        f.write(f"Final dataset shape: {stats_dict['final_shape']}\n")
-        f.write(f"Total outliers removed: {stats_dict['outliers_removed']}\n")
-        f.write(f"Normalization applied: {stats_dict['normalized']}\n\n")
-        
-        if stats_dict['skewed_columns']:
-            f.write("Skewed columns detected:\n")
-            for col, skewness in stats_dict['skewed_columns'].items():
-                f.write(f"  {col}: skewness = {skewness:.3f}\n")
-        else:
-            f.write("No significantly skewed columns detected.\n")
+    return True
