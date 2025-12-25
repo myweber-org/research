@@ -1,6 +1,6 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
@@ -25,7 +25,7 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df.reset_index(drop=True)
+    return filtered_df.copy()
 
 def calculate_summary_statistics(df, column):
     """
@@ -38,153 +38,78 @@ def calculate_summary_statistics(df, column):
     Returns:
     dict: Dictionary containing summary statistics
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    cleaned_df = remove_outliers_iqr(df, column)
+    
     stats = {
         'original_count': len(df),
-        'cleaned_count': len(remove_outliers_iqr(df, column)),
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std_dev': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max()
+        'cleaned_count': len(cleaned_df),
+        'outliers_removed': len(df) - len(cleaned_df),
+        'original_mean': df[column].mean(),
+        'cleaned_mean': cleaned_df[column].mean(),
+        'original_std': df[column].std(),
+        'cleaned_std': cleaned_df[column].std(),
+        'original_median': df[column].median(),
+        'cleaned_median': cleaned_df[column].median()
     }
     
     return stats
 
-def process_dataset(file_path, column_to_clean):
+def process_dataframe(df, columns_to_clean=None):
     """
-    Main function to load and clean a dataset.
-    
-    Parameters:
-    file_path (str): Path to CSV file
-    column_to_clean (str): Column name to clean
-    
-    Returns:
-    tuple: (cleaned DataFrame, summary statistics)
-    """
-    try:
-        df = pd.read_csv(file_path)
-        cleaned_df = remove_outliers_iqr(df, column_to_clean)
-        stats = calculate_summary_statistics(df, column_to_clean)
-        
-        return cleaned_df, stats
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found")
-        return None, None
-    except Exception as e:
-        print(f"Error processing dataset: {str(e)}")
-        return None, None
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)
-        ])
-    })
-    
-    cleaned_data = remove_outliers_iqr(sample_data, 'values')
-    print(f"Original data points: {len(sample_data)}")
-    print(f"Cleaned data points: {len(cleaned_data)}")
-    print(f"Outliers removed: {len(sample_data) - len(cleaned_data)}")
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Process multiple columns in a DataFrame for outlier removal.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def calculate_statistics(df, column):
-    """
-    Calculate basic statistics for a DataFrame column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistical measures
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
-
-def clean_numeric_data(df, columns=None):
-    """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean
+    columns_to_clean (list): List of column names to clean. If None, uses all numeric columns.
     
     Returns:
     pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each processed column
     """
-    if columns is None:
+    if columns_to_clean is None:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
+        columns_to_clean = numeric_cols
     
     cleaned_df = df.copy()
+    all_stats = {}
     
-    for column in columns:
-        if column in cleaned_df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
+    for column in columns_to_clean:
+        if column in df.columns and pd.api.types.is_numeric_dtype(df[column]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, column)
+                stats = calculate_summary_statistics(df, column)
+                all_stats[column] = stats
+            except Exception as e:
+                print(f"Error processing column '{column}': {e}")
     
-    return cleaned_df
+    return cleaned_df, all_stats
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'id': range(1, 101),
-        'value': np.random.normal(100, 15, 100)
-    }
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
     
-    # Add some outliers
-    sample_df = pd.DataFrame(sample_data)
-    sample_df.loc[100] = [101, 500]  # High outlier
-    sample_df.loc[101] = [102, -50]  # Low outlier
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Path to save the file
+    format (str): File format ('csv' or 'parquet')
     
-    print("Original DataFrame shape:", sample_df.shape)
-    print("\nOriginal statistics:")
-    print(calculate_statistics(sample_df, 'value'))
-    
-    cleaned_df = clean_numeric_data(sample_df, ['value'])
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("\nCleaned statistics:")
-    print(calculate_statistics(cleaned_df, 'value'))
+    Returns:
+    bool: True if successful, False otherwise
+    """
+    try:
+        if format.lower() == 'csv':
+            df.to_csv(output_path, index=False)
+        elif format.lower() == 'parquet':
+            df.to_parquet(output_path, index=False)
+        else:
+            raise ValueError("Format must be 'csv' or 'parquet'")
+        
+        print(f"Data successfully saved to {output_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
