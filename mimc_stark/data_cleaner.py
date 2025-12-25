@@ -1,52 +1,109 @@
+import numpy as np
 import pandas as pd
-import sys
+from scipy import stats
 
-def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
+def detect_outliers_iqr(data, column, threshold=1.5):
     """
-    Remove duplicate rows from a CSV file.
-    
-    Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. If None, overwrites input file
-        subset (list, optional): Columns to consider for identifying duplicates
-        keep (str): Which duplicate to keep - 'first', 'last', or False to drop all duplicates
-    
-    Returns:
-        int: Number of duplicates removed
+    Detect outliers using Interquartile Range method
     """
-    try:
-        df = pd.read_csv(input_file)
-        initial_rows = len(df)
-        
-        df_clean = df.drop_duplicates(subset=subset, keep=keep)
-        final_rows = len(df_clean)
-        
-        duplicates_removed = initial_rows - final_rows
-        
-        if output_file is None:
-            output_file = input_file
-        
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original rows: {initial_rows}, Cleaned rows: {final_rows}")
-        print(f"Saved to: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except Exception as e:
-        print(f"Error processing file: {e}")
-        return -1
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        sys.exit(1)
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
     
-    remove_duplicates(input_file, output_file)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with different strategies
+    """
+    cleaned_data = data.copy()
+    
+    for column in cleaned_data.columns:
+        if cleaned_data[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = cleaned_data[column].mean()
+            elif strategy == 'median':
+                fill_value = cleaned_data[column].median()
+            elif strategy == 'mode':
+                fill_value = cleaned_data[column].mode()[0]
+            elif strategy == 'ffill':
+                cleaned_data[column] = cleaned_data[column].ffill()
+                continue
+            elif strategy == 'bfill':
+                cleaned_data[column] = cleaned_data[column].bfill()
+                continue
+            else:
+                fill_value = 0
+            
+            cleaned_data[column] = cleaned_data[column].fillna(fill_value)
+    
+    return cleaned_data
+
+def validate_data_types(data, expected_types):
+    """
+    Validate that columns have expected data types
+    """
+    validation_results = {}
+    
+    for column, expected_type in expected_types.items():
+        if column in data.columns:
+            actual_type = str(data[column].dtype)
+            validation_results[column] = {
+                'expected': expected_type,
+                'actual': actual_type,
+                'valid': actual_type == expected_type
+            }
+    
+    return validation_results
+
+def create_data_summary(data):
+    """
+    Create a comprehensive summary of the dataset
+    """
+    summary = {
+        'shape': data.shape,
+        'columns': list(data.columns),
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'unique_values': {col: data[col].nunique() for col in data.columns},
+        'basic_stats': data.describe().to_dict()
+    }
+    
+    return summary
