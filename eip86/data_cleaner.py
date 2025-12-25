@@ -385,4 +385,48 @@ def validate_data(data, required_columns=None, allow_nan=False):
         if nan_count > 0:
             raise ValueError(f"Data contains {nan_count} NaN values")
     
-    return True
+    return Trueimport pandas as pd
+
+def clean_data(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean the input DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values with column mean.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+            else:
+                cleaned_df[column].fillna('Unknown', inplace=True)
+    
+    return cleaned_df
+
+def main():
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10.5, None, 10.5, 12.0, 12.0],
+        'C': ['x', 'y', 'x', None, 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_data(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+
+if __name__ == "__main__":
+    main()
