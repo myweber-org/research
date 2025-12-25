@@ -404,4 +404,11 @@ def process_csv(input_file: str, output_file: str, clean_column: int = 1, thresh
     if save_csv(processed_data, output_file):
         print(f"Processed data saved to '{output_file}'")
     else:
-        print("Failed to save processed data.")
+        print("Failed to save processed data.")def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
