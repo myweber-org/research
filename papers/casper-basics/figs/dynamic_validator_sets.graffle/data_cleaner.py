@@ -1,147 +1,86 @@
-
-import numpy as np
 import pandas as pd
 
-def remove_outliers_iqr(data, column, multiplier=1.5):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers using the Interquartile Range method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Args:
-        data: pandas DataFrame
-        column: column name to process
-        multiplier: IQR multiplier (default 1.5)
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_missing: Strategy for filling missing values ('mean', 'median', 'mode', or None)
     
     Returns:
-        Filtered DataFrame without outliers
+        Cleaned pandas DataFrame
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
     
-    lower_bound = q1 - multiplier * iqr
-    upper_bound = q3 + multiplier * iqr
+    if fill_missing and cleaned_df.isnull().sum().sum() > 0:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        
+        if fill_missing == 'mean':
+            for col in numeric_cols:
+                if cleaned_df[col].isnull().any():
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+        elif fill_missing == 'median':
+            for col in numeric_cols:
+                if cleaned_df[col].isnull().any():
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].isnull().any():
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
+        
+        print(f"Filled missing values using {fill_missing} strategy")
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return cleaned_df
 
-def normalize_minmax(data, column):
+def validate_dataset(df, required_columns=None, min_rows=1):
     """
-    Normalize data using Min-Max scaling to range [0, 1].
+    Validate dataset structure and content.
     
     Args:
-        data: pandas DataFrame
-        column: column name to normalize
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+        min_rows: Minimum number of rows required
     
     Returns:
-        DataFrame with normalized column
+        Boolean indicating if validation passed
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if len(df) < min_rows:
+        print(f"Dataset has only {len(df)} rows, minimum required is {min_rows}")
+        return False
     
-    min_val = data[column].min()
-    max_val = data[column].max()
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
     
-    if min_val == max_val:
-        data[f'{column}_normalized'] = 0.5
-    else:
-        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    
-    return data
+    return True
 
-def standardize_zscore(data, column):
+def get_dataset_stats(df):
     """
-    Standardize data using Z-score normalization.
+    Get basic statistics about the dataset.
     
     Args:
-        data: pandas DataFrame
-        column: column name to standardize
+        df: pandas DataFrame
     
     Returns:
-        DataFrame with standardized column
+        Dictionary with dataset statistics
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    stats = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': len(df.select_dtypes(include=['number']).columns),
+        'categorical_columns': len(df.select_dtypes(include=['object']).columns)
+    }
     
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        data[f'{column}_standardized'] = 0
-    else:
-        data[f'{column}_standardized'] = (data[column] - mean_val) / std_val
-    
-    return data
-
-def handle_missing_values(data, strategy='mean'):
-    """
-    Handle missing values in numeric columns.
-    
-    Args:
-        data: pandas DataFrame
-        strategy: imputation strategy ('mean', 'median', 'mode', or 'drop')
-    
-    Returns:
-        DataFrame with handled missing values
-    """
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    
-    if strategy == 'drop':
-        return data.dropna(subset=numeric_cols)
-    
-    for col in numeric_cols:
-        if data[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = data[col].mean()
-            elif strategy == 'median':
-                fill_value = data[col].median()
-            elif strategy == 'mode':
-                fill_value = data[col].mode()[0]
-            else:
-                raise ValueError(f"Unknown strategy: {strategy}")
-            
-            data[col] = data[col].fillna(fill_value)
-    
-    return data
-
-def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, 
-                  normalize_cols=None, standardize_cols=None, 
-                  missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        data: pandas DataFrame
-        numeric_columns: list of numeric columns to process
-        outlier_multiplier: IQR multiplier for outlier removal
-        normalize_cols: columns to normalize using Min-Max
-        standardize_cols: columns to standardize using Z-score
-        missing_strategy: strategy for handling missing values
-    
-    Returns:
-        Cleaned DataFrame
-    """
-    cleaned_data = data.copy()
-    
-    if numeric_columns is None:
-        numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
-    
-    for col in numeric_columns:
-        if col in cleaned_data.columns:
-            cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_multiplier)
-    
-    if normalize_cols:
-        for col in normalize_cols:
-            if col in cleaned_data.columns:
-                cleaned_data = normalize_minmax(cleaned_data, col)
-    
-    if standardize_cols:
-        for col in standardize_cols:
-            if col in cleaned_data.columns:
-                cleaned_data = standardize_zscore(cleaned_data, col)
-    
-    return cleaned_data
+    return stats
