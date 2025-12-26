@@ -448,4 +448,74 @@ if __name__ == "__main__":
         if is_valid:
             print("Data cleaning completed successfully")
         else:
-            print("Data cleaning completed with validation warnings")
+            print("Data cleaning completed with validation warnings")import csv
+import re
+from typing import List, Dict, Any
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value) if value is not None else ""
+    return re.sub(r'\s+', ' ', value.strip())
+
+def clean_numeric(value: str) -> float:
+    """Convert string to float, handling common issues."""
+    if value is None or value == "":
+        return 0.0
+    cleaned = re.sub(r'[^\d.-]', '', str(value))
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+def read_csv_file(filepath: str) -> List[Dict[str, Any]]:
+    """Read CSV file and return list of dictionaries."""
+    data = []
+    try:
+        with open(filepath, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File {filepath} not found.")
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+    return data
+
+def clean_csv_data(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Apply cleaning functions to all rows in the data."""
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for key, value in row.items():
+            if key.endswith('_amount') or key.endswith('_price'):
+                cleaned_row[key] = clean_numeric(value)
+            else:
+                cleaned_row[key] = clean_string(value)
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def write_cleaned_csv(data: List[Dict[str, Any]], output_path: str) -> None:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        print("No data to write.")
+        return
+    
+    fieldnames = data[0].keys()
+    try:
+        with open(output_path, 'w', encoding='utf-8', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Cleaned data written to {output_path}")
+    except Exception as e:
+        print(f"Error writing CSV: {e}")
+
+def process_csv_pipeline(input_file: str, output_file: str) -> None:
+    """Complete pipeline for CSV data cleaning."""
+    raw_data = read_csv_file(input_file)
+    if not raw_data:
+        return
+    
+    cleaned_data = clean_csv_data(raw_data)
+    write_cleaned_csv(cleaned_data, output_file)
