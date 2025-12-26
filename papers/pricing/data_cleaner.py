@@ -190,3 +190,77 @@ def clean_dataset(df, numeric_columns=None, outlier_multiplier=1.5):
             df_clean = standardize_column(df_clean, col)
     
     return df_clean
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+    
+    def remove_duplicates(self) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates()
+        return self
+    
+    def fill_missing_numeric(self, strategy: str = 'mean', fill_value: Optional[float] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'zero':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(0)
+        elif strategy == 'custom' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        
+        return self
+    
+    def fill_missing_categorical(self, fill_value: str = 'Unknown') -> 'DataCleaner':
+        categorical_cols = self.df.select_dtypes(include=['object']).columns
+        self.df[categorical_cols] = self.df[categorical_cols].fillna(fill_value)
+        return self
+    
+    def remove_columns_high_missing(self, threshold: float = 0.5) -> 'DataCleaner':
+        missing_ratio = self.df.isnull().sum() / len(self.df)
+        cols_to_drop = missing_ratio[missing_ratio > threshold].index
+        self.df = self.df.drop(columns=cols_to_drop)
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_cleaning_report(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1],
+            'remaining_missing_values': self.df.isnull().sum().sum()
+        }
+
+def clean_csv_file(filepath: str, output_path: Optional[str] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates() \
+           .remove_columns_high_missing(threshold=0.3) \
+           .fill_missing_numeric(strategy='median') \
+           .fill_missing_categorical(fill_value='Missing')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    report = cleaner.get_cleaning_report()
+    
+    print(f"Data cleaning completed:")
+    print(f"  - Removed {report['rows_removed']} duplicate rows")
+    print(f"  - Removed {report['columns_removed']} columns with >30% missing values")
+    print(f"  - Remaining missing values: {report['remaining_missing_values']}")
+    
+    if output_path:
+        cleaned_df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return cleaned_df
