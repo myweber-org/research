@@ -1,38 +1,37 @@
+
 import pandas as pd
-import re
+import numpy as np
+from scipy import stats
 
-def clean_dataset(df, text_column):
-    """
-    Clean a dataset by removing duplicate rows and standardizing text in a specified column.
-    """
-    # Remove duplicate rows
-    df_cleaned = df.drop_duplicates().reset_index(drop=True)
-    
-    # Standardize text: lowercase, remove extra whitespace
-    if text_column in df_cleaned.columns:
-        df_cleaned[text_column] = df_cleaned[text_column].apply(
-            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
-        )
-    
-    return df_cleaned
+def remove_outliers_iqr(df, columns):
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
 
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a specified column and return a boolean mask.
-    """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return df[email_column].str.match(email_pattern, na=False)
+def normalize_minmax(df, columns):
+    df_norm = df.copy()
+    for col in columns:
+        min_val = df_norm[col].min()
+        max_val = df_norm[col].max()
+        df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
 
-# Example usage (commented out for production)
-# if __name__ == "__main__":
-#     sample_data = pd.DataFrame({
-#         'name': ['Alice', 'Bob', 'Alice', 'Charlie'],
-#         'email': ['alice@example.com', 'bob@test.org', 'alice@example.com', 'invalid-email']
-#     })
-#     cleaned = clean_dataset(sample_data, 'name')
-#     valid_emails = validate_email_column(cleaned, 'email')
-#     print(cleaned)
-#     print(valid_emails)
+def clean_dataset(input_path, output_path, numeric_cols):
+    df = pd.read_csv(input_path)
+    df_clean = remove_outliers_iqr(df, numeric_cols)
+    df_normalized = normalize_minmax(df_clean, numeric_cols)
+    df_normalized.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+    print(f"Original rows: {len(df)}, Cleaned rows: {len(df_normalized)}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    numeric_columns = ["age", "income", "score"]
+    clean_dataset(input_file, output_file, numeric_columns)
