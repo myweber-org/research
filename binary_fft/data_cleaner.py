@@ -103,3 +103,145 @@ def validate_data(data, required_columns=None, allow_nan=False):
         raise ValueError("Data contains NaN values")
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using Interquartile Range method.
+    Returns filtered DataFrame and outlier indices.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers_mask = (data[column] < lower_bound) | (data[column] > upper_bound)
+    filtered_data = data[~outliers_mask].copy()
+    
+    return filtered_data, data[outliers_mask].index.tolist()
+
+def normalize_minmax(data, columns=None):
+    """
+    Apply Min-Max normalization to specified columns.
+    If columns is None, normalize all numeric columns.
+    """
+    if columns is None:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        col_min = data[col].min()
+        col_max = data[col].max()
+        
+        if col_max == col_min:
+            normalized_data[col] = 0.5
+        else:
+            normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
+    
+    return normalized_data
+
+def standardize_zscore(data, columns=None):
+    """
+    Apply Z-score standardization to specified columns.
+    If columns is None, standardize all numeric columns.
+    """
+    if columns is None:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    standardized_data = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        col_mean = data[col].mean()
+        col_std = data[col].std()
+        
+        if col_std == 0:
+            standardized_data[col] = 0
+        else:
+            standardized_data[col] = (data[col] - col_mean) / col_std
+    
+    return standardized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    Supported strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    if columns is None:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    processed_data = data.copy()
+    
+    if strategy == 'drop':
+        return processed_data.dropna(subset=columns)
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = data[col].mean()
+        elif strategy == 'median':
+            fill_value = data[col].median()
+        elif strategy == 'mode':
+            fill_value = data[col].mode()[0] if not data[col].mode().empty else np.nan
+        else:
+            raise ValueError(f"Unsupported strategy: {strategy}")
+        
+        processed_data[col] = data[col].fillna(fill_value)
+    
+    return processed_data
+
+def create_data_summary(data):
+    """
+    Create comprehensive summary statistics for DataFrame.
+    """
+    summary = {
+        'shape': data.shape,
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': data[col].mean(),
+            'std': data[col].std(),
+            'min': data[col].min(),
+            '25%': data[col].quantile(0.25),
+            '50%': data[col].median(),
+            '75%': data[col].quantile(0.75),
+            'max': data[col].max(),
+            'skewness': data[col].skew(),
+            'kurtosis': data[col].kurtosis()
+        }
+    
+    categorical_cols = data.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        value_counts = data[col].value_counts()
+        summary['categorical_stats'][col] = {
+            'unique_count': data[col].nunique(),
+            'top_value': value_counts.index[0] if not value_counts.empty else None,
+            'top_frequency': value_counts.iloc[0] if not value_counts.empty else 0,
+            'value_distribution': value_counts.head(10).to_dict()
+        }
+    
+    return summary
