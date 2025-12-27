@@ -111,4 +111,73 @@ def get_data_summary(data):
             'q3': data[col].quantile(0.75)
         }
     
-    return summary
+    return summaryimport csv
+import re
+
+def clean_csv(input_file, output_file, columns_to_clean=None):
+    """
+    Clean a CSV file by removing extra whitespace and optionally cleaning specific columns.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            cleaned_row = {}
+            for key, value in row.items():
+                if value is not None:
+                    value = re.sub(r'\s+', ' ', value.strip())
+                
+                if columns_to_clean and key in columns_to_clean:
+                    if value:
+                        value = re.sub(r'[^\w\s]', '', value)
+                        value = value.upper()
+                
+                cleaned_row[key] = value
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows)
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email)) if email else False
+
+def remove_duplicates(input_file, output_file, key_column):
+    """
+    Remove duplicate rows based on a key column.
+    """
+    unique_rows = {}
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            key = row.get(key_column)
+            if key not in unique_rows:
+                unique_rows[key] = row
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_rows.values())
+    
+    return len(unique_rows)
+
+if __name__ == "__main__":
+    # Example usage
+    rows_cleaned = clean_csv('input.csv', 'output.csv', ['name', 'email'])
+    print(f"Cleaned {rows_cleaned} rows")
+    
+    unique_count = remove_duplicates('output.csv', 'deduplicated.csv', 'id')
+    print(f"Found {unique_count} unique records")
