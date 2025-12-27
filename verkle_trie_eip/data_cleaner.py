@@ -225,4 +225,45 @@ if __name__ == "__main__":
     import os
     os.remove('test_data.csv')
     if os.path.exists('cleaned_data.csv'):
-        os.remove('cleaned_data.csv')
+        os.remove('cleaned_data.csv')import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_data(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, column):
+    """Remove outliers using IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def z_score_normalization(df, column):
+    """Apply z-score normalization to a column."""
+    df[column] = stats.zscore(df[column])
+    return df
+
+def min_max_normalization(df, column):
+    """Apply min-max normalization to a column."""
+    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
+    return df
+
+def clean_dataset(input_file, output_file):
+    """Main function to clean and normalize dataset."""
+    df = load_data(input_file)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_cols:
+        df = remove_outliers_iqr(df, col)
+        df = z_score_normalization(df, col)
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+
+if __name__ == "__main__":
+    clean_dataset("raw_data.csv", "cleaned_data.csv")
