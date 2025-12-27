@@ -1,148 +1,125 @@
-import numpy as np
+
 import pandas as pd
-from scipy import stats
+import numpy as np
+from typing import List, Union
 
-def remove_outliers_iqr(df, columns=None, factor=1.5):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
     """
-    Remove outliers using the Interquartile Range method.
+    Remove duplicate rows from DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    columns (list): List of column names to process, None for all numeric columns
-    factor (float): Multiplier for IQR
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-    pd.DataFrame: Dataframe with outliers removed
+        DataFrame with duplicates removed
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_clean = df.copy()
-    for col in columns:
-        if col in df.columns:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - factor * IQR
-            upper_bound = Q3 + factor * IQR
-            
-            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            df_clean = df_clean[mask]
-    
-    return df_clean.reset_index(drop=True)
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+def convert_column_types(df: pd.DataFrame, 
+                         column_type_map: dict) -> pd.DataFrame:
     """
-    Normalize data using Min-Max scaling.
+    Convert columns to specified data types.
     
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    columns (list): List of column names to normalize, None for all numeric columns
-    feature_range (tuple): Desired range of transformed data
+    Args:
+        df: Input DataFrame
+        column_type_map: Dictionary mapping column names to target types
     
     Returns:
-    pd.DataFrame: Dataframe with normalized columns
+        DataFrame with converted column types
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    df_copy = df.copy()
     
-    df_normalized = df.copy()
-    min_val, max_val = feature_range
+    for column, dtype in column_type_map.items():
+        if column in df_copy.columns:
+            try:
+                if dtype == 'datetime':
+                    df_copy[column] = pd.to_datetime(df_copy[column])
+                elif dtype == 'numeric':
+                    df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+                elif dtype == 'category':
+                    df_copy[column] = df_copy[column].astype('category')
+                else:
+                    df_copy[column] = df_copy[column].astype(dtype)
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not convert column '{column}' to {dtype}: {e}")
     
-    for col in columns:
-        if col in df.columns:
-            col_min = df[col].min()
-            col_max = df[col].max()
-            
-            if col_max - col_min != 0:
-                df_normalized[col] = min_val + (df[col] - col_min) * (max_val - min_val) / (col_max - col_min)
-            else:
-                df_normalized[col] = min_val
-    
-    return df_normalized
+    return df_copy
 
-def zscore_normalize(df, columns=None, threshold=3):
+def handle_missing_values(df: pd.DataFrame, 
+                         strategy: str = 'drop',
+                         fill_value: Union[int, float, str] = None) -> pd.DataFrame:
     """
-    Normalize data using Z-score and optionally remove extreme outliers.
+    Handle missing values in DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    columns (list): List of column names to process
-    threshold (float): Z-score threshold for outlier removal
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to use when filling missing values
     
     Returns:
-    pd.DataFrame: Normalized dataframe with extreme outliers removed
+        DataFrame with handled missing values
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_normalized = df.copy()
-    
-    for col in columns:
-        if col in df.columns:
-            z_scores = np.abs(stats.zscore(df[col].dropna()))
-            mask = z_scores < threshold
-            
-            valid_indices = df[col].dropna().index[mask]
-            df_normalized.loc[valid_indices, col] = stats.zscore(df.loc[valid_indices, col])
-            
-            df_normalized.loc[~df.index.isin(valid_indices), col] = np.nan
-    
-    return df_normalized
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df_filled = df.copy()
+            df_filled[numeric_cols] = df_filled[numeric_cols].fillna(df_filled[numeric_cols].mean())
+            return df_filled
+    else:
+        raise ValueError("Strategy must be either 'drop' or 'fill'")
 
-def clean_dataset(df, outlier_method='iqr', normalize_method='minmax', **kwargs):
+def clean_dataframe(df: pd.DataFrame,
+                   deduplicate: bool = True,
+                   type_conversions: dict = None,
+                   missing_strategy: str = 'drop',
+                   fill_value: Union[int, float, str] = None) -> pd.DataFrame:
     """
-    Main function to clean and normalize dataset.
+    Apply multiple cleaning operations to DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    outlier_method (str): 'iqr', 'zscore', or None
-    normalize_method (str): 'minmax', 'zscore', or None
-    **kwargs: Additional arguments for specific methods
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary for column type conversions
+        missing_strategy: Strategy for handling missing values
+        fill_value: Value to use when filling missing values
     
     Returns:
-    pd.DataFrame: Cleaned and normalized dataframe
+        Cleaned DataFrame
     """
-    df_clean = df.copy()
+    cleaned_df = df.copy()
     
-    if outlier_method == 'iqr':
-        df_clean = remove_outliers_iqr(df_clean, **kwargs)
-    elif outlier_method == 'zscore':
-        threshold = kwargs.get('threshold', 3)
-        df_clean = zscore_normalize(df_clean, threshold=threshold)
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
     
-    if normalize_method == 'minmax':
-        df_clean = normalize_minmax(df_clean, **kwargs)
-    elif normalize_method == 'zscore':
-        df_clean = zscore_normalize(df_clean, **kwargs)
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
     
-    return df_clean
+    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
+    
+    return cleaned_df
 
-def validate_dataframe(df, required_columns=None, min_rows=10):
+def validate_dataframe(df: pd.DataFrame) -> dict:
     """
-    Validate dataframe structure and content.
+    Validate DataFrame and return summary statistics.
     
-    Parameters:
-    df (pd.DataFrame): Dataframe to validate
-    required_columns (list): List of required column names
-    min_rows (int): Minimum number of rows required
+    Args:
+        df: Input DataFrame
     
     Returns:
-    tuple: (is_valid, message)
+        Dictionary with validation results
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_types': df.dtypes.to_dict(),
+        'numeric_summary': df.describe().to_dict() if not df.select_dtypes(include=[np.number]).empty else {}
+    }
     
-    if len(df) < min_rows:
-        return False, f"Dataframe has less than {min_rows} rows"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) == 0:
-        return False, "No numeric columns found in dataframe"
-    
-    return True, "Dataframe validation passed"
+    return validation_results
