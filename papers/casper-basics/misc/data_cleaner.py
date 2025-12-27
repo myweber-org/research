@@ -182,4 +182,90 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     print("\nFirst 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    print(cleaned_df.head())import csv
+import re
+from typing import List, Dict, Any, Optional
+
+def clean_csv_data(input_file: str, output_file: str, columns_to_clean: Optional[List[str]] = None) -> None:
+    """
+    Clean a CSV file by removing extra whitespace and standardizing text.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            cleaned_row = {}
+            for key, value in row.items():
+                if value is None:
+                    cleaned_row[key] = ''
+                elif isinstance(value, str):
+                    # Remove extra whitespace and normalize
+                    cleaned_value = re.sub(r'\s+', ' ', value.strip())
+                    cleaned_row[key] = cleaned_value
+                else:
+                    cleaned_row[key] = value
+            
+            # Apply additional cleaning to specified columns
+            if columns_to_clean:
+                for column in columns_to_clean:
+                    if column in cleaned_row and isinstance(cleaned_row[column], str):
+                        cleaned_row[column] = cleaned_row[column].upper()
+            
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+
+def validate_email_format(email: str) -> bool:
+    """
+    Validate if a string matches basic email format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(data: List[Dict[str, Any]], key_column: str) -> List[Dict[str, Any]]:
+    """
+    Remove duplicate rows based on a specified key column.
+    """
+    seen = set()
+    unique_data = []
+    
+    for row in data:
+        key_value = row.get(key_column)
+        if key_value not in seen:
+            seen.add(key_value)
+            unique_data.append(row)
+    
+    return unique_data
+
+def normalize_column_names(headers: List[str]) -> List[str]:
+    """
+    Normalize column names to lowercase with underscores.
+    """
+    normalized = []
+    for header in headers:
+        # Convert to lowercase and replace spaces with underscores
+        normalized_header = re.sub(r'\s+', '_', header.strip().lower())
+        normalized.append(normalized_header)
+    return normalized
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [
+        {"id": 1, "name": "John Doe  ", "email": "john@example.com"},
+        {"id": 2, "name": "Jane Smith", "email": "jane@example.com"},
+        {"id": 1, "name": "John Doe", "email": "john@example.com"}  # Duplicate
+    ]
+    
+    # Remove duplicates
+    unique_data = remove_duplicates(sample_data, "id")
+    print(f"Unique records: {len(unique_data)}")
+    
+    # Validate email
+    test_email = "test@example.com"
+    print(f"Email valid: {validate_email_format(test_email)}")
