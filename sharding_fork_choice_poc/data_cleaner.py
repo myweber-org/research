@@ -1,17 +1,16 @@
-
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): The input DataFrame.
     column (str): The column name to process.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed from the specified column.
+    pd.DataFrame: DataFrame with outliers removed.
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -27,49 +26,55 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df.reset_index(drop=True)
 
-def calculate_summary_statistics(df, column):
+def calculate_basic_stats(df, column):
     """
-    Calculate summary statistics for a DataFrame column.
+    Calculate basic statistics for a DataFrame column.
     
     Parameters:
     df (pd.DataFrame): The input DataFrame.
     column (str): The column name to analyze.
     
     Returns:
-    dict: Dictionary containing count, mean, std, min, max, and IQR.
+    dict: Dictionary containing statistical measures.
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
     stats = {
-        'count': df[column].count(),
         'mean': df[column].mean(),
+        'median': df[column].median(),
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'Q1': df[column].quantile(0.25),
-        'Q3': df[column].quantile(0.75),
-        'IQR': df[column].quantile(0.75) - df[column].quantile(0.25)
+        'count': df[column].count()
     }
     
     return stats
 
-if __name__ == "__main__":
-    sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 102, 12, 14, 13, 12, 11, 10, 14, 13, 12, 11, 200]
+def main():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'values': np.concatenate([
+            np.random.normal(100, 15, 95),
+            np.random.normal(300, 50, 5)
+        ])
     }
     
-    df = pd.DataFrame(sample_data)
+    df = pd.DataFrame(data)
+    
     print("Original DataFrame:")
-    print(df)
-    print(f"\nOriginal shape: {df.shape}")
+    print(f"Shape: {df.shape}")
+    print(f"Stats: {calculate_basic_stats(df, 'values')}")
     
     cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"\nCleaned shape: {cleaned_df.shape}")
     
-    stats = calculate_summary_statistics(cleaned_df, 'values')
-    print("\nSummary Statistics for cleaned data:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.4f}" if isinstance(value, (int, float)) else f"{key}: {value}")
+    print("\nCleaned DataFrame:")
+    print(f"Shape: {cleaned_df.shape}")
+    print(f"Stats: {calculate_basic_stats(cleaned_df, 'values')}")
+
+if __name__ == "__main__":
+    main()
