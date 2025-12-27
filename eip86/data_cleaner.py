@@ -36,4 +36,15 @@ if __name__ == "__main__":
     result = clean_dataset(sample_data, numeric_cols)
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {result.shape}")
-    print(result.head())
+    print(result.head())def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving the original order.
+    Returns a new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
