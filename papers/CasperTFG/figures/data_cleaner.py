@@ -501,3 +501,104 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True):
+    """
+    Clean a pandas DataFrame by standardizing column names and removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    column_mapping (dict): Optional dictionary mapping old column names to new names
+    drop_duplicates (bool): Whether to remove duplicate rows
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    if column_mapping:
+        cleaned_df.rename(columns=column_mapping, inplace=True)
+    
+    # Convert column names to lowercase with underscores
+    cleaned_df.columns = cleaned_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows if requested
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df.drop_duplicates(inplace=True)
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of column names that must be present
+    
+    Returns:
+    dict: Dictionary with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    # Check for null values
+    for column in df.columns:
+        null_count = df[column].isnull().sum()
+        validation_results['null_counts'][column] = null_count
+        
+        if null_count > 0:
+            validation_results['is_valid'] = False
+    
+    # Record data types
+    validation_results['data_types'] = df.dtypes.to_dict()
+    
+    return validation_results
+
+def sample_data_processing():
+    """Example usage of the data cleaning functions."""
+    # Create sample data
+    data = {
+        'Product Name': ['Widget A', 'Widget B', 'Widget A', 'Widget C', 'Widget B'],
+        'Price': [10.99, 15.50, 10.99, 20.00, 15.50],
+        'Quantity': [5, 3, 5, 2, 3],
+        'Category': ['Electronics', 'Electronics', 'Electronics', 'Home', 'Electronics']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, drop_duplicates=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned, required_columns=['product_name', 'price', 'quantity'])
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    sample_data_processing()
