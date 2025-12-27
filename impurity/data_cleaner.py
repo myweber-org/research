@@ -470,3 +470,65 @@ if __name__ == "__main__":
     # Validate the cleaned dataset
     is_valid, message = validate_dataset(cleaned, required_columns=['id', 'value'], min_rows=3)
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+    
+    def remove_duplicates(self) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates()
+        return self
+    
+    def fill_missing_numeric(self, strategy: str = 'mean', fill_value: Optional[float] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(self.df[col].mean())
+        elif strategy == 'median':
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(self.df[col].median())
+        elif strategy == 'constant' and fill_value is not None:
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self
+    
+    def drop_columns_missing_threshold(self, threshold: float = 0.5) -> 'DataCleaner':
+        missing_ratio = self.df.isnull().sum() / len(self.df)
+        columns_to_drop = missing_ratio[missing_ratio > threshold].index
+        self.df = self.df.drop(columns=columns_to_drop)
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_cleaning_report(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1],
+            'remaining_missing_values': self.df.isnull().sum().sum()
+        }
+
+def clean_csv_file(input_path: str, output_path: str) -> dict:
+    df = pd.read_csv(input_path)
+    cleaner = DataCleaner(df)
+    
+    report = cleaner \
+        .remove_duplicates() \
+        .drop_columns_missing_threshold(0.7) \
+        .fill_missing_numeric(strategy='median') \
+        .get_cleaning_report()
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    cleaned_df.to_csv(output_path, index=False)
+    
+    return report
