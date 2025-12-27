@@ -1,173 +1,61 @@
-
 import pandas as pd
-import numpy as np
-from typing import List, Union
 
-def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove duplicate rows from DataFrame.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
+                            Default is 'mean'.
     
     Returns:
-        DataFrame with duplicates removed
-    """
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def convert_column_types(df: pd.DataFrame, 
-                         column_type_map: dict) -> pd.DataFrame:
-    """
-    Convert columns to specified data types.
-    
-    Args:
-        df: Input DataFrame
-        column_type_map: Dictionary mapping column names to target types
-    
-    Returns:
-        DataFrame with converted column types
-    """
-    df_copy = df.copy()
-    
-    for column, dtype in column_type_map.items():
-        if column in df_copy.columns:
-            try:
-                if dtype == 'datetime':
-                    df_copy[column] = pd.to_datetime(df_copy[column])
-                elif dtype == 'numeric':
-                    df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
-                elif dtype == 'category':
-                    df_copy[column] = df_copy[column].astype('category')
-                else:
-                    df_copy[column] = df_copy[column].astype(dtype)
-            except (ValueError, TypeError) as e:
-                print(f"Warning: Could not convert column '{column}' to {dtype}: {e}")
-    
-    return df_copy
-
-def handle_missing_values(df: pd.DataFrame, 
-                         strategy: str = 'drop',
-                         fill_value: Union[int, float, str] = None) -> pd.DataFrame:
-    """
-    Handle missing values in DataFrame.
-    
-    Args:
-        df: Input DataFrame
-        strategy: 'drop' to remove rows, 'fill' to fill values
-        fill_value: Value to use when filling missing values
-    
-    Returns:
-        DataFrame with handled missing values
-    """
-    if strategy == 'drop':
-        return df.dropna()
-    elif strategy == 'fill':
-        if fill_value is not None:
-            return df.fillna(fill_value)
-        else:
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            df_filled = df.copy()
-            df_filled[numeric_cols] = df_filled[numeric_cols].fillna(df_filled[numeric_cols].mean())
-            return df_filled
-    else:
-        raise ValueError("Strategy must be either 'drop' or 'fill'")
-
-def clean_dataframe(df: pd.DataFrame,
-                   deduplicate: bool = True,
-                   type_conversions: dict = None,
-                   missing_strategy: str = 'drop',
-                   fill_value: Union[int, float, str] = None) -> pd.DataFrame:
-    """
-    Apply multiple cleaning operations to DataFrame.
-    
-    Args:
-        df: Input DataFrame
-        deduplicate: Whether to remove duplicates
-        type_conversions: Dictionary for column type conversions
-        missing_strategy: Strategy for handling missing values
-        fill_value: Value to use when filling missing values
-    
-    Returns:
-        Cleaned DataFrame
+        pd.DataFrame: Cleaned DataFrame.
     """
     cleaned_df = df.copy()
     
-    if deduplicate:
-        cleaned_df = remove_duplicates(cleaned_df)
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    if type_conversions:
-        cleaned_df = convert_column_types(cleaned_df, type_conversions)
-    
-    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            elif fill_missing == 'median':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            mode_value = cleaned_df[col].mode()
+            if not mode_value.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_value.iloc[0])
     
     return cleaned_df
 
-def validate_dataframe(df: pd.DataFrame) -> dict:
+def validate_data(df, required_columns=None, min_rows=1):
     """
-    Validate DataFrame and return summary statistics.
+    Validate the structure and content of a DataFrame.
     
     Args:
-        df: Input DataFrame
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
     
     Returns:
-        Dictionary with validation results
+        tuple: (is_valid, error_message)
     """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'column_types': df.dtypes.to_dict(),
-        'numeric_summary': df.describe().to_dict() if not df.select_dtypes(include=[np.number]).empty else {}
-    }
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    return validation_results
-def remove_duplicates(input_list):
-    """
-    Remove duplicate elements from a list while preserving order.
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
     
-    Args:
-        input_list (list): The list from which duplicates are to be removed.
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
-    Returns:
-        list: A new list with duplicates removed.
-    """
-    seen = set()
-    result = []
-    
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    
-    return result
-
-def clean_data_with_threshold(data, threshold=None):
-    """
-    Clean data by removing duplicates and optionally filtering by frequency.
-    
-    Args:
-        data (list): The input data list.
-        threshold (int, optional): Minimum frequency to keep an item.
-    
-    Returns:
-        list: Cleaned data list.
-    """
-    if not data:
-        return []
-    
-    cleaned = remove_duplicates(data)
-    
-    if threshold is not None and threshold > 0:
-        from collections import Counter
-        counts = Counter(data)
-        cleaned = [item for item in cleaned if counts[item] >= threshold]
-    
-    return cleaned
-
-if __name__ == "__main__":
-    sample_data = [1, 2, 2, 3, 4, 4, 4, 5, 1, 6]
-    print("Original data:", sample_data)
-    print("Without duplicates:", remove_duplicates(sample_data))
-    print("With threshold 2:", clean_data_with_threshold(sample_data, 2))
+    return True, "Data validation passed"
