@@ -1,113 +1,111 @@
-import pandas as pd
+
 import numpy as np
-
-def clean_dataframe(df):
-    """
-    Clean a pandas DataFrame by removing rows with null values
-    and standardizing column names to lowercase with underscores.
-    """
-    # Remove rows with any null values
-    df_cleaned = df.dropna()
-    
-    # Standardize column names
-    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
-    
-    return df_cleaned
-
-def validate_dataframe(df):
-    """
-    Validate that the DataFrame has no null values
-    and column names follow the standardized format.
-    """
-    # Check for null values
-    if df.isnull().any().any():
-        return False, "DataFrame contains null values"
-    
-    # Check column name format
-    for col in df.columns:
-        if not isinstance(col, str):
-            return False, f"Column name {col} is not a string"
-        if ' ' in col or col != col.lower():
-            return False, f"Column name {col} does not follow naming convention"
-    
-    return True, "DataFrame is valid"
-
-def process_data(file_path):
-    """
-    Load data from a CSV file, clean it, and validate the result.
-    """
-    try:
-        df = pd.read_csv(file_path)
-        df_cleaned = clean_dataframe(df)
-        is_valid, message = validate_dataframe(df_cleaned)
-        
-        if is_valid:
-            print(f"Data cleaning successful: {message}")
-            return df_cleaned
-        else:
-            print(f"Data cleaning failed: {message}")
-            return None
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        return None
-    except Exception as e:
-        print(f"Error processing data: {e}")
-        return None
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = pd.DataFrame({
-        'Product Name': ['A', 'B', None, 'D'],
-        'Price': [100, 200, 300, None],
-        'Quantity': [10, 20, 30, 40]
-    })
-    
-    cleaned = clean_dataframe(sample_data)
-    print("Original DataFrame:")
-    print(sample_data)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    is_valid, message = validate_dataframe(cleaned)
-    print(f"\nValidation result: {is_valid}, Message: {message}")
 import pandas as pd
-import re
+from scipy import stats
 
-def clean_dataframe(df, column_name):
-    """
-    Clean a specified column in a DataFrame by removing duplicates,
-    stripping whitespace, and converting to lowercase.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        
+        self.df = clean_df
+        return self
     
-    df = df.drop_duplicates(subset=[column_name])
-    df[column_name] = df[column_name].astype(str).str.strip().str.lower()
-    df = df.reset_index(drop=True)
-    return df
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        return self
+    
+    def standardize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        
+        return self
+    
+    def handle_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
+    
+    def summary(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.get_removed_count()}")
+        print(f"Columns: {list(self.df.columns)}")
+        
+        if len(self.df.select_dtypes(include=[np.number]).columns) > 0:
+            print("\nNumeric columns summary:")
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols[:5]:
+                print(f"{col}: mean={self.df[col].mean():.3f}, std={self.df[col].std():.3f}")
 
-def remove_special_characters(text):
-    """
-    Remove special characters from a string, keeping only alphanumeric and spaces.
-    """
-    if not isinstance(text, str):
-        return text
-    return re.sub(r'[^a-zA-Z0-9\s]', '', text)
-
-def normalize_column(df, column_name):
-    """
-    Apply cleaning and special character removal to a column.
-    """
-    df = clean_dataframe(df, column_name)
-    df[column_name] = df[column_name].apply(remove_special_characters)
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[np.random.choice(df.index, 50), 'feature_a'] = np.nan
+    df.loc[np.random.choice(df.index, 20), 'feature_b'] = 1000
+    
     return df
 
 if __name__ == "__main__":
-    sample_data = {'Name': [' Alice ', 'bob', 'Alice', 'Charlie!', '  david  ']}
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    sample_df = create_sample_data()
+    print("Sample data created")
+    print(f"Shape: {sample_df.shape}")
+    print(f"Missing values: {sample_df.isnull().sum().sum()}")
     
-    cleaned_df = normalize_column(df, 'Name')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    cleaner = DataCleaner(sample_df)
+    cleaner.handle_missing_median() \
+           .remove_outliers_iqr(factor=1.5) \
+           .normalize_minmax()
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    cleaner.summary()
