@@ -1,68 +1,99 @@
-import csv
-import re
 
-def clean_csv(input_file, output_file, remove_duplicates=True, strip_whitespace=True):
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
     """
-    Clean a CSV file by removing duplicates and stripping whitespace.
-    """
-    try:
-        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-            reader = csv.reader(infile)
-            headers = next(reader)
-            rows = list(reader)
-        
-        if strip_whitespace:
-            rows = [[cell.strip() for cell in row] for row in rows]
-        
-        if remove_duplicates:
-            seen = set()
-            unique_rows = []
-            for row in rows:
-                row_tuple = tuple(row)
-                if row_tuple not in seen:
-                    seen.add(row_tuple)
-                    unique_rows.append(row)
-            rows = unique_rows
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.writer(outfile)
-            writer.writerow(headers)
-            writer.writerows(rows)
-        
-        return True, f"Cleaned data saved to {output_file}"
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    except FileNotFoundError:
-        return False, f"Input file {input_file} not found"
-    except Exception as e:
-        return False, f"An error occurred: {str(e)}"
-
-def validate_email(email):
-    """
-    Validate email format using regex.
-    """
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
-
-def filter_by_column(input_file, output_file, column_index, filter_value):
-    """
-    Filter rows based on a specific column value.
-    """
-    try:
-        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-            reader = csv.reader(infile)
-            headers = next(reader)
-            filtered_rows = [row for row in reader if row[column_index] == filter_value]
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.writer(outfile)
-            writer.writerow(headers)
-            writer.writerows(filtered_rows)
-        
-        return True, f"Filtered data saved to {output_file}"
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
-    except FileNotFoundError:
-        return False, f"Input file {input_file} not found"
-    except IndexError:
-        return False, f"Column index {column_index} is out of range"
-    except Exception as e:
-        return False, f"An error occurred: {str(e)}"
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def clean_dataset(df, columns=None):
+    """
+    Clean multiple columns in a DataFrame by removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean. If None, clean all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in columns:
+        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{column}': {e}")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'A'] = 1000
+    df.loc[20, 'B'] = 500
+    
+    print("Original dataset shape:", df.shape)
+    print("Original statistics for column 'A':")
+    print(calculate_statistics(df, 'A'))
+    
+    cleaned_df = clean_dataset(df, ['A', 'B'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("Cleaned statistics for column 'A':")
+    print(calculate_statistics(cleaned_df, 'A'))
