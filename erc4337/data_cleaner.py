@@ -1,79 +1,142 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from typing import List, Union
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove duplicate rows from DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        DataFrame with duplicates removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def calculate_summary_statistics(df, column):
+def convert_column_types(df: pd.DataFrame, 
+                         column_type_map: dict) -> pd.DataFrame:
     """
-    Calculate summary statistics for a column after outlier removal.
+    Convert columns to specified data types.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    Args:
+        df: Input DataFrame
+        column_type_map: Dictionary mapping column names to target types
     
     Returns:
-    dict: Dictionary containing summary statistics
+        DataFrame with converted column types
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
+    df_copy = df.copy()
+    for column, dtype in column_type_map.items():
+        if column in df_copy.columns:
+            try:
+                df_copy[column] = df_copy[column].astype(dtype)
+            except (ValueError, TypeError):
+                print(f"Warning: Could not convert column '{column}' to {dtype}")
+    return df_copy
 
-def example_usage():
+def handle_missing_values(df: pd.DataFrame, 
+                         strategy: str = 'drop',
+                         fill_value: Union[int, float, str] = None) -> pd.DataFrame:
     """
-    Example usage of the data cleaning functions.
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
     """
-    np.random.seed(42)
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill' and fill_value is not None:
+        return df.fillna(fill_value)
+    else:
+        return df
+
+def clean_dataframe(df: pd.DataFrame,
+                   deduplicate: bool = True,
+                   type_conversions: dict = None,
+                   missing_strategy: str = 'drop',
+                   fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Main function to clean DataFrame with multiple operations.
     
-    data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100)
-    }
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary for column type conversions
+        missing_strategy: Strategy for handling missing values
+        fill_value: Value to fill missing values with
     
-    df = pd.DataFrame(data)
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
     
-    print("Original DataFrame shape:", df.shape)
-    print("Original statistics:", calculate_summary_statistics(df, 'value'))
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
     
-    cleaned_df = remove_outliers_iqr(df, 'value')
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
     
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
+    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
     
     return cleaned_df
 
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Basic validation of DataFrame structure.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        True if DataFrame is valid, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if df.columns.duplicated().any():
+        print("Warning: DataFrame has duplicate column names")
+        return False
+    
+    return True
+
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None],
+        'age': [25, 30, 30, None, 35],
+        'score': ['85', '90', '90', '95', '100']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    if validate_dataframe(df):
+        cleaned = clean_dataframe(
+            df,
+            deduplicate=True,
+            type_conversions={'age': 'float64', 'score': 'int64'},
+            missing_strategy='fill',
+            fill_value=0
+        )
+        
+        print("\nCleaned DataFrame:")
+        print(cleaned)
+        print("\nCleaned DataFrame info:")
+        print(cleaned.info())
+    else:
+        print("DataFrame validation failed")
