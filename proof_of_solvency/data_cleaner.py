@@ -408,3 +408,113 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_df.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
     print(cleaned_data.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data.copy()
+        self.original_shape = data.shape
+        
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        clean_data = self.data.copy()
+        for col in columns:
+            if col in clean_data.columns:
+                Q1 = clean_data[col].quantile(0.25)
+                Q3 = clean_data[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                clean_data = clean_data[(clean_data[col] >= lower_bound) & (clean_data[col] <= upper_bound)]
+        
+        self.data = clean_data
+        return self
+    
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        clean_data = self.data.copy()
+        for col in columns:
+            if col in clean_data.columns:
+                z_scores = np.abs(stats.zscore(clean_data[col].dropna()))
+                clean_data = clean_data[(z_scores < threshold) | clean_data[col].isna()]
+        
+        self.data = clean_data
+        return self
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.data.columns:
+                col_min = self.data[col].min()
+                col_max = self.data[col].max()
+                if col_max != col_min:
+                    self.data[col] = (self.data[col] - col_min) / (col_max - col_min)
+        
+        return self
+    
+    def normalize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.data.columns:
+                col_mean = self.data[col].mean()
+                col_std = self.data[col].std()
+                if col_std != 0:
+                    self.data[col] = (self.data[col] - col_mean) / col_std
+        
+        return self
+    
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.data.columns:
+                self.data[col] = self.data[col].fillna(self.data[col].mean())
+        
+        return self
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.data.columns:
+                self.data[col] = self.data[col].fillna(self.data[col].median())
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.data
+    
+    def get_removed_count(self):
+        return self.original_shape[0] - self.data.shape[0]
+
+def clean_dataset(df, method='iqr', normalization='minmax', fill_method='mean'):
+    cleaner = DataCleaner(df)
+    
+    if method == 'iqr':
+        cleaner.remove_outliers_iqr()
+    elif method == 'zscore':
+        cleaner.remove_outliers_zscore()
+    
+    if fill_method == 'mean':
+        cleaner.fill_missing_mean()
+    elif fill_method == 'median':
+        cleaner.fill_missing_median()
+    
+    if normalization == 'minmax':
+        cleaner.normalize_minmax()
+    elif normalization == 'zscore':
+        cleaner.normalize_zscore()
+    
+    return cleaner.get_cleaned_data(), cleaner.get_removed_count()
