@@ -358,3 +358,145 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(df, ['value'])
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def zscore_normalize(data, column):
+    """
+    Normalize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column added as '{column}_normalized'
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    normalized_col = f"{column}_normalized"
+    data[normalized_col] = stats.zscore(data[column])
+    return data
+
+def minmax_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized column added as '{column}_scaled'
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        scaled_col = np.zeros(len(data))
+    else:
+        scaled_col = (data[column] - min_val) / (max_val - min_val)
+        scaled_col = scaled_col * (feature_range[1] - feature_range[0]) + feature_range[0]
+    
+    scaled_col_name = f"{column}_scaled"
+    data[scaled_col_name] = scaled_col
+    return data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of columns to process (None processes all numeric columns)
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    data_clean = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if strategy == 'drop':
+            data_clean = data_clean.dropna(subset=[col])
+        elif strategy == 'mean':
+            data_clean[col] = data_clean[col].fillna(data_clean[col].mean())
+        elif strategy == 'median':
+            data_clean[col] = data_clean[col].fillna(data_clean[col].median())
+        elif strategy == 'mode':
+            mode_val = data_clean[col].mode()
+            if not mode_val.empty:
+                data_clean[col] = data_clean[col].fillna(mode_val.iloc[0])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return data_clean
+
+def validate_data(data, check_duplicates=True, check_infinite=True):
+    """
+    Validate data quality.
+    
+    Args:
+        data: pandas DataFrame
+        check_duplicates: flag to check for duplicate rows
+        check_infinite: flag to check for infinite values
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'duplicate_rows': 0,
+        'infinite_values': {}
+    }
+    
+    if check_duplicates:
+        validation_results['duplicate_rows'] = data.duplicated().sum()
+    
+    if check_infinite:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            infinite_count = np.isinf(data[col]).sum()
+            if infinite_count > 0:
+                validation_results['infinite_values'][col] = infinite_count
+    
+    return validation_results
