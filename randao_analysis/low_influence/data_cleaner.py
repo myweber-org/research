@@ -1,61 +1,35 @@
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_method=None):
-    """
-    Clean a pandas DataFrame by handling null values and optionally removing duplicates.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): If True, remove duplicate rows.
-    fill_method (str or None): Method to fill nulls: 'mean', 'median', 'mode', or None to drop.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    
-    # Handle null values
-    if fill_method is None:
-        cleaned_df = cleaned_df.dropna()
-    else:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        if fill_method == 'mean':
-            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
-        elif fill_method == 'median':
-            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
-        elif fill_method == 'mode':
-            for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
-                else:
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
-    
-    # Remove duplicates if requested
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    return cleaned_df
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def validate_dataset(df, required_columns=None):
-    """
-    Validate DataFrame for required columns and basic integrity.
+def normalize_column(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_data(input_file, output_file):
+    df = pd.read_csv(input_file)
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
     
-    Returns:
-    tuple: (is_valid, message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
+    for col in numeric_columns:
+        df = remove_outliers_iqr(df, col)
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+    for col in numeric_columns:
+        df = normalize_column(df, col)
     
-    return True, "Dataset is valid"
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    print(f"Original shape: {pd.read_csv(input_file).shape}")
+    print(f"Cleaned shape: {df.shape}")
+
+if __name__ == "__main__":
+    clean_data('raw_data.csv', 'cleaned_data.csv')
