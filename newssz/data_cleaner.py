@@ -127,4 +127,44 @@ def filter_by_column(df, column_name, min_value=None, max_value=None):
     if max_value is not None:
         filtered_df = filtered_df[filtered_df[column_name] <= max_value]
     
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import numpy as np
+import sys
+
+def clean_csv(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df.replace(['', 'NA', 'N/A', 'null', 'NULL'], np.nan, inplace=True)
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col].fillna(df[col].median(), inplace=True)
+        
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+        
+        df.drop_duplicates(inplace=True)
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned shape: {df.shape}")
+        print(f"Saved to: {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv(input_file, output_file)
