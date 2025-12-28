@@ -267,3 +267,99 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned.shape)
     print("\nCleaned Feature A statistics:")
     print(get_summary_statistics(cleaned, 'feature_a'))
+import pandas as pd
+
+def clean_dataset(df, missing_strategy='drop', duplicate_strategy='drop_first'):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for missing values - 'drop' or 'fill_mean'.
+    duplicate_strategy (str): Strategy for duplicates - 'drop_first' or 'drop_all'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'fill_mean':
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+    
+    # Handle duplicates
+    if duplicate_strategy == 'drop_first':
+        cleaned_df = cleaned_df.drop_duplicates(keep='first')
+    elif duplicate_strategy == 'drop_all':
+        cleaned_df = cleaned_df.drop_duplicates(keep=False)
+    
+    # Reset index after cleaning operations
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    dict: Validation results with status and messages.
+    """
+    validation_result = {
+        'is_valid': True,
+        'messages': [],
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
+    
+    # Check for empty dataset
+    if df.empty:
+        validation_result['is_valid'] = False
+        validation_result['messages'].append('Dataset is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_result['is_valid'] = False
+            validation_result['messages'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for all-null columns
+    null_columns = df.columns[df.isnull().all()].tolist()
+    if null_columns:
+        validation_result['messages'].append(f'Columns with all null values: {null_columns}')
+    
+    return validation_result
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+    pd.DataFrame: Statistics DataFrame.
+    """
+    numeric_df = df.select_dtypes(include=['number'])
+    
+    if numeric_df.empty:
+        return pd.DataFrame()
+    
+    stats = {
+        'mean': numeric_df.mean(),
+        'median': numeric_df.median(),
+        'std': numeric_df.std(),
+        'min': numeric_df.min(),
+        'max': numeric_df.max(),
+        'count': numeric_df.count()
+    }
+    
+    return pd.DataFrame(stats)
