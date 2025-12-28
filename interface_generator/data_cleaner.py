@@ -435,4 +435,86 @@ def validate_data(df, required_columns, numeric_columns):
             if not pd.api.types.is_numeric_dtype(df[col]):
                 raise TypeError(f"Column {col} must be numeric")
     
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    """
+    Load a CSV file and perform basic data cleaning.
+    """
+    df = pd.read_csv(filepath)
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].apply(lambda x: x.fillna(x.median()))
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    return df
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specific column using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a numeric column using specified method.
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+        else:
+            df[column + '_normalized'] = 0
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            df[column + '_normalized'] = (df[column] - mean_val) / std_val
+        else:
+            df[column + '_normalized'] = 0
+    return df
+
+def process_dataset(input_path, output_path):
+    """
+    Complete pipeline to load, clean, and process dataset.
+    """
+    # Load and clean
+    df = load_and_clean_data(input_path)
+    
+    # Process numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        # Remove outliers
+        df = remove_outliers_iqr(df, col)
+        # Normalize using z-score
+        df = normalize_column(df, col, method='zscore')
+    
+    # Save processed data
+    df.to_csv(output_path, index=False)
+    print(f"Processed data saved to {output_path}")
+    print(f"Original shape: {pd.read_csv(input_path).shape}, Cleaned shape: {df.shape}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    process_dataset(input_file, output_file)
