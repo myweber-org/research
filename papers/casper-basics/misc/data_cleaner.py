@@ -269,3 +269,11 @@ if __name__ == "__main__":
     # Validate email
     test_email = "test@example.com"
     print(f"Email valid: {validate_email_format(test_email)}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
