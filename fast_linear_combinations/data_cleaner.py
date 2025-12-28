@@ -457,4 +457,93 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import csv
+import re
+from typing import List, Dict, Optional
+
+def read_csv_file(filepath: str) -> List[Dict[str, str]]:
+    """Read CSV file and return list of dictionaries."""
+    data = []
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+    return data
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value) if value is not None else ""
+    cleaned = re.sub(r'\s+', ' ', value.strip())
+    return cleaned
+
+def clean_numeric(value: str) -> Optional[float]:
+    """Convert string to float, handling common issues."""
+    if value is None or value == "":
+        return None
+    try:
+        cleaned = re.sub(r'[^\d.-]', '', value)
+        return float(cleaned)
+    except ValueError:
+        return None
+
+def validate_email(email: str) -> bool:
+    """Basic email validation."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email.strip()))
+
+def clean_csv_data(data: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Apply cleaning functions to all rows in CSV data."""
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for key, value in row.items():
+            if key.lower().endswith('email'):
+                cleaned_row[key] = clean_string(value) if validate_email(value) else ""
+            elif any(num_key in key.lower() for num_key in ['price', 'amount', 'quantity', 'total']):
+                cleaned_value = clean_numeric(value)
+                cleaned_row[key] = str(cleaned_value) if cleaned_value is not None else ""
+            else:
+                cleaned_row[key] = clean_string(value)
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def write_csv_file(data: List[Dict[str, str]], filepath: str) -> bool:
+    """Write cleaned data to CSV file."""
+    if not data:
+        return False
+    try:
+        with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV: {e}")
+        return False
+
+def process_csv(input_path: str, output_path: str) -> None:
+    """Complete CSV processing pipeline."""
+    print(f"Reading data from: {input_path}")
+    raw_data = read_csv_file(input_path)
+    
+    if not raw_data:
+        print("No data to process.")
+        return
+    
+    print(f"Processing {len(raw_data)} records...")
+    cleaned_data = clean_csv_data(raw_data)
+    
+    print(f"Writing cleaned data to: {output_path}")
+    success = write_csv_file(cleaned_data, output_path)
+    
+    if success:
+        print("CSV processing completed successfully.")
+    else:
+        print("CSV processing failed.")
