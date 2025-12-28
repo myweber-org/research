@@ -155,3 +155,41 @@ if __name__ == "__main__":
         print("Data cleaning completed successfully")
     else:
         print("Data cleaning failed")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+            self.df = self.df[(z_scores < threshold) | (self.df[col].isna())]
+        return self.df
+    
+    def normalize_minmax(self):
+        for col in self.numeric_columns:
+            min_val = self.df[col].min()
+            max_val = self.df[col].max()
+            if max_val > min_val:
+                self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        return self.df
+    
+    def fill_missing_median(self):
+        for col in self.numeric_columns:
+            self.df[col] = self.df[col].fillna(self.df[col].median())
+        return self.df
+    
+    def get_clean_data(self):
+        return self.df.copy()
+
+def process_dataset(file_path):
+    df = pd.read_csv(file_path)
+    cleaner = DataCleaner(df)
+    cleaner.remove_outliers_zscore()
+    cleaner.fill_missing_median()
+    cleaner.normalize_minmax()
+    return cleaner.get_clean_data()
