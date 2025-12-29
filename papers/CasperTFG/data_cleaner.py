@@ -471,3 +471,49 @@ if __name__ == "__main__":
     
     summary = get_dataset_summary(cleaned_df)
     print(f"\nDataset summary keys: {list(summary.keys())}")
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    if columns is None:
+        columns = df.columns
+    return df.dropna(subset=columns)
+
+def fill_missing_with_mean(df, columns=None):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            df_filled[col] = df[col].fillna(df[col].mean())
+    return df_filled
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    if column not in df.columns:
+        return df
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def standardize_column(df, column):
+    if column not in df.columns:
+        return df
+    df_standardized = df.copy()
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    if std_val > 0:
+        df_standardized[column] = (df[column] - mean_val) / std_val
+    return df_standardized
+
+def get_data_summary(df):
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    return summary
