@@ -2,124 +2,64 @@
 import pandas as pd
 import re
 
-def clean_string_column(series, case='lower', strip=True, remove_special=True):
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
     """
-    Standardize string values in a pandas Series.
-    """
-    if not pd.api.types.is_string_dtype(series):
-        series = series.astype(str)
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
-    if case == 'lower':
-        series = series.str.lower()
-    elif case == 'upper':
-        series = series.str.upper()
-    
-    if strip:
-        series = series.str.strip()
-    
-    if remove_special:
-        series = series.apply(lambda x: re.sub(r'[^\w\s]', '', x))
-    
-    return series
-
-def remove_duplicate_rows(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from DataFrame with optional subset.
-    """
-    return df.drop_duplicates(subset=subset, keep=keep)
-
-def standardize_numeric(series, fillna=0):
-    """
-    Convert series to numeric type and fill missing values.
-    """
-    series = pd.to_numeric(series, errors='coerce')
-    return series.fillna(fillna)
-
-def clean_dataframe(df, string_columns=None, numeric_columns=None):
-    """
-    Apply cleaning operations to multiple columns.
-    """
-    df_clean = df.copy()
-    
-    if string_columns:
-        for col in string_columns:
-            if col in df_clean.columns:
-                df_clean[col] = clean_string_column(df_clean[col])
-    
-    if numeric_columns:
-        for col in numeric_columns:
-            if col in df_clean.columns:
-                df_clean[col] = standardize_numeric(df_clean[col])
-    
-    return df_clean
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: Optional dictionary to rename columns
+        drop_duplicates: Boolean to remove duplicate rows
+        normalize_text: Boolean to normalize text columns
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        Cleaned pandas DataFrame
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean a dataset by removing outliers from all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
     cleaned_df = df.copy()
     
-    for column in numeric_columns:
-        if column in cleaned_df.columns:
-            original_len = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_len - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
     
     return cleaned_df
 
-if __name__ == "__main__":
-    # Example usage
-    np.random.seed(42)
-    data = {
-        'id': range(100),
-        'value': np.random.randn(100) * 10 + 50,
-        'category': np.random.choice(['A', 'B', 'C'], 100)
-    }
+def _normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
     
-    df = pd.DataFrame(data)
-    print(f"Original dataset shape: {df.shape}")
+    text = str(text)
+    text = text.lower().strip()
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^\w\s-]', '', text)
     
-    cleaned_df = clean_dataset(df, ['value'])
-    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    return text
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a DataFrame column.
     
-    # Save cleaned data
-    cleaned_df.to_csv('cleaned_data.csv', index=False)
-    print("Cleaned data saved to 'cleaned_data.csv'")
+    Args:
+        df: pandas DataFrame
+        email_column: Name of the column containing email addresses
+    
+    Returns:
+        DataFrame with validation results
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validation_results = df.copy()
+    validation_results['is_valid_email'] = validation_results[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
+    )
+    
+    return validation_results
