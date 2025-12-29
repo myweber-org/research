@@ -176,3 +176,144 @@ if __name__ == "__main__":
     
     print("\nCleaned Data Summary:")
     print(cleaned_data.describe())
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, threshold=0.5):
+    """
+    Remove rows with missing values exceeding the threshold percentage.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        threshold (float): Maximum allowed missing value percentage per row (0-1)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    missing_percent = df.isnull().mean(axis=1)
+    return df[missing_percent <= threshold].reset_index(drop=True)
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median for specified columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with filled values
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            median_val = df[col].median()
+            df_filled[col] = df[col].fillna(median_val)
+    
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        pd.DataFrame: DataFrame containing outlier indices and values
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def cap_outliers(df, column, method='iqr'):
+    """
+    Cap outliers to specified bounds.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+        method (str): Method for determining bounds ('iqr' or 'percentile')
+    
+    Returns:
+        pd.DataFrame: DataFrame with capped values
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_capped = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+    elif method == 'percentile':
+        lower_bound = df[column].quantile(0.01)
+        upper_bound = df[column].quantile(0.99)
+    else:
+        raise ValueError("Method must be 'iqr' or 'percentile'")
+    
+    df_capped[column] = df_capped[column].clip(lower=lower_bound, upper=upper_bound)
+    return df_capped
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
+    
+    return df_standardized
+
+def clean_dataset(df, missing_threshold=0.3, outlier_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        missing_threshold (float): Threshold for removing rows with missing values
+        outlier_columns (list): Columns to process for outlier capping
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    cleaned_df = remove_missing_rows(cleaned_df, threshold=missing_threshold)
+    cleaned_df = fill_missing_with_median(cleaned_df)
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = cap_outliers(cleaned_df, col, method='iqr')
+    
+    return cleaned_df
