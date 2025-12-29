@@ -547,3 +547,11 @@ def process_csv(input_path: str, output_path: str) -> None:
         print("CSV processing completed successfully.")
     else:
         print("CSV processing failed.")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
