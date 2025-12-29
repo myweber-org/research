@@ -494,3 +494,138 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print("\nValidation Results:")
     print(validation)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize=False):
+    """
+    Main function to clean dataset with multiple options
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            outliers, lower, upper = detect_outliers_iqr(cleaned_df, col)
+            if not outliers.empty:
+                cleaned_df = cleaned_df[(cleaned_df[col] >= lower) & (cleaned_df[col] <= upper) | cleaned_df[col].isna()]
+        
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalize:
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[f'{col}_standardized'] = standardize_data(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, check_nulls=True):
+    """
+    Validate dataframe structure and content
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    if check_nulls:
+        for col in df.columns:
+            null_count = df[col].isnull().sum()
+            if null_count > 0:
+                validation_results['null_counts'][col] = null_count
+    
+    for col in df.columns:
+        validation_results['data_types'][col] = str(df[col].dtype)
+    
+    return validation_results
+
+def sample_usage():
+    """
+    Example usage of the data cleaning functions
+    """
+    np.random.seed(42)
+    sample_data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'value'] = 500
+    df.loc[20, 'value'] = -100
+    
+    print("Original DataFrame:")
+    print(df.describe())
+    
+    validation = validate_dataframe(df, required_columns=['id', 'value', 'category'])
+    print(f"\nValidation Results: {validation['is_valid']}")
+    
+    cleaned = clean_dataset(df, numeric_columns=['value'], outlier_method='iqr', normalize=True)
+    print(f"\nCleaned DataFrame shape: {cleaned.shape}")
+    print(cleaned.describe())
+    
+    return cleaned
+
+if __name__ == "__main__":
+    result_df = sample_usage()
