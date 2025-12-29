@@ -139,4 +139,56 @@ def validate_dataframe(df, required_columns=None):
     if null_counts.sum() > 0:
         return False, f"Found null values in columns: {null_counts[null_counts > 0].to_dict()}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and normalize column names.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+    
+    # Normalize column names: strip whitespace, lowercase, replace spaces with underscores
+    df_cleaned.columns = (
+        df_cleaned.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(' ', '_')
+    )
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and required columns.
+    """
+    if required_columns is None:
+        required_columns = []
+    
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Product Name': ['A', 'B', 'A', 'C'],
+        'Price': [100, 200, 100, 300],
+        'Category ': ['X', 'Y', 'X', 'Z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataframe(df)
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, ['product_name', 'price'])
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nValidation error: {e}")
