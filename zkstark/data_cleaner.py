@@ -1,16 +1,9 @@
-
 import numpy as np
+import pandas as pd
 
-def remove_outliers_iqr(data, column):
+def remove_outliers_iqr(data, column, factor=1.5):
     """
-    Remove outliers from a specific column using the Interquartile Range method.
-    
-    Args:
-        data: pandas DataFrame containing the data
-        column: string name of the column to clean
-    
-    Returns:
-        DataFrame with outliers removed from specified column
+    Remove outliers using IQR method
     """
     if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -19,97 +12,76 @@ def remove_outliers_iqr(data, column):
     Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    
     return filtered_data
 
-def calculate_statistics(data, column):
+def normalize_minmax(data, column):
     """
-    Calculate basic statistics for a column after outlier removal.
-    
-    Args:
-        data: pandas DataFrame
-        column: string name of the column
-    
-    Returns:
-        Dictionary containing statistical measures
+    Normalize data using min-max scaling
     """
-    stats = {
-        'mean': data[column].mean(),
-        'median': data[column].median(),
-        'std': data[column].std(),
-        'min': data[column].min(),
-        'max': data[column].max(),
-        'count': data[column].count()
-    }
-    
-    return stats
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to clean
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
+    if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    min_val = data[column].min()
+    max_val = data[column].max()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def clean_numeric_data(df, columns=None):
+def standardize_zscore(data, column):
     """
-    Clean numeric columns by removing outliers and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
+    Standardize data using z-score normalization
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    cleaned_df = df.copy()
+    mean_val = data[column].mean()
+    std_val = data[column].std()
     
-    for column in columns:
-        if column in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].median())
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
     
-    return cleaned_df
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 3, 4, 5, 100],
-        'B': [10, 20, 30, 40, 50, 200],
-        'C': [1.1, 2.2, 3.3, 4.4, 5.5, 1000.0]
-    }
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col].fillna(data[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col].fillna(data[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col].fillna(data[col].mode()[0], inplace=True)
+    elif strategy == 'drop':
+        data.dropna(subset=numeric_cols, inplace=True)
     
-    cleaned_df = clean_numeric_data(df)
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    return data
+
+def create_data_summary(data):
+    """
+    Create a summary statistics DataFrame
+    """
+    summary = pd.DataFrame({
+        'mean': data.mean(),
+        'median': data.median(),
+        'std': data.std(),
+        'min': data.min(),
+        'max': data.max(),
+        'missing': data.isnull().sum(),
+        'unique': data.nunique()
+    })
+    
+    return summary
