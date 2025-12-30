@@ -1,91 +1,132 @@
-
 import pandas as pd
 import numpy as np
 
-def clean_dataset(df, drop_threshold=0.5, fill_strategy='mean'):
+def remove_missing_rows(df, columns=None):
     """
-    Clean a pandas DataFrame by handling missing values and standardizing columns.
+    Remove rows with missing values from DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean
-    drop_threshold (float): Threshold for dropping columns with too many nulls (0.0 to 1.0)
-    fill_strategy (str): Strategy for filling remaining nulls ('mean', 'median', 'mode', or 'constant')
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to check for missing values.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+        pd.DataFrame: DataFrame with missing rows removed
     """
-    df_clean = df.copy()
-    
-    # Standardize column names
-    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
-    
-    # Drop columns with too many null values
-    null_ratio = df_clean.isnull().sum() / len(df_clean)
-    cols_to_drop = null_ratio[null_ratio > drop_threshold].index
-    df_clean = df_clean.drop(columns=cols_to_drop)
-    
-    # Fill remaining null values based on strategy
-    for col in df_clean.columns:
-        if df_clean[col].isnull().any():
-            if fill_strategy == 'mean' and np.issubdtype(df_clean[col].dtype, np.number):
-                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
-            elif fill_strategy == 'median' and np.issubdtype(df_clean[col].dtype, np.number):
-                df_clean[col].fillna(df_clean[col].median(), inplace=True)
-            elif fill_strategy == 'mode':
-                df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0, inplace=True)
-            elif fill_strategy == 'constant':
-                df_clean[col].fillna(0, inplace=True)
-            else:
-                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
-    
-    # Remove duplicate rows
-    df_clean = df_clean.drop_duplicates()
-    
-    return df_clean
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
 
-def validate_dataset(df, required_columns=None):
+def fill_missing_with_mean(df, columns):
     """
-    Validate a DataFrame for basic quality checks.
+    Fill missing values with column mean.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): Columns to fill missing values
     
     Returns:
-    dict: Dictionary with validation results
+        pd.DataFrame: DataFrame with filled values
     """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'null_count': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'column_types': df.dtypes.to_dict()
-    }
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        validation_results['missing_required_columns'] = missing_columns
-        validation_results['has_all_required_columns'] = len(missing_columns) == 0
-    
-    return validation_results
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+    return df_filled
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'Name': ['Alice', 'Bob', None, 'David', 'Alice'],
-        'Age': [25, 30, None, 35, 25],
-        'Score': [85.5, 92.0, 78.5, None, 85.5],
-        'Department': ['HR', 'IT', 'IT', 'Finance', 'HR']
-    }
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nValidation Results:")
-    print(validate_dataset(df))
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column to check for outliers
+        threshold (float): IQR multiplier threshold
     
-    cleaned_df = clean_dataset(df, drop_threshold=0.3, fill_strategy='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print("\nCleaned Validation Results:")
-    print(validate_dataset(cleaned_df))
+    Returns:
+        pd.Series: Boolean series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def remove_outliers(df, column, threshold=1.5):
+    """
+    Remove outliers from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column to remove outliers from
+        threshold (float): IQR multiplier threshold
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    outliers = detect_outliers_iqr(df, column, threshold)
+    return df[~outliers]
+
+def standardize_column(df, column):
+    """
+    Standardize column using z-score normalization.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_standardized = df.copy()
+    mean_val = df_standardized[column].mean()
+    std_val = df_standardized[column].std()
+    
+    if std_val > 0:
+        df_standardized[column] = (df_standardized[column] - mean_val) / std_val
+    
+    return df_standardized
+
+def clean_dataset(df, missing_strategy='drop', outlier_columns=None, standardize_columns=None):
+    """
+    Comprehensive dataset cleaning function.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        missing_strategy (str): 'drop' or 'mean'
+        outlier_columns (list): Columns to remove outliers from
+        standardize_columns (list): Columns to standardize
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = remove_missing_rows(cleaned_df)
+    elif missing_strategy == 'mean':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns.tolist()
+        cleaned_df = fill_missing_with_mean(cleaned_df, numeric_cols)
+    
+    # Remove outliers
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers(cleaned_df, col)
+    
+    # Standardize columns
+    if standardize_columns:
+        for col in standardize_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = standardize_column(cleaned_df, col)
+    
+    return cleaned_df
