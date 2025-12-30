@@ -97,4 +97,11 @@ def get_data_summary(df):
         'data_types': df.dtypes.astype(str).to_dict(),
         'numeric_stats': df.describe().to_dict() if not df.select_dtypes(include=[np.number]).empty else {}
     }
-    return summary
+    return summarydef deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
