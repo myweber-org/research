@@ -117,4 +117,121 @@ def deduplicate_list(input_list):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+    elif strategy == 'drop':
+        data = data.dropna(subset=numeric_cols)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return data
+
+def validate_data_types(data, schema):
+    """
+    Validate data types according to provided schema
+    """
+    validation_results = {}
+    
+    for column, expected_type in schema.items():
+        if column not in data.columns:
+            validation_results[column] = {'valid': False, 'error': 'Column not found'}
+            continue
+        
+        actual_type = str(data[column].dtype)
+        is_valid = actual_type == expected_type
+        
+        validation_results[column] = {
+            'valid': is_valid,
+            'expected': expected_type,
+            'actual': actual_type
+        }
+    
+    return validation_results
+
+def create_sample_data():
+    """
+    Create sample data for testing
+    """
+    np.random.seed(42)
+    
+    data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100),
+        'score': np.random.uniform(0, 100, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[np.random.choice(100, 5), 'value'] = np.nan
+    df.loc[np.random.choice(100, 3), 'score'] = np.nan
+    
+    return df
