@@ -164,4 +164,16 @@ def validate_email_column(df, email_column):
         pd.Series: Boolean series indicating valid emails
     """
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return df[email_column].str.match(email_pattern, na=False)
+    return df[email_column].str.match(email_pattern, na=False)def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data):
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
+    return remove_duplicates(data)
