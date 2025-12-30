@@ -114,3 +114,74 @@ if __name__ == "__main__":
     print("Original dataset shape:", df.shape)
     cleaned_df = clean_dataset(df)
     print("Cleaned dataset shape:", cleaned_df.shape)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_summary_statistics(data, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
+    
+    Returns:
+    dict: Dictionary containing count, mean, std, min, max, and IQR.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'count': data[column].count(),
+        'mean': data[column].mean(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'q1': data[column].quantile(0.25),
+        'q3': data[column].quantile(0.75),
+        'iqr': data[column].quantile(0.75) - data[column].quantile(0.25)
+    }
+    return stats
+
+def validate_dataframe(data, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): The DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, raises ValueError otherwise.
+    """
+    if data.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if data.isnull().all().any():
+        raise ValueError("DataFrame contains columns with all null values")
+    
+    return True
