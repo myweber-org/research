@@ -1,98 +1,49 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
-    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
 
-def calculate_basic_stats(df, column):
-    """
-    Calculate basic statistics for a DataFrame column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    return (data[column] - min_val) / (max_val - min_val)
 
-def clean_numeric_data(df, columns=None):
-    """
-    Clean numeric data by removing outliers from specified columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean. If None, uses all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
-    
+def standardize_zscore(data, column):
+    mean = data[column].mean()
+    std = data[column].std()
+    if std == 0:
+        return data[column].apply(lambda x: 0)
+    return (data[column] - mean) / std
+
+def clean_dataset(df, numeric_columns):
     cleaned_df = df.copy()
-    
-    for column in columns:
-        if column in cleaned_df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            except Exception as e:
-                print(f"Warning: Could not process column '{column}': {e}")
-    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col + '_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[col + '_standardized'] = standardize_zscore(cleaned_df, col)
     return cleaned_df
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("\nOriginal Statistics for column 'A':")
-    print(calculate_basic_stats(df, 'A'))
-    
-    cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("\nCleaned Statistics for column 'A':")
-    print(calculate_basic_stats(cleaned_df, 'A'))
+def generate_summary(cleaned_df, original_df, numeric_columns):
+    summary = {}
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            summary[col] = {
+                'original_count': original_df[col].count(),
+                'cleaned_count': cleaned_df[col].count(),
+                'removed_outliers': original_df[col].count() - cleaned_df[col].count(),
+                'original_mean': original_df[col].mean(),
+                'cleaned_mean': cleaned_df[col].mean(),
+                'original_std': original_df[col].std(),
+                'cleaned_std': cleaned_df[col].std()
+            }
+    return pd.DataFrame.from_dict(summary, orient='index')
