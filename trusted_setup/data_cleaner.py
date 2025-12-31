@@ -1,55 +1,100 @@
-import pandas as pd
-import sys
 
-def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a CSV file.
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
     
-    Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. If None, overwrites input file
-        subset (list, optional): Columns to consider for identifying duplicates
-        keep (str): Which duplicates to keep - 'first', 'last', or False to drop all
-        
-    Returns:
-        int: Number of duplicates removed
-    """
-    try:
-        df = pd.read_csv(input_file)
-        initial_rows = len(df)
-        
-        df_clean = df.drop_duplicates(subset=subset, keep=keep)
-        final_rows = len(df_clean)
-        
-        duplicates_removed = initial_rows - final_rows
-        
-        if output_file is None:
-            output_file = input_file
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        self.df = self.df[(z_scores < threshold) | (self.df[column].isna())]
+        return self
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+    
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = strategy
             
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original rows: {initial_rows}, Cleaned rows: {final_rows}")
-        print(f"Saved to: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty")
-        return -1
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return -1
+        self.df[column].fillna(fill_value, inplace=True)
+        return self
+    
+    def get_cleaned_data(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        return self.df
+    
+    def generate_report(self):
+        report = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_columns': self.df.shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist(),
+            'categorical_columns': self.df.select_dtypes(include=['object']).columns.tolist()
+        }
+        return report
+
+def process_sample_data():
+    np.random.seed(42)
+    data = {
+        'age': np.random.normal(35, 10, 100),
+        'income': np.random.exponential(50000, 100),
+        'score': np.random.uniform(0, 100, 100)
+    }
+    
+    data['age'][[10, 25, 50]] = [150, -10, 200]
+    data['income'][[15, 30]] = [1000000, -50000]
+    data['score'][[5, 20, 70]] = [np.nan, np.nan, np.nan]
+    
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_outliers_zscore('age')
+    cleaner.remove_outliers_zscore('income')
+    cleaner.fill_missing('score', 'median')
+    cleaner.normalize_column('income', 'minmax')
+    cleaner.normalize_column('score', 'zscore')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    report = cleaner.generate_report()
+    
+    return cleaned_df, report
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        sys.exit(1)
+    cleaned_data, report = process_sample_data()
+    print("\nData Cleaning Report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
-    
-    remove_duplicates(input_file, output_file)
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_data.head())
