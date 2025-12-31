@@ -1,168 +1,112 @@
+
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(data, column, threshold=1.5):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to process.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    Remove outliers using IQR method
     """
-    if column not in df.columns:
+    if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
     
-    return filtered_df.reset_index(drop=True)
+    return filtered_data, outliers_removed
 
-def calculate_basic_stats(df, column):
+def remove_outliers_zscore(data, column, threshold=3):
     """
-    Calculate basic statistics for a DataFrame column.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to analyze.
-    
-    Returns:
-    dict: Dictionary containing statistical measures.
+    Remove outliers using Z-score method
     """
-    if column not in df.columns:
+    if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    outliers_removed = len(data) - len(filtered_data)
     
-    return stats
+    return filtered_data, outliers_removed
 
-def main():
+def normalize_minmax(data, columns=None):
     """
-    Example usage of the data cleaning functions.
+    Normalize data using Min-Max scaling
     """
-    np.random.seed(42)
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
     
-    data = {
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)
-        ])
-    }
+    normalized_data = data.copy()
     
-    df = pd.DataFrame(data)
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            min_val = data[col].min()
+            max_val = data[col].max()
+            
+            if max_val > min_val:
+                normalized_data[col] = (data[col] - min_val) / (max_val - min_val)
     
-    print("Original DataFrame:")
-    print(f"Shape: {df.shape}")
-    print(f"Stats: {calculate_basic_stats(df, 'values')}")
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned DataFrame:")
-    print(f"Shape: {cleaned_df.shape}")
-    print(f"Stats: {calculate_basic_stats(cleaned_df, 'values')}")
+    return normalized_data
 
-if __name__ == "__main__":
-    main()import pandas as pd
-import re
+def normalize_zscore(data, columns=None):
+    """
+    Normalize data using Z-score standardization
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    standardized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            mean_val = data[col].mean()
+            std_val = data[col].std()
+            
+            if std_val > 0:
+                standardized_data[col] = (data[col] - mean_val) / std_val
+    
+    return standardized_data
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def clean_dataset(data, outlier_method='iqr', normalization_method=None, outlier_threshold=1.5):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
-    
-    Args:
-        df: pandas DataFrame to clean
-        column_mapping: dictionary mapping original column names to new names
-        drop_duplicates: whether to remove duplicate rows
-        normalize_text: whether to normalize text columns (strip, lower case)
-    
-    Returns:
-        Cleaned pandas DataFrame
+    Comprehensive data cleaning pipeline
     """
-    cleaned_df = df.copy()
+    cleaned_data = data.copy()
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns
     
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
+    for col in numeric_columns:
+        if outlier_method == 'iqr':
+            cleaned_data, _ = remove_outliers_iqr(cleaned_data, col, outlier_threshold)
+        elif outlier_method == 'zscore':
+            cleaned_data, _ = remove_outliers_zscore(cleaned_data, col, outlier_threshold)
     
-    if normalize_text:
-        for column in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[column] = cleaned_df[column].apply(
-                lambda x: str(x).strip().lower() if pd.notnull(x) else x
-            )
+    if normalization_method == 'minmax':
+        cleaned_data = normalize_minmax(cleaned_data)
+    elif normalization_method == 'zscore':
+        cleaned_data = normalize_zscore(cleaned_data)
     
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    return cleaned_df
+    return cleaned_data
 
-def validate_email(email):
+def validate_data(data, required_columns=None, allow_nan=False):
     """
-    Validate email format using regex.
-    
-    Args:
-        email: string email address to validate
-    
-    Returns:
-        Boolean indicating if email is valid
+    Validate data structure and content
     """
-    if pd.isnull(email):
-        return False
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
     
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, str(email)))
-
-def filter_valid_emails(df, email_column):
-    """
-    Filter DataFrame to only include rows with valid email addresses.
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
     
-    Args:
-        df: pandas DataFrame
-        email_column: name of column containing email addresses
+    if not allow_nan and data.isnull().any().any():
+        raise ValueError("Data contains NaN values")
     
-    Returns:
-        Filtered DataFrame with valid emails only
-    """
-    mask = df[email_column].apply(validate_email)
-    return df[mask].copy()
-
-def main():
-    sample_data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', ''],
-        'email': ['john@example.com', 'jane@example.com', 'invalid-email', 'bob@example.com', None],
-        'age': [25, 30, 25, 35, 40]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    cleaned = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
-    print("Cleaned DataFrame:")
-    print(cleaned)
-    print("\n" + "="*50 + "\n")
-    
-    valid_emails = filter_valid_emails(cleaned, 'email')
-    print("DataFrame with valid emails only:")
-    print(valid_emails)
-
-if __name__ == "__main__":
-    main()
+    return True
