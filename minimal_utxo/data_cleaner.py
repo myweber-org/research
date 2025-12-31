@@ -192,3 +192,118 @@ if __name__ == "__main__":
         print("\nData validation passed.")
     except ValueError as e:
         print(f"\nValidation error: {e}")
+import csv
+import os
+
+def clean_csv(input_file, output_file, remove_duplicates=True, strip_whitespace=True):
+    """
+    Clean a CSV file by removing duplicates and stripping whitespace.
+    
+    Args:
+        input_file (str): Path to the input CSV file.
+        output_file (str): Path to the output cleaned CSV file.
+        remove_duplicates (bool): Whether to remove duplicate rows.
+        strip_whitespace (bool): Whether to strip whitespace from all fields.
+    """
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Input file '{input_file}' not found.")
+    
+    seen_rows = set()
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        cleaned_rows.append(header)
+        
+        for row in reader:
+            if strip_whitespace:
+                row = [field.strip() if isinstance(field, str) else field for field in row]
+            
+            row_tuple = tuple(row)
+            
+            if remove_duplicates:
+                if row_tuple in seen_rows:
+                    continue
+                seen_rows.add(row_tuple)
+            
+            cleaned_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(cleaned_rows)
+    
+    print(f"Cleaned data saved to '{output_file}'")
+    print(f"Original rows: {len(cleaned_rows) + len(seen_rows) - 1}")
+    print(f"Cleaned rows: {len(cleaned_rows) - 1}")
+
+def validate_csv(file_path, required_columns=None):
+    """
+    Validate a CSV file for basic structure and required columns.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not os.path.exists(file_path):
+        print(f"File '{file_path}' not found.")
+        return False
+    
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            header = next(reader)
+            
+            if required_columns:
+                missing_columns = [col for col in required_columns if col not in header]
+                if missing_columns:
+                    print(f"Missing required columns: {missing_columns}")
+                    return False
+            
+            row_count = 0
+            for row in reader:
+                row_count += 1
+                if len(row) != len(header):
+                    print(f"Row {row_count + 1} has {len(row)} columns, expected {len(header)}")
+                    return False
+            
+            print(f"CSV validation passed: {row_count} rows, {len(header)} columns")
+            return True
+            
+    except Exception as e:
+        print(f"Error validating CSV: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    sample_input = "sample_data.csv"
+    sample_output = "cleaned_data.csv"
+    
+    # Create a sample CSV file for testing
+    sample_data = [
+        ["Name", "Age", "Email"],
+        ["John Doe", "30", "john@example.com"],
+        ["Jane Smith", "25", "jane@example.com"],
+        ["John Doe", "30", "john@example.com"],  # Duplicate
+        [" Bob Johnson ", " 35 ", "bob@example.com"]  # With whitespace
+    ]
+    
+    with open(sample_input, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(sample_data)
+    
+    print("Created sample CSV file")
+    
+    # Clean the CSV
+    clean_csv(sample_input, sample_output)
+    
+    # Validate the cleaned CSV
+    validate_csv(sample_output, required_columns=["Name", "Email"])
+    
+    # Clean up sample files
+    os.remove(sample_input)
+    os.remove(sample_output)
+    print("Sample files cleaned up")
