@@ -281,3 +281,89 @@ class DataCleaner:
             self.df.to_excel(filepath, index=False)
         elif format == 'parquet':
             self.df.to_parquet(filepath, index=False)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.original_shape = data.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        clean_data = self.data.copy()
+        for col in columns:
+            Q1 = clean_data[col].quantile(0.25)
+            Q3 = clean_data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            clean_data = clean_data[(clean_data[col] >= lower_bound) & (clean_data[col] <= upper_bound)]
+        
+        removed_count = self.original_shape[0] - clean_data.shape[0]
+        return clean_data, removed_count
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        normalized_data = self.data.copy()
+        for col in columns:
+            min_val = normalized_data[col].min()
+            max_val = normalized_data[col].max()
+            if max_val != min_val:
+                normalized_data[col] = (normalized_data[col] - min_val) / (max_val - min_val)
+        
+        return normalized_data
+    
+    def standardize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        standardized_data = self.data.copy()
+        for col in columns:
+            mean_val = standardized_data[col].mean()
+            std_val = standardized_data[col].std()
+            if std_val > 0:
+                standardized_data[col] = (standardized_data[col] - mean_val) / std_val
+        
+        return standardized_data
+    
+    def handle_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.data.columns if hasattr(self.data, 'columns') else range(self.data.shape[1])
+        
+        filled_data = self.data.copy()
+        for col in columns:
+            median_val = filled_data[col].median()
+            filled_data[col] = filled_data[col].fillna(median_val)
+        
+        return filled_data
+
+def generate_sample_data():
+    np.random.seed(42)
+    data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000)
+    })
+    data.loc[np.random.choice(1000, 50), 'feature_a'] = np.nan
+    return data
+
+if __name__ == "__main__":
+    sample_data = generate_sample_data()
+    cleaner = DataCleaner(sample_data)
+    
+    cleaned_data, removed = cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
+    normalized_data = cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
+    standardized_data = cleaner.standardize_zscore(['feature_a', 'feature_b'])
+    filled_data = cleaner.handle_missing_median(['feature_a'])
+    
+    print(f"Original data shape: {sample_data.shape}")
+    print(f"After outlier removal: {cleaned_data.shape}, removed {removed} rows")
+    print(f"Normalized data range: {normalized_data.min().min():.3f} to {normalized_data.max().max():.3f}")
+    print(f"Standardized data mean: {standardized_data.mean().mean():.3f}, std: {standardized_data.std().std():.3f}")
+    print(f"Missing values after fill: {filled_data.isna().sum().sum()}")
