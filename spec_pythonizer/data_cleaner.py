@@ -1,64 +1,146 @@
+
 import pandas as pd
 import numpy as np
+from typing import List, Union
 
-def clean_dataset(df, text_columns=None):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
     """
-    Clean a pandas DataFrame by removing rows with null values
-    and standardizing text columns to lowercase.
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
     """
-    # Create a copy to avoid modifying the original
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, 
+                         column_type_map: dict) -> pd.DataFrame:
+    """
+    Convert specified columns to target data types.
+    
+    Args:
+        df: Input DataFrame
+        column_type_map: Dictionary mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_copy = df.copy()
+    for column, dtype in column_type_map.items():
+        if column in df_copy.columns:
+            try:
+                df_copy[column] = df_copy[column].astype(dtype)
+            except (ValueError, TypeError):
+                print(f"Warning: Could not convert column '{column}' to {dtype}")
+    return df_copy
+
+def handle_missing_values(df: pd.DataFrame, 
+                         strategy: str = 'drop',
+                         fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill' and fill_value is not None:
+        return df.fillna(fill_value)
+    else:
+        return df
+
+def clean_dataframe(df: pd.DataFrame,
+                   deduplicate: bool = True,
+                   type_conversions: dict = None,
+                   missing_strategy: str = 'drop',
+                   fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Apply multiple cleaning operations to DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary for column type conversions
+        missing_strategy: Strategy for handling missing values
+        fill_value: Value to fill missing values with
+    
+    Returns:
+        Cleaned DataFrame
+    """
     cleaned_df = df.copy()
     
-    # Remove rows with any null values
-    cleaned_df = cleaned_df.dropna()
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
     
-    # Standardize text columns if specified
-    if text_columns:
-        for col in text_columns:
-            if col in cleaned_df.columns:
-                cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
     
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
+    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
     
     return cleaned_df
 
-def validate_cleaned_data(df):
+def validate_dataframe(df: pd.DataFrame, 
+                      required_columns: List[str] = None) -> bool:
     """
-    Validate that the cleaned DataFrame has no null values
-    and text columns are properly standardized.
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of columns that must be present
+    
+    Returns:
+        True if DataFrame passes validation
     """
-    # Check for null values
-    if df.isnull().sum().sum() > 0:
-        return False, "DataFrame contains null values"
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
     
-    # Check that all values are strings in text columns
-    # (assuming we want to validate string columns)
-    for col in df.select_dtypes(include=['object']).columns:
-        if not all(isinstance(val, str) for val in df[col]):
-            return False, f"Column {col} contains non-string values"
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Warning: Missing required columns: {missing_columns}")
+            return False
     
-    return True, "Data validation passed"
+    return True
 
-# Example usage
 if __name__ == "__main__":
-    # Create sample data
+    # Example usage
     sample_data = {
-        'name': ['John', 'Jane', None, 'Bob', 'Alice'],
-        'age': [25, 30, 35, None, 28],
-        'city': ['New York', 'LONDON', 'Paris', 'Berlin', 'TOKYO']
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None],
+        'age': ['25', '30', '30', '35', '40'],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print("\n" + "="*50 + "\n")
+    print("\nDataFrame info:")
+    print(df.info())
     
     # Clean the data
-    cleaned_df = clean_dataset(df, text_columns=['name', 'city'])
-    print("Cleaned DataFrame:")
+    cleaned_df = clean_dataframe(
+        df,
+        deduplicate=True,
+        type_conversions={'age': 'int32', 'score': 'float64'},
+        missing_strategy='fill',
+        fill_value=0
+    )
+    
+    print("\nCleaned DataFrame:")
     print(cleaned_df)
+    print("\nCleaned DataFrame info:")
+    print(cleaned_df.info())
     
     # Validate the cleaned data
-    is_valid, message = validate_cleaned_data(cleaned_df)
-    print(f"\nValidation: {message}")
+    is_valid = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age'])
+    print(f"\nData validation passed: {is_valid}")
