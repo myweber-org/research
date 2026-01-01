@@ -108,3 +108,84 @@ def clean_dataset(input_path, output_path):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    text_columns (list): List of column names containing text data.
+    fill_strategy (str): Strategy for filling numerical missing values ('mean', 'median', 'zero').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values in numerical columns
+    numerical_cols = df_clean.select_dtypes(include=[np.number]).columns
+    if fill_strategy == 'mean':
+        df_clean[numerical_cols] = df_clean[numerical_cols].fillna(df_clean[numerical_cols].mean())
+    elif fill_strategy == 'median':
+        df_clean[numerical_cols] = df_clean[numerical_cols].fillna(df_clean[numerical_cols].median())
+    elif fill_strategy == 'zero':
+        df_clean[numerical_cols] = df_clean[numerical_cols].fillna(0)
+    
+    # Standardize text columns
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+                df_clean[col] = df_clean[col].replace(['nan', 'none', 'null', ''], np.nan)
+    
+    # Drop rows where all values are NaN
+    df_clean = df_clean.dropna(how='all')
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = {
+#         'id': [1, 2, 3, 4],
+#         'value': [10.5, np.nan, 15.2, np.nan],
+#         'category': ['A', 'B', 'C', None],
+#         'text': [' Hello ', 'WORLD', ' test ', None]
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     
+#     cleaned_df = clean_dataset(df, text_columns=['category', 'text'], fill_strategy='mean')
+#     print("\nCleaned DataFrame:")
+#     print(cleaned_df)
+#     
+#     is_valid, message = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
+#     print(f"\nValidation: {is_valid}, Message: {message}")
