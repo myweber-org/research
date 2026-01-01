@@ -1,107 +1,76 @@
 
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport re
-from typing import List, Optional
+import pandas as pd
 
-def remove_special_characters(text: str, keep_spaces: bool = True) -> str:
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
     """
-    Remove all non-alphanumeric characters from the input string.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Args:
-        text: The input string to clean.
-        keep_spaces: If True, preserve spaces. If False, remove spaces as well.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str or dict): Method to fill missing values. 
+                                Can be 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+                                If None, missing values are not filled. Default is None.
     
     Returns:
-        A cleaned string with only alphanumeric characters and optionally spaces.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if keep_spaces:
-        pattern = r'[^A-Za-z0-9\s]'
-    else:
-        pattern = r'[^A-Za-z0-9]'
+    cleaned_df = df.copy()
     
-    return re.sub(pattern, '', text)
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for column in cleaned_df.columns:
+                if cleaned_df[column].dtype == 'object':
+                    mode_value = cleaned_df[column].mode()
+                    if not mode_value.empty:
+                        cleaned_df[column] = cleaned_df[column].fillna(mode_value[0])
+    
+    return cleaned_df
 
-def normalize_whitespace(text: str) -> str:
+def validate_data(df, required_columns=None, min_rows=1):
     """
-    Replace multiple consecutive whitespace characters with a single space.
+    Validate the DataFrame for required columns and minimum row count.
     
-    Args:
-        text: The input string to normalize.
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present. Default is None.
+    min_rows (int): Minimum number of rows required. Default is 1.
     
     Returns:
-        A string with normalized whitespace.
+    tuple: (is_valid, error_message)
     """
-    return re.sub(r'\s+', ' ', text).strip()
+    if len(df) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} row(s)"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Data validation passed"
 
-def clean_text_pipeline(text: str, 
-                       remove_special: bool = True, 
-                       normalize_space: bool = True,
-                       to_lower: bool = False) -> str:
-    """
-    Apply a series of cleaning operations to the input text.
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, 20, 20, 40, None],
+        'C': ['x', 'y', 'y', None, 'z']
+    }
     
-    Args:
-        text: The input string to process.
-        remove_special: If True, remove special characters.
-        normalize_space: If True, normalize whitespace.
-        to_lower: If True, convert text to lowercase.
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (drop duplicates, fill with mean for numeric, mode for categorical):")
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print(cleaned)
     
-    Returns:
-        A cleaned version of the input text.
-    """
-    result = text
-    
-    if remove_special:
-        result = remove_special_characters(result)
-    
-    if normalize_space:
-        result = normalize_whitespace(result)
-    
-    if to_lower:
-        result = result.lower()
-    
-    return result
-
-def batch_clean_texts(texts: List[str], **kwargs) -> List[str]:
-    """
-    Apply cleaning pipeline to a list of text strings.
-    
-    Args:
-        texts: A list of text strings to clean.
-        **kwargs: Additional arguments to pass to clean_text_pipeline.
-    
-    Returns:
-        A list of cleaned text strings.
-    """
-    return [clean_text_pipeline(text, **kwargs) for text in texts]
-
-def validate_email(email: str) -> bool:
-    """
-    Validate an email address format using regex.
-    
-    Args:
-        email: The email address string to validate.
-    
-    Returns:
-        True if the email format is valid, False otherwise.
-    """
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
-
-def extract_digits(text: str) -> str:
-    """
-    Extract only digit characters from a string.
-    
-    Args:
-        text: The input string containing digits.
-    
-    Returns:
-        A string containing only the digits from the input.
-    """
-    return ''.join(re.findall(r'\d', text))
+    is_valid, message = validate_data(cleaned, required_columns=['A', 'B'], min_rows=2)
+    print(f"\nValidation: {is_valid}, Message: {message}")
