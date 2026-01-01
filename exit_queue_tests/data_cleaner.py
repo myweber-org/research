@@ -285,3 +285,89 @@ if __name__ == "__main__":
     print(original_stats)
     print("\nCleaned statistics:")
     print(cleaned_stats)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to remove duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'constant').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing and cleaned_df.isnull().values.any():
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        categorical_cols = cleaned_df.select_dtypes(exclude=[np.number]).columns
+        
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if strategy == 'mean':
+                    cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+                elif strategy == 'constant':
+                    cleaned_df[col].fillna(0, inplace=True)
+        
+        for col in categorical_cols:
+            if cleaned_df[col].isnull().any():
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown', inplace=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, check_duplicates=True, check_missing=True):
+    """
+    Validate a DataFrame by checking for duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    check_duplicates (bool): Whether to check for duplicate rows.
+    check_missing (bool): Whether to check for missing values.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_duplicates:
+        duplicate_count = df.duplicated().sum()
+        validation_results['duplicates'] = duplicate_count
+        validation_results['has_duplicates'] = duplicate_count > 0
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        total_missing = missing_counts.sum()
+        validation_results['missing_counts'] = missing_counts.to_dict()
+        validation_results['total_missing'] = total_missing
+        validation_results['has_missing'] = total_missing > 0
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None, 6],
+        'B': [10, None, 30, 40, 50, 60],
+        'C': ['apple', 'banana', 'apple', None, 'cherry', 'banana']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataset(df))
+    
+    cleaned = clean_dataset(df, strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nValidation Results after cleaning:")
+    print(validate_dataset(cleaned))
