@@ -59,4 +59,95 @@ def validate_dataframe(df, required_columns=None):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=False, strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to remove duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'constant').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing and cleaned_df.isnull().any().any():
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        
+        if strategy == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif strategy == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif strategy == 'mode':
+            for col in numeric_cols:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
+        elif strategy == 'constant':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+        else:
+            raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'constant'.")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate a DataFrame for required columns and minimum rows.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if len(df) < min_rows:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
+    
+    return True
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Method for outlier detection ('iqr' or 'zscore').
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+    
+    data = df[column].dropna()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        mask = abs((df[column] - mean) / std) <= threshold
+    else:
+        raise ValueError("Invalid method. Choose 'iqr' or 'zscore'.")
+    
+    return df[mask]
