@@ -166,4 +166,85 @@ def normalize_columns(df, columns=None):
             else:
                 normalized_df[col] = 0
     
-    return normalized_df
+    return normalized_dfimport pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, missing_strategy='mean', columns_to_drop=None):
+    """
+    Load and clean CSV data by handling missing values and optionally dropping columns.
+    
+    Parameters:
+    filepath (str): Path to the CSV file.
+    missing_strategy (str): Strategy for handling missing values.
+        Options: 'mean', 'median', 'mode', 'drop', 'zero'.
+    columns_to_drop (list): List of column names to drop.
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+
+    if missing_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif missing_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif missing_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    elif missing_strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    elif missing_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+
+    for col in categorical_cols:
+        df[col] = df[col].fillna('Unknown')
+
+    df = df.reset_index(drop=True)
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame for required columns and basic integrity.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if df is None or df.empty:
+        print("DataFrame is empty or None.")
+        return False
+
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+
+    if df.isnull().any().any():
+        print("Warning: DataFrame contains missing values after cleaning.")
+
+    return True
+
+if __name__ == "__main__":
+    sample_data = clean_csv_data('sample.csv', missing_strategy='mean', columns_to_drop=['id'])
+    if validate_dataframe(sample_data, required_columns=['value', 'category']):
+        print("Data cleaning completed successfully.")
+        print(sample_data.head())
+    else:
+        print("Data cleaning failed.")
