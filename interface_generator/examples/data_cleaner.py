@@ -433,4 +433,87 @@ if __name__ == "__main__":
     
     print("\nValidating cleaned dataset...")
     results = validate_dataset(cleaned)
-    print(f"\nValidation results: {results}")
+    print(f"\nValidation results: {results}")import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fill_missing (str or dict): Method to fill missing values.
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            for column, value in fill_missing.items():
+                if column in df_clean.columns:
+                    df_clean[column] = df_clean[column].fillna(value)
+        elif fill_missing == 'mean':
+            df_clean = df_clean.fillna(df_clean.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            df_clean = df_clean.fillna(df_clean.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for column in df_clean.columns:
+                if df_clean[column].dtype == 'object':
+                    mode_val = df_clean[column].mode()
+                    if not mode_val.empty:
+                        df_clean[column] = df_clean[column].fillna(mode_val[0])
+    
+    return df_clean
+
+def validate_dataset(df, required_columns=None, unique_columns=None):
+    """
+    Validate a DataFrame for required columns and unique constraints.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of columns that must be present.
+        unique_columns (list): List of columns that should have unique values.
+    
+    Returns:
+        tuple: (bool, str) indicating validation result and message.
+    """
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            return False, f"Missing required columns: {missing}"
+    
+    if unique_columns:
+        for column in unique_columns:
+            if column in df.columns:
+                if df[column].duplicated().any():
+                    return False, f"Column '{column}' contains duplicate values"
+    
+    return True, "Dataset validation passed"
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve'],
+        'age': [25, 30, 30, None, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nCleaned dataset (drop duplicates, fill with mean):")
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print(cleaned)
+    
+    validation_result, message = validate_dataset(
+        cleaned, 
+        required_columns=['id', 'name', 'age'],
+        unique_columns=['id']
+    )
+    print(f"\nValidation: {message}")
