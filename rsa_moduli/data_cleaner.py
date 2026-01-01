@@ -269,4 +269,76 @@ if __name__ == "__main__":
     output_file = "cleaned_data.csv"
     
     cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    save_cleaned_data(cleaned_df, output_file)import pandas as pd
+import numpy as np
+import argparse
+
+def clean_csv(input_file, output_file, strategy='mean', columns=None):
+    """
+    Clean a CSV file by handling missing values.
+    
+    Parameters:
+    input_file (str): Path to the input CSV file.
+    output_file (str): Path to save the cleaned CSV file.
+    strategy (str): Strategy for imputation ('mean', 'median', 'mode', 'drop').
+    columns (list): List of column names to apply cleaning. If None, applies to all numeric columns.
+    """
+    try:
+        df = pd.read_csv(input_file)
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return
+    
+    original_shape = df.shape
+    
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns_to_clean = numeric_cols
+    else:
+        columns_to_clean = [col for col in columns if col in df.columns]
+        missing_cols = set(columns) - set(columns_to_clean)
+        if missing_cols:
+            print(f"Warning: Columns {missing_cols} not found in the dataset.")
+    
+    for column in columns_to_clean:
+        if df[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[column].mean()
+            elif strategy == 'median':
+                fill_value = df[column].median()
+            elif strategy == 'mode':
+                fill_value = df[column].mode()[0] if not df[column].mode().empty else 0
+            elif strategy == 'drop':
+                df = df.dropna(subset=[column])
+                continue
+            else:
+                print(f"Warning: Unknown strategy '{strategy}'. Using 'mean' instead.")
+                fill_value = df[column].mean()
+            
+            df[column].fillna(fill_value, inplace=True)
+            print(f"Column '{column}': Filled {df[column].isnull().sum()} missing values with {strategy} value {fill_value:.4f}")
+    
+    try:
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to '{output_file}'")
+        print(f"Original shape: {original_shape}, Cleaned shape: {df.shape}")
+    except Exception as e:
+        print(f"Error saving file: {e}")
+
+def main():
+    parser = argparse.ArgumentParser(description='Clean CSV files by handling missing values.')
+    parser.add_argument('input', help='Input CSV file path')
+    parser.add_argument('output', help='Output CSV file path')
+    parser.add_argument('--strategy', choices=['mean', 'median', 'mode', 'drop'], 
+                       default='mean', help='Imputation strategy (default: mean)')
+    parser.add_argument('--columns', nargs='+', help='Specific columns to clean (default: all numeric columns)')
+    
+    args = parser.parse_args()
+    
+    clean_csv(args.input, args.output, args.strategy, args.columns)
+
+if __name__ == '__main__':
+    main()
