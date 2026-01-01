@@ -247,3 +247,96 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset statistics:")
     print(calculate_statistics(cleaned_df, 'value'))
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or np.array): Input data array
+    column (int): Index of column to process (if 2D array) or ignored (if 1D)
+    
+    Returns:
+    np.array: Data with outliers removed
+    """
+    # Convert to numpy array for consistent handling
+    data_array = np.array(data)
+    
+    # Handle 2D array case
+    if data_array.ndim == 2:
+        column_data = data_array[:, column]
+    else:
+        column_data = data_array
+    
+    # Calculate quartiles and IQR
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    # Define outlier bounds
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    # Create mask for non-outliers
+    if data_array.ndim == 2:
+        mask = (data_array[:, column] >= lower_bound) & (data_array[:, column] <= upper_bound)
+        cleaned_data = data_array[mask]
+    else:
+        mask = (data_array >= lower_bound) & (data_array <= upper_bound)
+        cleaned_data = data_array[mask]
+    
+    return cleaned_data
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Parameters:
+    data (np.array): Input data array
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    if len(data) == 0:
+        return {
+            'mean': np.nan,
+            'median': np.nan,
+            'std': np.nan,
+            'min': np.nan,
+            'max': np.nan
+        }
+    
+    stats = {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data)
+    }
+    
+    return stats
+
+# Example usage
+if __name__ == "__main__":
+    # Test with 1D data
+    test_data_1d = np.random.normal(100, 15, 1000)
+    test_data_1d[50] = 500  # Add an outlier
+    
+    cleaned_1d = remove_outliers_iqr(test_data_1d, 0)
+    stats_1d = calculate_statistics(cleaned_1d)
+    
+    print(f"Original 1D data length: {len(test_data_1d)}")
+    print(f"Cleaned 1D data length: {len(cleaned_1d)}")
+    print(f"Statistics: {stats_1d}")
+    
+    # Test with 2D data
+    test_data_2d = np.random.normal(100, 15, (1000, 3))
+    test_data_2d[50, 1] = 500  # Add an outlier to column 1
+    
+    cleaned_2d = remove_outliers_iqr(test_data_2d, 1)
+    stats_2d = calculate_statistics(cleaned_2d[:, 1])
+    
+    print(f"\nOriginal 2D data shape: {test_data_2d.shape}")
+    print(f"Cleaned 2D data shape: {cleaned_2d.shape}")
+    print(f"Column 1 statistics: {stats_2d}")
