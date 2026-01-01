@@ -204,4 +204,102 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     validation = validate_data(cleaned_df, required_columns=['id', 'value'], numeric_columns=['id', 'value'])
-    print(f"\nValidation results: {validation}")
+    print(f"\nValidation results: {validation}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean. 
+                                 If None, cleans all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    return cleaned_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
+    
+    stats = df[numeric_cols].agg(['count', 'mean', 'std', 'min', 'max'])
+    stats.loc['median'] = df[numeric_cols].median()
+    stats.loc['q1'] = df[numeric_cols].quantile(0.25)
+    stats.loc['q3'] = df[numeric_cols].quantile(0.75)
+    
+    return stats.T
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100),
+        'score': np.random.uniform(0, 1, 100)
+    }
+    
+    # Introduce some outliers
+    data['value'][5] = 500
+    data['value'][10] = -200
+    data['score'][15] = 2.5
+    
+    df = pd.DataFrame(data)
+    print("Original data shape:", df.shape)
+    
+    # Clean the data
+    cleaned_df = clean_numeric_data(df, ['value', 'score'])
+    print("Cleaned data shape:", cleaned_df.shape)
+    
+    # Show summary statistics
+    print("\nOriginal statistics:")
+    print(calculate_summary_statistics(df))
+    
+    print("\nCleaned statistics:")
+    print(calculate_summary_statistics(cleaned_df))
