@@ -724,3 +724,77 @@ class DataCleaner:
     def save_cleaned_data(self, filepath):
         self.df.to_csv(filepath, index=False)
         print(f"Cleaned data saved to {filepath}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.cleaned_data = None
+        
+    def remove_outliers_iqr(self, column):
+        Q1 = self.data[column].quantile(0.25)
+        Q3 = self.data[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return self.data[(self.data[column] >= lower_bound) & (self.data[column] <= upper_bound)]
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.data[column]))
+        return self.data[z_scores < threshold]
+    
+    def normalize_minmax(self, column):
+        min_val = self.data[column].min()
+        max_val = self.data[column].max()
+        return (self.data[column] - min_val) / (max_val - min_val)
+    
+    def normalize_zscore(self, column):
+        mean_val = self.data[column].mean()
+        std_val = self.data[column].std()
+        return (self.data[column] - mean_val) / std_val
+    
+    def handle_missing_mean(self, column):
+        mean_val = self.data[column].mean()
+        return self.data[column].fillna(mean_val)
+    
+    def handle_missing_median(self, column):
+        median_val = self.data[column].median()
+        return self.data[column].fillna(median_val)
+    
+    def clean_pipeline(self, outlier_method='iqr', normalize_method='minmax', missing_method='mean'):
+        temp_data = self.data.copy()
+        
+        numeric_cols = temp_data.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if outlier_method == 'iqr':
+                temp_data = self.remove_outliers_iqr(col)
+            elif outlier_method == 'zscore':
+                temp_data = self.remove_outliers_zscore(col)
+            
+            if missing_method == 'mean':
+                temp_data[col] = self.handle_missing_mean(col)
+            elif missing_method == 'median':
+                temp_data[col] = self.handle_missing_median(col)
+            
+            if normalize_method == 'minmax':
+                temp_data[col] = self.normalize_minmax(col)
+            elif normalize_method == 'zscore':
+                temp_data[col] = self.normalize_zscore(col)
+        
+        self.cleaned_data = temp_data
+        return self.cleaned_data
+    
+    def get_summary(self):
+        if self.cleaned_data is None:
+            return "No cleaned data available. Run clean_pipeline() first."
+        
+        summary = {
+            'original_shape': self.data.shape,
+            'cleaned_shape': self.cleaned_data.shape,
+            'columns_processed': list(self.cleaned_data.select_dtypes(include=[np.number]).columns),
+            'missing_values': self.cleaned_data.isnull().sum().sum()
+        }
+        return summary
