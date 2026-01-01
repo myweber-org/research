@@ -1,72 +1,79 @@
 
-import numpy as np
 import pandas as pd
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, subset=None, fill_method='mean'):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Clean a pandas DataFrame by removing duplicate rows and handling missing values.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df (pd.DataFrame): Input DataFrame to clean.
+    subset (list, optional): List of column names to consider for duplicate removal.
+    fill_method (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates(subset=subset, keep='first')
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    # Handle missing values
+    if fill_method == 'drop':
+        df_cleaned = df_cleaned.dropna()
+    elif fill_method == 'mean':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mean(numeric_only=True))
+    elif fill_method == 'median':
+        df_cleaned = df_cleaned.fillna(df_cleaned.median(numeric_only=True))
+    elif fill_method == 'mode':
+        for col in df_cleaned.columns:
+            if df_cleaned[col].dtype == 'object':
+                df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else None)
+            else:
+                df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 0)
+    else:
+        raise ValueError("fill_method must be 'drop', 'mean', 'median', or 'mode'")
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df_cleaned
 
-def calculate_summary_statistics(df, column):
+def validate_data(df, required_columns=None):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Validate the DataFrame for required columns and data types.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
     Returns:
-    dict: Dictionary containing summary statistics
+    bool: True if validation passes, False otherwise.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    if not numeric_cols.empty:
+        if df[numeric_cols].isin([float('inf'), float('-inf')]).any().any():
+            print("DataFrame contains infinite values in numeric columns.")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', None]
     }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
     
-    return stats
-
-def process_dataframe(df, columns_to_clean):
-    """
-    Process multiple columns for outlier removal and return cleaned DataFrame.
+    cleaned_df = clean_dataset(df, subset=['A', 'C'], fill_method='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-    
-    return cleaned_df
+    is_valid = validate_data(cleaned_df, required_columns=['A', 'B', 'C'])
+    print(f"\nData validation passed: {is_valid}")
