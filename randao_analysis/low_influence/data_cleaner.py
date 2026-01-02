@@ -1,74 +1,58 @@
 import pandas as pd
+import numpy as np
 
-def clean_dataframe(df, drop_duplicates=True, fill_method=None):
+def clean_csv_data(input_file, output_file):
     """
-    Clean a pandas DataFrame by handling missing values and optionally removing duplicates.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): If True, remove duplicate rows.
-    fill_method (str or None): Method to fill missing values: 
-                               'ffill', 'bfill', or a constant value.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Load a CSV file, clean missing values, convert data types,
+    and save the cleaned data to a new file.
     """
-    cleaned_df = df.copy()
-    
-    # Handle missing values
-    if fill_method is not None:
-        if fill_method == 'ffill':
-            cleaned_df = cleaned_df.ffill()
-        elif fill_method == 'bfill':
-            cleaned_df = cleaned_df.bfill()
-        else:
-            cleaned_df = cleaned_df.fillna(fill_method)
-    
-    # Remove duplicates
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        categorical_columns = df.select_dtypes(include=['object']).columns
+        
+        for col in numeric_columns:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].median())
+        
+        for col in categorical_columns:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna('Unknown')
+        
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                try:
+                    df[col] = pd.to_datetime(df[col])
+                    print(f"Converted column '{col}' to datetime")
+                except (ValueError, TypeError):
+                    pass
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        print(f"Final data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"Error: Input file '{input_file}' is empty.")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return None
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': [1, 2, None, 4, 2],
-        'B': [5, None, 7, 8, 5],
-        'C': [9, 10, 11, 12, 9]
-    }
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    cleaned_df = clean_csv_data(input_csv, output_csv)
     
-    cleaned = clean_dataframe(df, fill_method='ffill')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
+        print(cleaned_df.head())
