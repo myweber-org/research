@@ -1,102 +1,98 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def clean_csv_data(file_path, output_path=None):
     """
-    Remove outliers using IQR method
+    Load a CSV file, perform basic cleaning operations,
+    and optionally save the cleaned data.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    z_scores = np.abs(stats.zscore(data[column]))
-    filtered_data = data[z_scores < threshold]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if min_val == max_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def normalize_zscore(data, column):
-    """
-    Normalize data using Z-score standardization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for col in numeric_columns:
-        if col not in df.columns:
-            continue
-            
-        if outlier_method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif outlier_method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original shape: {df.shape}")
         
-        if normalize_method == 'minmax':
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-        elif normalize_method == 'zscore':
-            cleaned_df[col] = normalize_zscore(cleaned_df, col)
-    
-    return cleaned_df
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Drop columns with all NaN values
+        df = df.dropna(axis=1, how='all')
+        print(f"After dropping all-NaN columns: {df.shape}")
+        
+        # Fill numeric column NaN values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isna().any():
+                median_val = df[col].median()
+                df[col] = df[col].fillna(median_val)
+                print(f"Filled NaN in {col} with median: {median_val}")
+        
+        # Fill categorical column NaN values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isna().any():
+                mode_val = df[col].mode()[0] if not df[col].mode().empty else 'Unknown'
+                df[col] = df[col].fillna(mode_val)
+                print(f"Filled NaN in {col} with mode: {mode_val}")
+        
+        # Remove rows where more than 50% of values are NaN
+        threshold = len(df.columns) * 0.5
+        df = df.dropna(thresh=threshold)
+        print(f"After dropping rows with >50% NaN: {df.shape}")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The file is empty")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
 
-def validate_data(df, required_columns=None, allow_nan=False):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate dataset structure and content
+    Validate the structure and content of a DataFrame.
     """
+    if df is None or df.empty:
+        print("DataFrame is empty or None")
+        return False
+    
+    print(f"DataFrame shape: {df.shape}")
+    print(f"DataFrame columns: {list(df.columns)}")
+    print(f"DataFrame dtypes:\n{df.dtypes}")
+    
     if required_columns:
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+            print(f"Missing required columns: {missing_cols}")
+            return False
     
-    if not allow_nan and df.isnull().any().any():
-        raise ValueError("Dataset contains NaN values")
+    # Check for any remaining NaN values
+    nan_count = df.isna().sum().sum()
+    if nan_count > 0:
+        print(f"Warning: DataFrame contains {nan_count} NaN values")
+        nan_by_col = df.isna().sum()
+        print("NaN values by column:")
+        print(nan_by_col[nan_by_col > 0])
     
     return True
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, output_file)
+    
+    if cleaned_df is not None:
+        is_valid = validate_dataframe(cleaned_df)
+        if is_valid:
+            print("Data cleaning completed successfully")
+        else:
+            print("Data validation failed")
