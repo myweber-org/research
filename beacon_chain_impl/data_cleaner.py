@@ -104,3 +104,11 @@ if __name__ == "__main__":
     # Validate the cleaned dataset
     validation_passed = validate_dataset(cleaned, required_columns=['id', 'value'], min_rows=3)
     print(f"\nValidation result: {'PASS' if validation_passed else 'FAIL'}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
