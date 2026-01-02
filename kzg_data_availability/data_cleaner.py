@@ -123,3 +123,11 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     print(f"Removed {removed} outliers from column '{column}'")
     
     return filtered_df
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
