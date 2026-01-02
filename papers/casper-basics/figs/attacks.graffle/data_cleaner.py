@@ -579,3 +579,112 @@ def clean_dataset(file_path: str, output_path: Optional[str] = None) -> pd.DataF
         print(f"Cleaned data saved to: {output_path}")
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.Series: Normalized column values
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val == min_val:
+            return pd.Series([0.5] * len(df), index=df.index)
+        return (df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val == 0:
+            return pd.Series([0] * len(df), index=df.index)
+        return (df[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+
+# Example usage demonstration
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    data = {
+        'values': np.concatenate([
+            np.random.normal(100, 15, 90),
+            np.random.normal(300, 50, 10)  # Outliers
+        ])
+    }
+    
+    df = pd.DataFrame(data)
+    print(f"Original data shape: {df.shape}")
+    print(f"Original statistics: {calculate_summary_statistics(df, 'values')}")
+    
+    # Remove outliers
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print(f"\nCleaned data shape: {cleaned_df.shape}")
+    print(f"Cleaned statistics: {calculate_summary_statistics(cleaned_df, 'values')}")
+    
+    # Normalize the cleaned data
+    normalized_values = normalize_column(cleaned_df, 'values', method='minmax')
+    print(f"\nNormalized values (first 5): {normalized_values.head().tolist()}")
