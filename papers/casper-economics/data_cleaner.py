@@ -215,3 +215,78 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    
+    # For non-numeric columns, fill with mode (most frequent value)
+    non_numeric_cols = df_cleaned.select_dtypes(exclude=[np.number]).columns
+    for col in non_numeric_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns
+    and has no completely empty rows.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Remove rows where all values are NaN
+    df_validated = df.dropna(how='all')
+    
+    return df_validated
+
+def process_data(file_path, required_columns=None):
+    """
+    Main function to load, validate, and clean data from a CSV file.
+    """
+    # Load data
+    df = pd.read_csv(file_path)
+    
+    # Validate data if required columns are specified
+    if required_columns:
+        df = validate_data(df, required_columns)
+    
+    # Clean data
+    df_cleaned = clean_dataset(df)
+    
+    # Log cleaning statistics
+    original_rows = len(df)
+    cleaned_rows = len(df_cleaned)
+    duplicates_removed = original_rows - cleaned_rows
+    
+    print(f"Original rows: {original_rows}")
+    print(f"Cleaned rows: {cleaned_rows}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'value': [10, 20, 20, np.nan, 40],
+        'category': ['A', 'B', 'B', 'C', None],
+        'score': [100, 200, 200, 300, np.nan]
+    })
+    
+    cleaned_data = clean_dataset(sample_data)
+    print("Cleaned data sample:")
+    print(cleaned_data)
