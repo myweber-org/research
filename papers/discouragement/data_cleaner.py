@@ -119,3 +119,74 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nCleaned DataFrame info:")
     print(cleaned.info())
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    
+    if drop_duplicates:
+        df = df.drop_duplicates()
+        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows")
+    
+    if fill_missing:
+        for column in df.columns:
+            if df[column].isnull().any():
+                if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
+                    df[column] = df[column].fillna(df[column].mean())
+                elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(df[column]):
+                    df[column] = df[column].fillna(df[column].median())
+                elif fill_missing == 'mode':
+                    df[column] = df[column].fillna(df[column].mode()[0])
+                elif fill_missing == 'zero':
+                    df[column] = df[column].fillna(0)
+                else:
+                    df[column] = df[column].fillna(method='ffill')
+    
+    print(f"Dataset cleaned: {original_shape} -> {df.shape}")
+    return df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    """
+    if df.empty:
+        raise ValueError("Dataset is empty")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset has fewer than {min_rows} rows")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'A': [1, 2, 2, 3, np.nan],
+        'B': [4, 5, 5, np.nan, 7],
+        'C': ['x', 'y', 'y', 'z', 'z']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original dataset:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataset(cleaned_df, required_columns=['A', 'B', 'C'], min_rows=1)
+        print("Dataset validation passed")
+    except ValueError as e:
+        print(f"Dataset validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
