@@ -191,4 +191,102 @@ def clean_dataset(df: pd.DataFrame,
             if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
                 cleaner.remove_outliers_iqr(col)
     
-    return cleaner.get_cleaned_data()
+    return cleaner.get_cleaned_data()import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: Input pandas DataFrame
+        drop_duplicates: Boolean flag to remove duplicate rows
+        fill_missing: Boolean flag to fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        missing_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        missing_after = cleaned_df.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def process_data_file(file_path, output_path=None):
+    """
+    Process a data file by loading, cleaning, and optionally saving it.
+    
+    Args:
+        file_path: Path to input data file
+        output_path: Optional path to save cleaned data
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        if validate_dataframe(df):
+            cleaned_df = clean_dataframe(df)
+            print(f"Cleaned data shape: {cleaned_df.shape}")
+            
+            if output_path:
+                cleaned_df.to_csv(output_path, index=False)
+                print(f"Saved cleaned data to: {output_path}")
+            
+            return cleaned_df
+        else:
+            print("Data validation failed")
+            return None
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 2, None, 5],
+        'B': [None, 2, 2, 4, 5],
+        'C': [1, 2, 3, 4, 5]
+    })
+    
+    print("Original DataFrame:")
+    print(sample_data)
+    
+    cleaned = clean_dataframe(sample_data)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
