@@ -245,3 +245,11 @@ if __name__ == "__main__":
         print(f"\n{col}:")
         for stat_name, stat_value in col_stats.items():
             print(f"  {stat_name}: {stat_value:.2f}")
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
