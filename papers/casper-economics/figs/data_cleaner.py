@@ -163,3 +163,93 @@ def example_usage():
 if __name__ == "__main__":
     result_df = example_usage()
     print(f"\nRemoved {100 - len(result_df)} outliers")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean dataset by handling missing values and outliers.
+    
+    Args:
+        df: pandas DataFrame
+        missing_strategy: Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+        outlier_method: Method for handling outliers ('iqr', 'zscore')
+        columns: Specific columns to clean, if None clean all numeric columns
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().any():
+            df_clean = handle_missing_values(df_clean, col, missing_strategy)
+        
+        if outlier_method:
+            df_clean = handle_outliers(df_clean, col, outlier_method)
+    
+    return df_clean
+
+def handle_missing_values(df, column, strategy):
+    """Handle missing values in specified column."""
+    if strategy == 'mean':
+        fill_value = df[column].mean()
+    elif strategy == 'median':
+        fill_value = df[column].median()
+    elif strategy == 'mode':
+        fill_value = df[column].mode()[0]
+    elif strategy == 'drop':
+        return df.dropna(subset=[column])
+    else:
+        raise ValueError(f"Unknown missing value strategy: {strategy}")
+    
+    df[column] = df[column].fillna(fill_value)
+    return df
+
+def handle_outliers(df, column, method):
+    """Handle outliers in specified column."""
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        df[column] = np.where(df[column] < lower_bound, lower_bound, df[column])
+        df[column] = np.where(df[column] > upper_bound, upper_bound, df[column])
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = (df[column] - mean) / std
+        
+        df[column] = np.where(np.abs(z_scores) > 3, 
+                             np.sign(z_scores) * 3 * std + mean, 
+                             df[column])
+    
+    else:
+        raise ValueError(f"Unknown outlier method: {method}")
+    
+    return df
+
+def get_cleaning_summary(df_original, df_cleaned):
+    """Generate summary of cleaning operations."""
+    summary = {
+        'original_rows': len(df_original),
+        'cleaned_rows': len(df_cleaned),
+        'missing_values_fixed': df_original.isnull().sum().sum() - df_cleaned.isnull().sum().sum(),
+        'columns_cleaned': list(df_original.select_dtypes(include=[np.number]).columns)
+    }
+    return summary
+
+def validate_dataframe(df):
+    """Validate that input is a pandas DataFrame."""
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    return True
