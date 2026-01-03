@@ -1,166 +1,114 @@
-
 import pandas as pd
-import re
+import numpy as np
 
-def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, normalize_text=True):
+def clean_missing_data(df, strategy='mean', columns=None):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Handle missing values in a DataFrame using specified strategy.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns_to_clean (list, optional): List of column names to apply text normalization.
-                                       If None, all object dtype columns are cleaned.
-    remove_duplicates (bool): If True, remove duplicate rows.
-    normalize_text (bool): If True, normalize text in specified columns.
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Method for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): Specific columns to clean, if None cleans all columns
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Cleaned DataFrame
     """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
     df_clean = df.copy()
     
-    if remove_duplicates:
-        initial_rows = df_clean.shape[0]
-        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
-        removed = initial_rows - df_clean.shape[0]
-        print(f"Removed {removed} duplicate rows.")
-    
-    if normalize_text:
-        if columns_to_clean is None:
-            columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
-        
-        for col in columns_to_clean:
-            if col in df_clean.columns:
-                df_clean[col] = df_clean[col].apply(_normalize_string)
-                print(f"Normalized text in column: {col}")
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().sum() == 0:
+            continue
+            
+        if strategy == 'mean':
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+        elif strategy == 'median':
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+        elif strategy == 'mode':
+            if not df_clean[col].empty:
+                mode_value = df_clean[col].mode()
+                if not mode_value.empty:
+                    df_clean[col].fillna(mode_value[0], inplace=True)
+        elif strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
     
     return df_clean
 
-def _normalize_string(text):
+def validate_dataframe(df, required_columns=None):
     """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
+    Validate DataFrame structure and content.
     
     Parameters:
-    text (str): Input string.
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of columns that must be present
     
     Returns:
-    str: Normalized string.
+    tuple: (is_valid, error_message)
     """
-    if pd.isna(text):
-        return text
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
     
-    text = str(text)
-    text = text.lower().strip()
-    text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[^\w\s]', '', text)
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    return text
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
 
-def validate_email_column(df, email_column):
+def load_and_clean_csv(filepath, **kwargs):
     """
-    Validate email addresses in a DataFrame column.
+    Load CSV file and clean missing data.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    email_column (str): Name of the column containing email addresses.
+    filepath (str): Path to CSV file
+    **kwargs: Additional arguments passed to clean_missing_data
     
     Returns:
-    pd.DataFrame: DataFrame with validation results.
+    pd.DataFrame: Cleaned DataFrame
     """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
-    df_result = df.copy()
-    df_result['email_valid'] = df_result[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
-    )
-    
-    valid_count = df_result['email_valid'].sum()
-    total_count = df_result.shape[0]
-    
-    print(f"Email validation: {valid_count} valid out of {total_count} total.")
-    
-    return df_result
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
-
-def main():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    
-    data = {
-        'id': range(1, 101),
-        'value': np.concatenate([
-            np.random.normal(100, 10, 90),
-            np.random.normal(300, 50, 10)
-        ])
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original data shape:", df.shape)
-    print("Original statistics:", calculate_summary_statistics(df, 'value'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
-    
-    return cleaned_df
+    try:
+        df = pd.read_csv(filepath)
+        is_valid, message = validate_dataframe(df)
+        
+        if not is_valid:
+            print(f"Warning: {message}")
+            return df
+        
+        return clean_missing_data(df, **kwargs)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error loading file: {str(e)}")
+        return pd.DataFrame()
 
 if __name__ == "__main__":
-    cleaned_data = main()
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 2, 3, 4, 5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned with mean strategy:")
+    print(clean_missing_data(df, strategy='mean'))
+    print("\nCleaned with drop strategy:")
+    print(clean_missing_data(df, strategy='drop'))
