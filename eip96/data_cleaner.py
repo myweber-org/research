@@ -36,4 +36,65 @@ if __name__ == "__main__":
     print("Original shape:", sample_data.shape)
     print("Cleaned shape:", cleaned.shape)
     print("\nCleaned data preview:")
-    print(cleaned.head())
+    print(cleaned.head())import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase, removing extra whitespace,
+    and stripping special characters except basic punctuation.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^\w\s.,!?-]', '', x))
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    return df
+
+def remove_duplicate_rows(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def validate_email_column(df, column_name):
+    """
+    Validate email format and return boolean mask.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[column_name].str.match(email_pattern)
+
+def main():
+    # Example usage
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
+        'email': ['john@example.com', 'invalid-email', 'john@example.com', 'bob@company.org'],
+        'notes': ['Important client!!!', 'Needs follow-up.', 'Important client!!!', '  Regular customer  ']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean text columns
+    df = clean_text_column(df, 'name')
+    df = clean_text_column(df, 'notes')
+    
+    # Remove duplicates
+    df = remove_duplicate_rows(df, subset=['name', 'email'])
+    
+    # Validate emails
+    df['valid_email'] = validate_email_column(df, 'email')
+    
+    print("Cleaned DataFrame:")
+    print(df)
+
+if __name__ == "__main__":
+    main()
