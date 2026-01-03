@@ -621,4 +621,108 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     if removed_count > 0:
         print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_csv_data(input_path, output_path):
+    """
+    Load a CSV file, clean the data by handling missing values,
+    converting data types, and save the cleaned version.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Original shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Handle missing values for numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Handle missing values for categorical columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna('Unknown')
+        
+        # Convert date columns if present
+        for col in df.columns:
+            if 'date' in col.lower() or 'time' in col.lower():
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                except:
+                    pass
+        
+        # Remove rows where critical columns are still null
+        critical_cols = [col for col in df.columns if df[col].isnull().sum() < len(df) * 0.5]
+        if critical_cols:
+            df = df.dropna(subset=critical_cols[:3])  # Drop rows where first 3 critical cols are null
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Final shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the cleaned dataframe for basic quality checks.
+    """
+    if df is None or df.empty:
+        print("DataFrame is empty or None")
+        return False
+    
+    checks_passed = True
+    
+    # Check for required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            checks_passed = False
+    
+    # Check for remaining null values
+    null_counts = df.isnull().sum()
+    if null_counts.sum() > 0:
+        print("Warning: DataFrame still contains null values:")
+        print(null_counts[null_counts > 0])
+        checks_passed = False
+    
+    # Check data types
+    print("\nData types:")
+    print(df.dtypes)
+    
+    return checks_passed
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, output_file)
+    
+    if cleaned_df is not None:
+        # Define required columns for validation
+        required_cols = ['id', 'value', 'timestamp']
+        is_valid = validate_data(cleaned_df, required_cols)
+        
+        if is_valid:
+            print("\nData cleaning completed successfully.")
+        else:
+            print("\nData cleaning completed with warnings.")
