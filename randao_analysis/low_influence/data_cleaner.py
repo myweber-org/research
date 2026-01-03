@@ -1,58 +1,45 @@
-import pandas as pd
-import numpy as np
 
-def clean_csv_data(input_file, output_file):
+import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file=None):
     """
-    Load a CSV file, clean missing values, convert data types,
-    and save the cleaned data to a new file.
+    Reads a CSV file, removes duplicate rows, and saves the cleaned data.
     """
     try:
         df = pd.read_csv(input_file)
+        initial_count = len(df)
+        df_cleaned = df.drop_duplicates()
+        final_count = len(df_cleaned)
         
-        print(f"Original data shape: {df.shape}")
-        print(f"Missing values per column:\n{df.isnull().sum()}")
+        if output_file is None:
+            output_file = input_file.replace('.csv', '_cleaned.csv')
         
-        numeric_columns = df.select_dtypes(include=[np.number]).columns
-        categorical_columns = df.select_dtypes(include=['object']).columns
+        df_cleaned.to_csv(output_file, index=False)
         
-        for col in numeric_columns:
-            if df[col].isnull().any():
-                df[col] = df[col].fillna(df[col].median())
-        
-        for col in categorical_columns:
-            if df[col].isnull().any():
-                df[col] = df[col].fillna('Unknown')
-        
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                try:
-                    df[col] = pd.to_datetime(df[col])
-                    print(f"Converted column '{col}' to datetime")
-                except (ValueError, TypeError):
-                    pass
-        
-        df.to_csv(output_file, index=False)
+        print(f"Processing complete.")
+        print(f"Original rows: {initial_count}")
+        print(f"Rows after cleaning: {final_count}")
+        print(f"Duplicates removed: {initial_count - final_count}")
         print(f"Cleaned data saved to: {output_file}")
-        print(f"Final data shape: {df.shape}")
         
-        return df
-        
+        return df_cleaned
+    
     except FileNotFoundError:
-        print(f"Error: Input file '{input_file}' not found.")
-        return None
+        print(f"Error: File '{input_file}' not found.")
+        sys.exit(1)
     except pd.errors.EmptyDataError:
-        print(f"Error: Input file '{input_file}' is empty.")
-        return None
+        print(f"Error: File '{input_file}' is empty.")
+        sys.exit(1)
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        return None
+        print(f"An unexpected error occurred: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    input_csv = "raw_data.csv"
-    output_csv = "cleaned_data.csv"
+    if len(sys.argv) < 2:
+        print("Usage: python data_cleaner.py <input_file.csv> [output_file.csv]")
+        sys.exit(1)
     
-    cleaned_df = clean_csv_data(input_csv, output_csv)
-    
-    if cleaned_df is not None:
-        print("Data cleaning completed successfully.")
-        print(cleaned_df.head())
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    remove_duplicates(input_file, output_file)
