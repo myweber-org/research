@@ -341,4 +341,34 @@ def main():
     clean_csv(args.input, args.output, args.strategy, args.columns)
 
 if __name__ == '__main__':
-    main()
+    main()import pandas as pd
+
+def clean_data(file_path, output_path):
+    """
+    Load a CSV file, remove duplicate rows, and fill missing numeric values with the column mean.
+    Save the cleaned data to a new CSV file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original data shape: {df.shape}")
+        
+        df_cleaned = df.drop_duplicates()
+        print(f"After removing duplicates: {df_cleaned.shape}")
+        
+        numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+        df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+        
+        df_cleaned.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return df_cleaned
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    clean_data(input_file, output_file)
