@@ -1,114 +1,84 @@
 import pandas as pd
 import numpy as np
+from scipy import stats
 
-def clean_missing_data(df, strategy='mean', columns=None):
-    """
-    Handle missing values in a DataFrame using specified strategy.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    strategy (str): Method for handling missing values ('mean', 'median', 'mode', 'drop')
-    columns (list): Specific columns to clean, if None cleans all columns
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if df.empty:
-        return df
-    
-    if columns is None:
-        columns = df.columns
-    
-    df_clean = df.copy()
-    
-    for col in columns:
-        if col not in df_clean.columns:
-            continue
-            
-        if df_clean[col].isnull().sum() == 0:
-            continue
-            
-        if strategy == 'mean':
-            if pd.api.types.is_numeric_dtype(df_clean[col]):
-                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
-        elif strategy == 'median':
-            if pd.api.types.is_numeric_dtype(df_clean[col]):
-                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if strategy == 'mean' and self.numeric_columns.any():
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].mean()
+            )
+        elif strategy == 'median' and self.numeric_columns.any():
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].median()
+            )
         elif strategy == 'mode':
-            if not df_clean[col].empty:
-                mode_value = df_clean[col].mode()
-                if not mode_value.empty:
-                    df_clean[col].fillna(mode_value[0], inplace=True)
+            for col in self.df.columns:
+                self.df[col] = self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else None)
+        elif strategy == 'constant' and fill_value is not None:
+            self.df = self.df.fillna(fill_value)
         elif strategy == 'drop':
-            df_clean = df_clean.dropna(subset=[col])
-        else:
-            raise ValueError(f"Unknown strategy: {strategy}")
-    
-    return df_clean
+            self.df = self.df.dropna()
+        return self
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of columns that must be present
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame is valid"
+    def remove_outliers(self, method='zscore', threshold=3):
+        if method == 'zscore':
+            z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
+            self.df = self.df[(z_scores < threshold).all(axis=1)]
+        elif method == 'iqr':
+            for col in self.numeric_columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        return self
 
-def load_and_clean_csv(filepath, **kwargs):
-    """
-    Load CSV file and clean missing data.
-    
-    Parameters:
-    filepath (str): Path to CSV file
-    **kwargs: Additional arguments passed to clean_missing_data
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    try:
-        df = pd.read_csv(filepath)
-        is_valid, message = validate_dataframe(df)
-        
-        if not is_valid:
-            print(f"Warning: {message}")
-            return df
-        
-        return clean_missing_data(df, **kwargs)
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"Error loading file: {str(e)}")
-        return pd.DataFrame()
+    def normalize_data(self, method='minmax'):
+        if method == 'minmax':
+            for col in self.numeric_columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val != min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            for col in self.numeric_columns:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        return self
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': [1, 2, np.nan, 4, 5],
-        'B': [np.nan, 2, 3, np.nan, 5],
-        'C': [1, 2, 3, 4, 5]
+    def get_cleaned_data(self):
+        return self.df
+
+def example_usage():
+    data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['X', 'Y', 'X', 'Y', np.nan, 'X']
     }
+    df = pd.DataFrame(data)
     
-    df = pd.DataFrame(sample_data)
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                 .handle_missing_values(strategy='mean')
+                 .remove_outliers(method='zscore', threshold=2)
+                 .normalize_data(method='minmax')
+                 .get_cleaned_data())
+    
     print("Original DataFrame:")
     print(df)
-    print("\nCleaned with mean strategy:")
-    print(clean_missing_data(df, strategy='mean'))
-    print("\nCleaned with drop strategy:")
-    print(clean_missing_data(df, strategy='drop'))
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    example_usage()
