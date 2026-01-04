@@ -102,4 +102,61 @@ def validate_data(df, required_columns, numeric_threshold=0.8):
     duplicate_rows = df.duplicated().sum()
     validation_report['duplicate_rows'] = duplicate_rows
     
-    return validation_report
+    return validation_reportimport pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, strategy='mean', columns=None):
+    """
+    Clean a CSV file by handling missing values.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        strategy (str): Strategy for imputation ('mean', 'median', 'mode', 'drop').
+        columns (list): Specific columns to clean. If None, clean all columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+        
+        if df[col].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else np.nan, inplace=True)
+            elif strategy == 'drop':
+                df.dropna(subset=[col], inplace=True)
+            else:
+                df[col].fillna(method='ffill', inplace=True)
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    
+    Args:
+        df (pd.DataFrame): Cleaned DataFrame.
+        output_path (str): Path to save the cleaned CSV.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, strategy='mean')
+    save_cleaned_data(cleaned_df, output_file)
