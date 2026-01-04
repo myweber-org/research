@@ -1,77 +1,130 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Load a CSV file, clean missing values, and save the cleaned data.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        input_file (str): Path to the input CSV file.
+        output_file (str): Path to save the cleaned CSV file.
+        missing_strategy (str): Strategy for handling missing values.
+            Options: 'mean', 'median', 'drop', 'zero'.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Loaded data from {input_file}. Shape: {df.shape}")
+        
+        # Check for missing values
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values in the dataset.")
+            
+            if missing_strategy == 'mean':
+                # Fill numeric columns with mean
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+                print("Filled missing values with column means.")
+                
+            elif missing_strategy == 'median':
+                # Fill numeric columns with median
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+                print("Filled missing values with column medians.")
+                
+            elif missing_strategy == 'drop':
+                # Drop rows with any missing values
+                df = df.dropna()
+                print(f"Dropped rows with missing values. New shape: {df.shape}")
+                
+            elif missing_strategy == 'zero':
+                # Fill all missing values with 0
+                df = df.fillna(0)
+                print("Filled missing values with zeros.")
+                
+            else:
+                print(f"Unknown strategy: {missing_strategy}. Using 'mean' as default.")
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        else:
+            print("No missing values found in the dataset.")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}. Shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the cleaned dataframe for basic data quality.
+    
+    Args:
+        df (pd.DataFrame): Dataframe to validate.
+        required_columns (list): List of column names that must be present.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        dict: Dictionary with validation results.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    validation_results = {
+        'is_valid': True,
+        'issues': []
+    }
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if df is None or df.empty:
+        validation_results['is_valid'] = False
+        validation_results['issues'].append('DataFrame is empty or None')
+        return validation_results
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['issues'].append(f'Missing required columns: {missing_cols}')
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    inf_count = np.isinf(df[numeric_cols]).sum().sum()
+    if inf_count > 0:
+        validation_results['issues'].append(f'Found {inf_count} infinite values')
     
-    return filtered_df
-
-def clean_dataset(df, columns_to_clean=None):
-    """
-    Clean multiple columns in a DataFrame using IQR outlier removal.
+    # Check data types consistency
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            # Check for mixed types in object columns
+            unique_types = set([type(x).__name__ for x in df[col].dropna()])
+            if len(unique_types) > 1:
+                validation_results['issues'].append(f'Column {col} has mixed types: {unique_types}')
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if columns_to_clean is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns_to_clean = numeric_cols
-    
-    cleaned_df = df.copy()
-    
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
-            original_len = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_len - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
-    
-    return cleaned_df
+    return validation_results
 
 if __name__ == "__main__":
     # Example usage
-    np.random.seed(42)
-    data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
     
-    # Add some outliers
-    data['A'][:5] = [500, 600, -400, 700, 800]
-    data['B'][:3] = [1000, 1200, 1500]
+    # Clean the data using mean imputation
+    cleaned_df = clean_csv_data(input_csv, output_csv, missing_strategy='mean')
     
-    df = pd.DataFrame(data)
-    print(f"Original dataset shape: {df.shape}")
-    
-    cleaned_df = clean_dataset(df)
-    print(f"Cleaned dataset shape: {cleaned_df.shape}")
-    
-    # Save cleaned data
-    cleaned_df.to_csv('cleaned_data.csv', index=False)
-    print("Cleaned data saved to 'cleaned_data.csv'")
+    if cleaned_df is not None:
+        # Validate the cleaned data
+        validation = validate_data(cleaned_df)
+        
+        if validation['is_valid']:
+            print("Data validation passed.")
+        else:
+            print("Data validation failed. Issues:")
+            for issue in validation['issues']:
+                print(f"  - {issue}")
+        
+        # Show basic statistics
+        print("\nBasic statistics:")
+        print(cleaned_df.describe())
