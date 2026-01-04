@@ -1,39 +1,73 @@
-import csv
-import sys
 
-def clean_csv(input_file, output_file):
-    try:
-        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-            reader = csv.reader(infile)
-            headers = next(reader)
-            rows = list(reader)
-        
-        cleaned_rows = []
-        for row in rows:
-            if len(row) == len(headers):
-                cleaned_row = [cell.strip() for cell in row]
-                cleaned_rows.append(cleaned_row)
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.writer(outfile)
-            writer.writerow(headers)
-            writer.writerows(cleaned_rows)
-        
-        print(f"Cleaned data saved to {output_file}")
-        return True
+import pandas as pd
+
+def clean_dataset(df, fill_method='mean'):
+    """
+    Remove duplicate rows and fill missing values in a DataFrame.
     
-    except FileNotFoundError:
-        print(f"Error: Input file '{input_file}' not found.")
-        return False
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        fill_method (str): Method for filling missing values ('mean', 'median', 'mode', or 'zero').
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Fill missing values
+    for column in cleaned_df.select_dtypes(include=['number']).columns:
+        if cleaned_df[column].isnull().any():
+            if fill_method == 'mean':
+                cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+            elif fill_method == 'median':
+                cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+            elif fill_method == 'mode':
+                cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+            elif fill_method == 'zero':
+                cleaned_df[column].fillna(0, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataset(df):
+    """
+    Validate dataset by checking for remaining missing values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary containing validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    return validation_results
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python data_cleaner.py <input_file> <output_file>")
-        sys.exit(1)
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 10, 40, 50],
+        'C': [100, 200, 300, 400, 500]
+    }
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    clean_csv(input_file, output_file)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, fill_method='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    validation = validate_dataset(cleaned)
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
