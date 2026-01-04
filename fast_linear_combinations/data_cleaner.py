@@ -1,72 +1,52 @@
 
 import pandas as pd
-import numpy as np
+import re
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+def clean_dataframe(df, column_name):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Clean a specific column in a DataFrame by removing duplicates,
+    stripping whitespace, and converting to lowercase.
     """
-    df_clean = df.copy()
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    if drop_duplicates:
-        initial_rows = df_clean.shape[0]
-        df_clean = df_clean.drop_duplicates()
-        removed = initial_rows - df_clean.shape[0]
-        print(f"Removed {removed} duplicate rows")
+    df[column_name] = df[column_name].astype(str)
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].str.lower()
+    df = df.drop_duplicates(subset=[column_name], keep='first')
     
-    if fill_missing:
-        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if df_clean[col].isnull().any():
-                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
-                print(f"Filled missing values in column '{col}' with median")
-        
-        categorical_cols = df_clean.select_dtypes(include=['object']).columns
-        for col in categorical_cols:
-            if df_clean[col].isnull().any():
-                df_clean[col] = df_clean[col].fillna('Unknown')
-                print(f"Filled missing values in column '{col}' with 'Unknown'")
-    
-    return df_clean
+    return df
 
-def validate_dataframe(df, required_columns=None):
+def normalize_string(text):
     """
-    Validate DataFrame structure and content.
+    Normalize a string by removing special characters and extra spaces.
     """
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+    if not isinstance(text, str):
+        return text
     
-    if df.empty:
-        print("Warning: DataFrame is empty")
+    text = re.sub(r'[^\w\s]', '', text)
+    text = re.sub(r'\s+', ' ', text)
     
-    return True
+    return text.strip()
 
-def save_cleaned_data(df, output_path):
+def process_csv(input_path, output_path, column_to_clean):
     """
-    Save cleaned DataFrame to CSV file.
+    Read a CSV file, clean the specified column, and save the result.
     """
+    df = pd.read_csv(input_path)
+    df = clean_dataframe(df, column_to_clean)
+    df[column_to_clean] = df[column_to_clean].apply(normalize_string)
     df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
+    
+    return df
 
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'id': [1, 2, 2, 3, 4, 5],
-        'value': [10.5, np.nan, 15.0, 20.0, np.nan, 30.0],
-        'category': ['A', 'B', 'B', None, 'C', 'A']
-    })
+    input_file = "input_data.csv"
+    output_file = "cleaned_data.csv"
+    target_column = "product_name"
     
-    print("Original DataFrame:")
-    print(sample_data)
-    print("\nCleaning data...")
-    
-    cleaned_df = clean_dataframe(sample_data)
-    
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    
-    if validate_dataframe(cleaned_df, required_columns=['id', 'value']):
-        print("\nData validation passed")
-    
-    save_cleaned_data(cleaned_df, "cleaned_data.csv")
+    try:
+        result_df = process_csv(input_file, output_file, target_column)
+        print(f"Data cleaned successfully. Rows processed: {len(result_df)}")
+    except Exception as e:
+        print(f"Error during processing: {e}")
