@@ -892,3 +892,79 @@ if __name__ == "__main__":
     stats = get_cleaning_stats(df, cleaned_df)
     for key, value in stats.items():
         print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    
+    Args:
+        input_list: A list that may contain duplicate elements.
+    
+    Returns:
+        A new list with duplicates removed, preserving the original order.
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to numbers and handling None values.
+    
+    Args:
+        values: List of values that may include strings, numbers, or None.
+        default: Default value to use for None or invalid entries.
+    
+    Returns:
+        List of cleaned numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        if value is None:
+            cleaned.append(default)
+        elif isinstance(value, str):
+            try:
+                cleaned.append(float(value))
+            except ValueError:
+                cleaned.append(default)
+        else:
+            cleaned.append(float(value))
+    
+    return cleaned
+
+def filter_by_threshold(data, threshold, key=None):
+    """
+    Filter data based on a threshold value.
+    
+    Args:
+        data: List of values or dictionaries to filter.
+        threshold: Minimum value to include in results.
+        key: If data contains dictionaries, key to extract value for comparison.
+    
+    Returns:
+        Filtered list containing only values >= threshold.
+    """
+    if key is None:
+        return [item for item in data if item >= threshold]
+    else:
+        return [item for item in data if item.get(key, 0) >= threshold]
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 4, 5]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    mixed_data = ["1.5", 2, None, "3.7", "invalid", 5]
+    numeric_data = clean_numeric_data(mixed_data)
+    print(f"Numeric data: {numeric_data}")
+    
+    filtered = filter_by_threshold(numeric_data, 3.0)
+    print(f"Filtered (>= 3.0): {filtered}")
