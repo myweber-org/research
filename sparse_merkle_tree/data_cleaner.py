@@ -130,3 +130,94 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'drop',
+    fill_value: Optional[float] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        input_path: Path to input CSV file
+        output_path: Path to save cleaned CSV file
+        missing_strategy: Strategy for handling missing values ('drop', 'fill', 'mean')
+        fill_value: Value to use when missing_strategy is 'fill'
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    
+    df = pd.read_csv(input_path)
+    
+    original_rows = len(df)
+    print(f"Original data: {original_rows} rows, {len(df.columns)} columns")
+    
+    df = df.drop_duplicates()
+    
+    if missing_strategy == 'drop':
+        df = df.dropna()
+    elif missing_strategy == 'fill':
+        if fill_value is not None:
+            df = df.fillna(fill_value)
+        else:
+            df = df.fillna(0)
+    elif missing_strategy == 'mean':
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    
+    cleaned_rows = len(df)
+    print(f"Cleaned data: {cleaned_rows} rows, {len(df.columns)} columns")
+    print(f"Removed {original_rows - cleaned_rows} rows")
+    
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+    
+    return df
+
+def validate_dataframe(df: pd.DataFrame) -> dict:
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_types': df.dtypes.to_dict(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 3, 4, 5, 5],
+        'value': [10.5, np.nan, 15.2, 20.1, np.nan, 10.5],
+        'category': ['A', 'B', 'A', 'C', None, 'A']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data(
+        input_path='sample_data.csv',
+        output_path='cleaned_data.csv',
+        missing_strategy='mean'
+    )
+    
+    validation = validate_dataframe(cleaned_df)
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
