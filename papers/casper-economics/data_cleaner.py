@@ -1,37 +1,72 @@
-
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def clean_csv_data(file_path, missing_strategy='mean', columns_to_drop=None):
+    """
+    Load and clean CSV data by handling missing values and optionally dropping columns.
+    
+    Parameters:
+    file_path (str): Path to the CSV file.
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop').
+    columns_to_drop (list): List of column names to drop.
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    original_shape = df.shape
+    
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+    
+    if missing_strategy == 'drop':
+        df = df.dropna()
+    elif missing_strategy in ['mean', 'median']:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if missing_strategy == 'mean':
+                fill_value = df[col].mean()
+            else:
+                fill_value = df[col].median()
+            df[col] = df[col].fillna(fill_value)
+    elif missing_strategy == 'mode':
+        for col in df.columns:
+            mode_value = df[col].mode()
+            if not mode_value.empty:
+                df[col] = df[col].fillna(mode_value[0])
+    
+    cleaned_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    print(f"Cleaned data shape: {cleaned_shape}")
+    print(f"Removed rows: {original_shape[0] - cleaned_shape[0]}")
+    print(f"Removed columns: {original_shape[1] - cleaned_shape[1]}")
+    
+    return df
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    if max_val == min_val:
-        return df[column]
-    return (df[column] - min_val) / (max_val - min_val)
-
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.dropna()
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to save.
+    output_path (str): Path for output CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
 
 if __name__ == "__main__":
     sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 200),
-        'feature_b': np.random.exponential(50, 200),
-        'category': np.random.choice(['X', 'Y', 'Z'], 200)
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': ['x', 'y', 'z', 'x', 'y'],
+        'D': [10, 20, 30, 40, 50]
     })
-    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {cleaned.shape}")
-    print(f"Removed {len(sample_data) - len(cleaned)} outliers")
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', missing_strategy='mean', columns_to_drop=['D'])
+    save_cleaned_data(cleaned_df, 'cleaned_sample_data.csv')
