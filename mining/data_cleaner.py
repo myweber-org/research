@@ -84,3 +84,78 @@ def validate_dataframe(df, required_columns=None):
 #     validation = validate_dataframe(cleaned_df, required_columns=['Name', 'Age', 'Score'])
 #     print("\nValidation Result:")
 #     print(validation)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from specified column
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_column(data, column, method='minmax'):
+    """
+    Normalize column using specified method
+    """
+    if method == 'minmax':
+        min_val = data[column].min()
+        max_val = data[column].max()
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = data[column].mean()
+        std_val = data[column].std()
+        data[column + '_normalized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def handle_missing_values(data, column, strategy='mean'):
+    """
+    Handle missing values in specified column
+    """
+    if strategy == 'mean':
+        fill_value = data[column].mean()
+    elif strategy == 'median':
+        fill_value = data[column].median()
+    elif strategy == 'mode':
+        fill_value = data[column].mode()[0]
+    else:
+        fill_value = 0
+    
+    data[column] = data[column].fillna(fill_value)
+    return data
+
+def clean_dataset(data, numeric_columns, outlier_threshold=1.5, normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = handle_missing_values(cleaned_data, column)
+            cleaned_data = remove_outliers(cleaned_data, column, outlier_threshold)
+            cleaned_data = normalize_column(cleaned_data, column, normalize_method)
+    
+    return cleaned_data
