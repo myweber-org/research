@@ -1,114 +1,78 @@
+
 import pandas as pd
 import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_duplicates (bool): Whether to drop duplicate rows
-        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean
     
     Returns:
         pd.DataFrame: Cleaned DataFrame
     """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
     cleaned_df = df.copy()
     
-    # Remove duplicate rows
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
+    for column in columns:
+        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{column}': {e}")
     
-    # Handle missing values
-    missing_count = cleaned_df.isnull().sum().sum()
-    if missing_count > 0:
-        print(f"Found {missing_count} missing values")
-        
-        if fill_missing == 'drop':
-            cleaned_df = cleaned_df.dropna()
-            print("Dropped rows with missing values")
-        elif fill_missing in ['mean', 'median']:
-            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-            for col in numeric_cols:
-                if fill_missing == 'mean':
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-                else:
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-            print(f"Filled missing numeric values with {fill_missing}")
-        elif fill_missing == 'mode':
-            for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
-            print("Filled missing categorical values with mode")
-    
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    print(f"Cleaning complete. Final dataset shape: {cleaned_df.shape}")
     return cleaned_df
 
-def validate_dataset(df, required_columns=None, min_rows=1):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate dataset structure and content.
+    Validate DataFrame structure and content.
     
     Args:
         df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-        min_rows (int): Minimum number of rows required
+        required_columns (list, optional): List of required column names
     
     Returns:
-        bool: True if validation passes, False otherwise
+        tuple: (is_valid, message)
     """
-    if len(df) < min_rows:
-        print(f"Validation failed: Dataset has less than {min_rows} rows")
-        return False
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
     
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Validation failed: Missing required columns: {missing_cols}")
-            return False
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    # Check for infinite values
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    if not numeric_cols.empty:
-        inf_count = np.isinf(df[numeric_cols]).sum().sum()
-        if inf_count > 0:
-            print(f"Validation warning: Found {inf_count} infinite values")
-    
-    print("Dataset validation passed")
-    return True
-
-# Example usage
-if __name__ == "__main__":
-    # Create sample data
-    sample_data = {
-        'id': [1, 2, 2, 3, 4, 5],
-        'value': [10.5, 20.3, 20.3, None, 40.1, 50.0],
-        'category': ['A', 'B', 'B', 'C', None, 'A']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original dataset:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    # Clean the dataset
-    cleaned = clean_dataset(df, fill_missing='mean')
-    print("\nCleaned dataset:")
-    print(cleaned)
-    
-    # Validate the cleaned dataset
-    validation_passed = validate_dataset(cleaned, required_columns=['id', 'value'], min_rows=3)
-    print(f"\nValidation result: {'PASS' if validation_passed else 'FAIL'}")
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    return True, "DataFrame is valid"
