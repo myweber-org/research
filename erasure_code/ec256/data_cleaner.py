@@ -381,4 +381,108 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
 #     print(cleaned)
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-#     print(f"\nValidation: {is_valid} - {message}")
+#     print(f"\nValidation: {is_valid} - {message}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in df_clean.columns:
+                Q1 = df_clean[col].quantile(0.25)
+                Q3 = df_clean[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        
+        removed_count = len(self.df) - len(df_clean)
+        self.df = df_clean
+        return removed_count
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_norm = self.df.copy()
+        for col in columns:
+            if col in df_norm.columns:
+                min_val = df_norm[col].min()
+                max_val = df_norm[col].max()
+                if max_val > min_val:
+                    df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        
+        self.df = df_norm
+        return self.df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_filled = self.df.copy()
+        for col in columns:
+            if col in df_filled.columns and df_filled[col].isnull().any():
+                median_val = df_filled[col].median()
+                df_filled[col] = df_filled[col].fillna(median_val)
+        
+        self.df = df_filled
+        return self.df
+    
+    def get_cleaning_report(self):
+        report = {
+            'original_rows': self.original_shape[0],
+            'current_rows': len(self.df),
+            'rows_removed': self.original_shape[0] - len(self.df),
+            'original_columns': self.original_shape[1],
+            'current_columns': self.df.shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        return report
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    data['feature_a'][np.random.choice(1000, 50, replace=False)] = np.nan
+    data['feature_b'][np.random.choice(1000, 20, replace=False)] = 1000
+    
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    df = create_sample_data()
+    cleaner = DataCleaner(df)
+    
+    print("Initial data shape:", df.shape)
+    print("Missing values:", df.isnull().sum().sum())
+    
+    removed = cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
+    print(f"Removed {removed} outliers")
+    
+    cleaner.fill_missing_median()
+    cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
+    
+    report = cleaner.get_cleaning_report()
+    print("\nCleaning Report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    print("\nCleaned data shape:", cleaned_df.shape)
