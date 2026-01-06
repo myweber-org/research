@@ -1,99 +1,91 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from typing import Optional, Dict, List
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else np.nan, inplace=True)
+                elif strategy == 'drop':
+                    self.df.dropna(subset=[col], inplace=True)
+                else:
+                    self.df[col].fillna(method='ffill', inplace=True)
+        return self
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    def convert_dtypes(self, type_mapping: Dict[str, str]) -> 'DataCleaner':
+        for col, dtype in type_mapping.items():
+            if col in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[col] = pd.to_datetime(self.df[col], errors='coerce')
+                    elif dtype == 'numeric':
+                        self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+                    elif dtype == 'category':
+                        self.df[col] = self.df[col].astype('category')
+                    else:
+                        self.df[col] = self.df[col].astype(dtype)
+                except (ValueError, TypeError):
+                    continue
+        return self
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> 'DataCleaner':
+        self.df.drop_duplicates(subset=subset, keep=keep, inplace=True)
+        return self
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    def normalize_column(self, column: str, method: str = 'minmax') -> 'DataCleaner':
+        if column in self.df.columns and pd.api.types.is_numeric_dtype(self.df[column]):
+            if method == 'minmax':
+                min_val = self.df[column].min()
+                max_val = self.df[column].max()
+                if max_val > min_val:
+                    self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = self.df[column].mean()
+                std_val = self.df[column].std()
+                if std_val > 0:
+                    self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    def get_cleaning_report(self) -> Dict:
+        return {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.astype(str).to_dict()
+        }
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
+def load_and_clean_csv(filepath: str, cleaning_steps: Optional[Dict] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    if cleaning_steps:
+        if 'missing_strategy' in cleaning_steps:
+            cleaner.handle_missing_values(
+                strategy=cleaning_steps['missing_strategy'],
+                columns=cleaning_steps.get('missing_columns')
+            )
+        if 'type_mapping' in cleaning_steps:
+            cleaner.convert_dtypes(cleaning_steps['type_mapping'])
+        if 'remove_dups' in cleaning_steps and cleaning_steps['remove_dups']:
+            cleaner.remove_duplicates(subset=cleaning_steps.get('dup_subset'))
+        if 'normalize' in cleaning_steps:
+            for norm_config in cleaning_steps['normalize']:
+                cleaner.normalize_column(**norm_config)
     
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
-
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean dataset by removing outliers from all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for column in numeric_columns:
-        if column in df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            except Exception as e:
-                print(f"Warning: Could not process column '{column}': {e}")
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    df.loc[::100, 'A'] = 500  # Add some outliers
-    
-    print("Original dataset shape:", df.shape)
-    print("Original statistics for column 'A':")
-    print(calculate_summary_statistics(df, 'A'))
-    
-    cleaned_df = clean_dataset(df, ['A', 'B'])
-    
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("Cleaned statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    return cleaner.get_cleaned_data()
