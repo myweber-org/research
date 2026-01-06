@@ -151,4 +151,68 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {is_valid}, Message: {message}")
+    print(f"\nValidation: {is_valid}, Message: {message}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, z_threshold=3):
+    """
+    Clean dataset by handling missing values, normalizing numeric columns,
+    and removing outliers based on z-score.
+    """
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            mean_val = df_clean[col].mean()
+            df_clean[col].fillna(mean_val, inplace=True)
+            
+            if df_clean[col].std() > 0:
+                z_scores = np.abs(stats.zscore(df_clean[col]))
+                df_clean = df_clean[z_scores < z_threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_features(df, columns=None):
+    """
+    Normalize specified columns to range [0,1] using min-max scaling.
+    """
+    df_norm = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col in df_norm.columns and df_norm[col].std() > 0:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    
+    return df_norm
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from dataframe.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, 8, 9],
+        'C': ['x', 'y', 'x', 'y', 'z']
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned = clean_dataset(sample_data, numeric_columns=['A', 'B'])
+    print("\nCleaned data:")
+    print(cleaned)
+    
+    normalized = normalize_features(cleaned, columns=['A', 'B'])
+    print("\nNormalized data:")
+    print(normalized)
