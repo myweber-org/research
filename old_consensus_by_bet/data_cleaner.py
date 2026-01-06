@@ -269,4 +269,64 @@ if __name__ == "__main__":
     
     cleaned_df, report = clean_dataset(df, ['feature_a', 'feature_b'])
     print("\nCleaning Report:", report)
-    print(f"\nOriginal shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    print(f"\nOriginal shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")import csv
+import re
+from typing import List, Dict, Optional
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value)
+    cleaned = re.sub(r'\s+', ' ', value.strip())
+    return cleaned
+
+def clean_numeric(value: str) -> Optional[float]:
+    """Convert string to float, handling common issues."""
+    if not value:
+        return None
+    cleaned = value.replace(',', '').replace('$', '').strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+def clean_csv_row(row: Dict[str, str]) -> Dict[str, str]:
+    """Apply cleaning functions to all fields in a row."""
+    cleaned_row = {}
+    for key, value in row.items():
+        if any(num_key in key.lower() for num_key in ['price', 'amount', 'quantity', 'total']):
+            cleaned_value = clean_numeric(value)
+            cleaned_row[key] = str(cleaned_value) if cleaned_value is not None else ''
+        else:
+            cleaned_row[key] = clean_string(value)
+    return cleaned_row
+
+def process_csv_file(input_path: str, output_path: str) -> None:
+    """Read CSV, clean data, and write to new file."""
+    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for row in reader:
+                cleaned_row = clean_csv_row(row)
+                writer.writerow(cleaned_row)
+
+def validate_email(email: str) -> bool:
+    """Basic email validation."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(data: List[Dict], key_field: str) -> List[Dict]:
+    """Remove duplicate entries based on specified key field."""
+    seen = set()
+    unique_data = []
+    for item in data:
+        key = item.get(key_field)
+        if key not in seen:
+            seen.add(key)
+            unique_data.append(item)
+    return unique_data
