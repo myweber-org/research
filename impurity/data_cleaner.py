@@ -1,17 +1,17 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a specified column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with outliers removed
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -25,18 +25,18 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_df.reset_index(drop=True)
 
-def calculate_basic_stats(df, column):
+def calculate_summary_stats(df, column):
     """
-    Calculate basic statistics for a column.
+    Calculate summary statistics for a column after outlier removal.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
     Returns:
-        dict: Dictionary containing statistics
+    dict: Dictionary containing summary statistics
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -47,54 +47,34 @@ def calculate_basic_stats(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count()
+        'count': len(df[column])
     }
     
     return stats
 
-def clean_numeric_data(df, columns=None):
+def clean_dataset(df, columns_to_clean):
     """
-    Clean numeric data by removing NaN values and converting to appropriate types.
+    Clean multiple columns in a DataFrame by removing outliers.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): List of columns to clean. If None, clean all numeric columns.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of summary statistics for each cleaned column
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
     cleaned_df = df.copy()
+    summary_stats = {}
     
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-            cleaned_df = cleaned_df.dropna(subset=[col])
+    for column in columns_to_clean:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_summary_stats(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            summary_stats[column] = stats
     
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        tuple: (is_valid, message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame validation passed"
+    return cleaned_df, summary_stats
