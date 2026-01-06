@@ -1,118 +1,120 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
 class DataCleaner:
     def __init__(self, df):
         self.df = df.copy()
-        self.numeric_columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
-        self.categorical_columns = self.df.select_dtypes(include=['object']).columns.tolist()
-    
-    def handle_missing_values(self, strategy='mean', fill_value=None):
-        if strategy == 'mean' and self.numeric_columns:
-            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
-                self.df[self.numeric_columns].mean()
-            )
-        elif strategy == 'median' and self.numeric_columns:
-            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
-                self.df[self.numeric_columns].median()
-            )
-        elif strategy == 'mode' and self.categorical_columns:
-            for col in self.categorical_columns:
-                self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
-        elif strategy == 'constant' and fill_value is not None:
-            self.df = self.df.fillna(fill_value)
-        elif strategy == 'drop':
-            self.df = self.df.dropna()
-        return self
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
     def remove_outliers_iqr(self, columns=None, multiplier=1.5):
         if columns is None:
             columns = self.numeric_columns
         
+        clean_df = self.df.copy()
         for col in columns:
-            if col in self.numeric_columns:
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
                 IQR = Q3 - Q1
                 lower_bound = Q1 - multiplier * IQR
                 upper_bound = Q3 + multiplier * IQR
-                
-                self.df = self.df[
-                    (self.df[col] >= lower_bound) & 
-                    (self.df[col] <= upper_bound)
-                ]
-        return self
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        return clean_df
     
-    def standardize_data(self, columns=None):
+    def remove_outliers_zscore(self, columns=None, threshold=3):
         if columns is None:
             columns = self.numeric_columns
         
+        clean_df = self.df.copy()
         for col in columns:
-            if col in self.numeric_columns:
-                mean = self.df[col].mean()
-                std = self.df[col].std()
-                if std > 0:
-                    self.df[col] = (self.df[col] - mean) / std
-        return self
+            if col in clean_df.columns:
+                z_scores = np.abs(stats.zscore(clean_df[col].dropna()))
+                clean_df = clean_df[(z_scores < threshold) | clean_df[col].isna()]
+        return clean_df
     
-    def normalize_data(self, columns=None):
+    def normalize_minmax(self, columns=None):
         if columns is None:
             columns = self.numeric_columns
         
+        normalized_df = self.df.copy()
         for col in columns:
-            if col in self.numeric_columns:
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
-        return self
+            if col in normalized_df.columns:
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val != min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+        return normalized_df
     
-    def get_cleaned_data(self):
-        return self.df
+    def normalize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in normalized_df.columns:
+                mean_val = normalized_df[col].mean()
+                std_val = normalized_df[col].std()
+                if std_val != 0:
+                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        return normalized_df
     
-    def summary(self):
-        print("Data Summary:")
-        print(f"Shape: {self.df.shape}")
-        print(f"Missing values: {self.df.isnull().sum().sum()}")
-        print(f"Columns: {list(self.df.columns)}")
-        print(f"Numeric columns: {self.numeric_columns}")
-        print(f"Categorical columns: {self.categorical_columns}")
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in filled_df.columns:
+                filled_df[col] = filled_df[col].fillna(filled_df[col].mean())
+        return filled_df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in filled_df.columns:
+                filled_df[col] = filled_df[col].fillna(filled_df[col].median())
+        return filled_df
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': self.df.shape,
+            'numeric_columns': self.numeric_columns,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
 
 def create_sample_data():
     np.random.seed(42)
     data = {
-        'age': np.random.randint(20, 70, 100),
-        'salary': np.random.normal(50000, 15000, 100),
-        'department': np.random.choice(['IT', 'HR', 'Finance', 'Marketing'], 100),
-        'experience': np.random.randint(0, 30, 100)
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
     }
-    
-    df = pd.DataFrame(data)
-    
-    df.loc[np.random.choice(df.index, 10), 'salary'] = np.nan
-    df.loc[np.random.choice(df.index, 5), 'age'] = np.nan
-    df.loc[np.random.choice(df.index, 3), 'department'] = np.nan
-    
-    df.loc[0, 'salary'] = 200000
-    df.loc[1, 'age'] = 150
-    
-    return df
+    data['feature_a'][np.random.choice(1000, 50)] = np.nan
+    data['feature_b'][np.random.choice(1000, 30)] = np.nan
+    data['feature_a'][:10] = 500
+    return pd.DataFrame(data)
 
 if __name__ == "__main__":
     sample_df = create_sample_data()
     cleaner = DataCleaner(sample_df)
     
-    print("Original data:")
-    cleaner.summary()
+    print("Data Summary:")
+    summary = cleaner.get_summary()
+    print(f"Original shape: {summary['original_shape']}")
+    print(f"Numeric columns: {summary['numeric_columns']}")
     
-    cleaner.handle_missing_values(strategy='mean')
-    cleaner.remove_outliers_iqr(multiplier=1.5)
-    cleaner.standardize_data()
+    cleaned_df = cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
+    normalized_df = cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
+    filled_df = cleaner.fill_missing_mean(['feature_a', 'feature_b'])
     
-    print("\nCleaned data:")
-    cleaner.summary()
-    
-    cleaned_df = cleaner.get_cleaned_data()
-    print(f"\nCleaned data shape: {cleaned_df.shape}")
-    print(f"Cleaned data head:\n{cleaned_df.head()}")
+    print(f"\nCleaned shape: {cleaned_df.shape}")
+    print(f"Normalized range - feature_a: [{normalized_df['feature_a'].min():.3f}, {normalized_df['feature_a'].max():.3f}]")
+    print(f"Missing values after fill: {filled_df.isnull().sum().sum()}")
