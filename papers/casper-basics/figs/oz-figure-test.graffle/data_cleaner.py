@@ -150,4 +150,150 @@ def validate_data(df, required_columns):
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing data in a pandas DataFrame.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for handling missing values.
+                        Options: 'mean', 'median', 'mode', 'drop', 'fill_zero'
+        columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
+
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_cleaned = df.copy()
+    
+    if columns is None:
+        columns = df_cleaned.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col not in df_cleaned.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df_cleaned[col].mean()
+        elif strategy == 'median':
+            fill_value = df_cleaned[col].median()
+        elif strategy == 'mode':
+            fill_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 0
+        elif strategy == 'fill_zero':
+            fill_value = 0
+        elif strategy == 'drop':
+            df_cleaned = df_cleaned.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+    
+    return df_cleaned
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to check for outliers
+        threshold (float): IQR multiplier threshold
+
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_filtered = df.copy()
+    
+    for col in columns:
+        if col not in df_filtered.columns:
+            continue
+            
+        Q1 = df_filtered[col].quantile(0.25)
+        Q3 = df_filtered[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        df_filtered = df_filtered[(df_filtered[col] >= lower_bound) & 
+                                  (df_filtered[col] <= upper_bound)]
+    
+    return df_filtered
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize data in specified columns.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to normalize
+        method (str): Normalization method ('minmax' or 'zscore')
+
+    Returns:
+        pd.DataFrame: DataFrame with normalized columns
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        columns = df_normalized.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col not in df_normalized.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            if std_val != 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+    
+    return df_normalized
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
+
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def save_cleaned_data(df, output_path, index=False):
+    """
+    Save cleaned DataFrame to CSV file.
+
+    Args:
+        df (pd.DataFrame): DataFrame to save
+        output_path (str): Path to output CSV file
+        index (bool): Whether to save index
+    """
+    df.to_csv(output_path, index=index)
+    print(f"Cleaned data saved to: {output_path}")
