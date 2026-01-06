@@ -1,77 +1,54 @@
-
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_statistics(df, column):
-    """
-    Calculate basic statistics for a column.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
-    
-    Returns:
-        dict: Dictionary containing statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column]),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
-
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    data = {
-        'values': np.random.normal(100, 15, 1000).tolist() + [500, -200, 1000]
-    }
-    df = pd.DataFrame(data)
-    
-    print("Original data shape:", df.shape)
-    print("Original statistics:", calculate_statistics(df, 'values'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_statistics(cleaned_df, 'values'))
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    cleaned_data = example_usage()
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
+        
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        self.df = self.df[z_scores < threshold]
+        return self
+        
+    def fill_missing_mean(self, column):
+        mean_value = self.df[column].mean()
+        self.df[column].fillna(mean_value, inplace=True)
+        return self
+        
+    def fill_missing_median(self, column):
+        median_value = self.df[column].median()
+        self.df[column].fillna(median_value, inplace=True)
+        return self
+        
+    def normalize_minmax(self, column):
+        min_val = self.df[column].min()
+        max_val = self.df[column].max()
+        self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        return self
+        
+    def standardize_zscore(self, column):
+        mean_val = self.df[column].mean()
+        std_val = self.df[column].std()
+        self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+        
+    def drop_duplicates(self):
+        self.df.drop_duplicates(inplace=True)
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df
+        
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
