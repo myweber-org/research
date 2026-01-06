@@ -1,100 +1,107 @@
 
+import numpy as np
 import pandas as pd
-import re
 
-def clean_dataframe(df, text_column):
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate rows and normalize text in specified column.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
     """
-    # Remove duplicates
-    df_clean = df.drop_duplicates().reset_index(drop=True)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    # Normalize text: lowercase, remove extra whitespace
-    df_clean[text_column] = df_clean[text_column].apply(
-        lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
-    )
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    return df_clean
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def save_cleaned_data(df, output_path):
+def calculate_summary_statistics(df, column):
     """
-    Save cleaned DataFrame to CSV file.
-    """
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = pd.DataFrame({
-        'id': [1, 2, 2, 3, 4],
-        'text': ['Hello World', 'Python Code', 'python code', '  DATA  ', 'Test']
-    })
+    Calculate summary statistics for a column after outlier removal.
     
-    cleaned = clean_dataframe(sample_data, 'text')
-    save_cleaned_data(cleaned, 'cleaned_data.csv')
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
-    print("Original shape:", sample_data.shape)
-    print("Cleaned shape:", cleaned.shape)
-    print("\nCleaned data preview:")
-    print(cleaned.head())import pandas as pd
-import re
-
-def clean_text_column(df, column_name):
+    Returns:
+    dict: Dictionary containing summary statistics
     """
-    Standardize text by converting to lowercase, removing extra whitespace,
-    and stripping special characters except basic punctuation.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    df[column_name] = df[column_name].astype(str).str.lower()
-    df[column_name] = df[column_name].str.strip()
-    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^\w\s.,!?-]', '', x))
-    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x))
-    
-    return df
-
-def remove_duplicate_rows(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from DataFrame.
-    """
-    return df.drop_duplicates(subset=subset, keep=keep)
-
-def validate_email_column(df, column_name):
-    """
-    Validate email format and return boolean mask.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return df[column_name].str.match(email_pattern)
-
-def main():
-    # Example usage
-    data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
-        'email': ['john@example.com', 'invalid-email', 'john@example.com', 'bob@company.org'],
-        'notes': ['Important client!!!', 'Needs follow-up.', 'Important client!!!', '  Regular customer  ']
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
     }
     
-    df = pd.DataFrame(data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
+    return stats
+
+def process_dataset(df, numeric_columns):
+    """
+    Process dataset by removing outliers from multiple numeric columns.
     
-    # Clean text columns
-    df = clean_text_column(df, 'name')
-    df = clean_text_column(df, 'notes')
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of column names to process
     
-    # Remove duplicates
-    df = remove_duplicate_rows(df, subset=['name', 'email'])
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each column
+    """
+    cleaned_df = df.copy()
+    all_stats = {}
     
-    # Validate emails
-    df['valid_email'] = validate_email_column(df, 'email')
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_summary_statistics(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            all_stats[column] = stats
     
-    print("Cleaned DataFrame:")
-    print(df)
+    return cleaned_df, all_stats
 
 if __name__ == "__main__":
-    main()
+    # Example usage
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500  # Add some outliers
+    
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics:")
+    print(df.describe())
+    
+    cleaned_df, stats = process_dataset(df, ['A', 'B', 'C'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned statistics:")
+    print(cleaned_df.describe())
+    
+    print("\nProcessing summary:")
+    for col, col_stats in stats.items():
+        print(f"\n{col}:")
+        for key, value in col_stats.items():
+            print(f"  {key}: {value:.2f}")
