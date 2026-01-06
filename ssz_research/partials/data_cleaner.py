@@ -7,10 +7,10 @@ def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_tex
     Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
     Args:
-        df: pandas DataFrame to clean
-        column_mapping: Optional dictionary to rename columns
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns {old_name: new_name}
         drop_duplicates: Boolean to remove duplicate rows
-        normalize_text: Boolean to normalize text columns
+        normalize_text: Boolean to normalize text columns (lowercase, strip whitespace)
     
     Returns:
         Cleaned pandas DataFrame
@@ -27,46 +27,54 @@ def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_tex
         print(f"Removed {removed} duplicate rows")
     
     if normalize_text:
-        for column in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[column] = cleaned_df[column].apply(_normalize_string)
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+            cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
     
     return cleaned_df
-
-def _normalize_string(text):
-    """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
-    """
-    if pd.isna(text):
-        return text
-    
-    normalized = str(text).lower().strip()
-    normalized = re.sub(r'\s+', ' ', normalized)
-    normalized = re.sub(r'[^\w\s-]', '', normalized)
-    
-    return normalized
 
 def validate_email_column(df, email_column):
     """
     Validate email addresses in a specified column.
     
     Args:
-        df: pandas DataFrame
+        df: Input pandas DataFrame
         email_column: Name of the column containing email addresses
     
     Returns:
-        DataFrame with validation results
+        DataFrame with additional 'email_valid' boolean column
     """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['email_valid'] = df[email_column].str.match(email_pattern, na=False)
     
-    validation_results = df.copy()
-    validation_results['email_valid'] = validation_results[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
-    )
+    invalid_count = len(df) - df['email_valid'].sum()
+    if invalid_count > 0:
+        print(f"Found {invalid_count} invalid email addresses")
     
-    valid_count = validation_results['email_valid'].sum()
-    total_count = len(validation_results)
+    return df
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
     
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
+    Args:
+        df: Cleaned pandas DataFrame
+        output_path: Path to save the file
+        format: File format ('csv', 'excel', 'json')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records', indent=2)
+    else:
+        raise ValueError(f"Unsupported format: {format}. Use 'csv', 'excel', or 'json'")
     
-    return validation_results
+    print(f"Cleaned data saved to {output_path}")
