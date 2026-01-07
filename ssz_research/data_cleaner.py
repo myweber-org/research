@@ -252,3 +252,88 @@ def example_usage():
 
 if __name__ == "__main__":
     result_df = example_usage()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns_to_check=None, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    duplicates_removed = original_shape[0] - df_cleaned.shape[0]
+    
+    # Handle missing values
+    if fill_missing:
+        if columns_to_check is None:
+            columns_to_check = df_cleaned.columns
+        
+        for column in columns_to_check:
+            if df_cleaned[column].dtype in [np.float64, np.int64]:
+                # Fill numeric columns with median
+                df_cleaned[column] = df_cleaned[column].fillna(df_cleaned[column].median())
+            elif df_cleaned[column].dtype == 'object':
+                # Fill categorical columns with mode
+                df_cleaned[column] = df_cleaned[column].fillna(df_cleaned[column].mode()[0] if not df_cleaned[column].mode().empty else 'Unknown')
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    # Print cleaning summary
+    print(f"Original dataset shape: {original_shape}")
+    print(f"Cleaned dataset shape: {df_cleaned.shape}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    print(f"Missing values filled: {fill_missing}")
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic data quality requirements.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with some issues
+    data = {
+        'id': [1, 2, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve', 'Eve'],
+        'age': [25, 30, 30, None, 35, 40, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5, 95.5]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, fill_missing=True)
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    try:
+        validate_data(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
