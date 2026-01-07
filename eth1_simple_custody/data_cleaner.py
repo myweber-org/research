@@ -362,4 +362,93 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid, msg = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {msg}")
+    print(f"\nValidation: {msg}")import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': data[column].count()
+    }
+    return stats
+
+def normalize_column(data, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val != min_val:
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    else:
+        data[column + '_normalized'] = 0
+    
+    return data
+
+def handle_missing_values(data, column, method='mean'):
+    """
+    Handle missing values in a column.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    method (str): Method for imputation ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if method == 'mean':
+        fill_value = data[column].mean()
+    elif method == 'median':
+        fill_value = data[column].median()
+    elif method == 'mode':
+        fill_value = data[column].mode()[0]
+    elif method == 'drop':
+        return data.dropna(subset=[column])
+    else:
+        raise ValueError("Method must be 'mean', 'median', 'mode', or 'drop'")
+    
+    data[column] = data[column].fillna(fill_value)
+    return data
