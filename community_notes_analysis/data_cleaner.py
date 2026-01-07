@@ -166,4 +166,80 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    result_df = example_usage()
+    result_df = example_usage()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, numeric_columns=None, drop_na=True, normalize=True, remove_outliers=True):
+    """
+    Clean a pandas DataFrame by handling missing values, normalizing numeric columns,
+    and removing outliers.
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if normalize and numeric_columns:
+        for col in numeric_columns:
+            if col in df_clean.columns:
+                col_min = df_clean[col].min()
+                col_max = df_clean[col].max()
+                if col_max > col_min:
+                    df_clean[col] = (df_clean[col] - col_min) / (col_max - col_min)
+    
+    if remove_outliers and numeric_columns:
+        for col in numeric_columns:
+            if col in df_clean.columns:
+                q1 = df_clean[col].quantile(0.25)
+                q3 = df_clean[col].quantile(0.75)
+                iqr = q3 - q1
+                lower_bound = q1 - 1.5 * iqr
+                upper_bound = q3 + 1.5 * iqr
+                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    return df_clean.reset_index(drop=True)
+
+def calculate_statistics(df, numeric_columns=None):
+    """
+    Calculate basic statistics for numeric columns in a DataFrame.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = {}
+    for col in numeric_columns:
+        if col in df.columns:
+            stats[col] = {
+                'mean': df[col].mean(),
+                'median': df[col].median(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max()
+            }
+    
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = clean_dataset(df, normalize=True, remove_outliers=True)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print()
+    
+    stats = calculate_statistics(cleaned_df)
+    print("Statistics:")
+    for col, col_stats in stats.items():
+        print(f"{col}: {col_stats}")
