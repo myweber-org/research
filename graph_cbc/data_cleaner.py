@@ -211,3 +211,59 @@ if __name__ == "__main__":
     
     validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {validation['message']}")
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove duplicate rows and standardize column names.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe to clean.
+    
+    Returns:
+        pd.DataFrame: Cleaned dataframe.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
+    
+    return df_clean
+
+def validate_dataframe(df):
+    """
+    Perform basic validation on dataframe.
+    
+    Args:
+        df (pd.DataFrame): Dataframe to validate.
+    
+    Returns:
+        dict: Dictionary containing validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Product Name': ['A', 'B', 'A', 'C', 'B'],
+        'Price': [100, 200, 100, 300, 200],
+        'Quantity': [5, 3, 5, 2, 3]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataframe(df))
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
