@@ -65,3 +65,11 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     cleaned_df = clean_dataset(df, ['temperature', 'humidity'])
     print(cleaned_df)
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
