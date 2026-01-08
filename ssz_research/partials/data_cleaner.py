@@ -1,80 +1,138 @@
 
 import pandas as pd
-import re
+import numpy as np
+from typing import List, Union
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Remove duplicate rows from DataFrame.
     
     Args:
-        df: Input pandas DataFrame
-        column_mapping: Dictionary to rename columns {old_name: new_name}
-        drop_duplicates: Boolean to remove duplicate rows
-        normalize_text: Boolean to normalize text columns (lowercase, strip whitespace)
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-        Cleaned pandas DataFrame
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, 
+                         column_types: dict) -> pd.DataFrame:
+    """
+    Convert specified columns to given data types.
+    
+    Args:
+        df: Input DataFrame
+        column_types: Dictionary mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_copy = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_copy.columns:
+            try:
+                df_copy[column] = df_copy[column].astype(dtype)
+            except (ValueError, TypeError):
+                df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+    return df_copy
+
+def handle_missing_values(df: pd.DataFrame, 
+                          strategy: str = 'mean',
+                          columns: List[str] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: Specific columns to process
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        columns = df_copy.columns
+    
+    for column in columns:
+        if column in df_copy.columns:
+            if strategy == 'drop':
+                df_copy = df_copy.dropna(subset=[column])
+            elif strategy == 'mean':
+                df_copy[column] = df_copy[column].fillna(df_copy[column].mean())
+            elif strategy == 'median':
+                df_copy[column] = df_copy[column].fillna(df_copy[column].median())
+            elif strategy == 'mode':
+                df_copy[column] = df_copy[column].fillna(df_copy[column].mode()[0])
+    
+    return df_copy
+
+def normalize_numeric_columns(df: pd.DataFrame,
+                             columns: List[str] = None,
+                             method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize numeric columns in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        columns: Columns to normalize
+        method: 'minmax' or 'zscore'
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        columns = df_copy.select_dtypes(include=[np.number]).columns
+    
+    for column in columns:
+        if column in df_copy.columns and pd.api.types.is_numeric_dtype(df_copy[column]):
+            if method == 'minmax':
+                min_val = df_copy[column].min()
+                max_val = df_copy[column].max()
+                if max_val > min_val:
+                    df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = df_copy[column].mean()
+                std_val = df_copy[column].std()
+                if std_val > 0:
+                    df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
+
+def clean_dataframe(df: pd.DataFrame,
+                   deduplicate: bool = True,
+                   type_conversions: dict = None,
+                   missing_strategy: str = 'mean',
+                   normalize: bool = False) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary of column type conversions
+        missing_strategy: Strategy for handling missing values
+        normalize: Whether to normalize numeric columns
+    
+    Returns:
+        Cleaned DataFrame
     """
     cleaned_df = df.copy()
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
     
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
     
-    if normalize_text:
-        text_columns = cleaned_df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
-            cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x))
+    if missing_strategy != 'none':
+        cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     
-    cleaned_df = cleaned_df.reset_index(drop=True)
+    if normalize:
+        cleaned_df = normalize_numeric_columns(cleaned_df)
     
     return cleaned_df
-
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a specified column.
-    
-    Args:
-        df: Input pandas DataFrame
-        email_column: Name of the column containing email addresses
-    
-    Returns:
-        DataFrame with additional 'email_valid' boolean column
-    """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    df['email_valid'] = df[email_column].str.match(email_pattern, na=False)
-    
-    invalid_count = len(df) - df['email_valid'].sum()
-    if invalid_count > 0:
-        print(f"Found {invalid_count} invalid email addresses")
-    
-    return df
-
-def save_cleaned_data(df, output_path, format='csv'):
-    """
-    Save cleaned DataFrame to file.
-    
-    Args:
-        df: Cleaned pandas DataFrame
-        output_path: Path to save the file
-        format: File format ('csv', 'excel', 'json')
-    """
-    if format == 'csv':
-        df.to_csv(output_path, index=False)
-    elif format == 'excel':
-        df.to_excel(output_path, index=False)
-    elif format == 'json':
-        df.to_json(output_path, orient='records', indent=2)
-    else:
-        raise ValueError(f"Unsupported format: {format}. Use 'csv', 'excel', or 'json'")
-    
-    print(f"Cleaned data saved to {output_path}")
