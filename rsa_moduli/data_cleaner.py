@@ -1,34 +1,73 @@
 
 import pandas as pd
 import numpy as np
-from scipy import stats
+from typing import List, Union
 
-def remove_outliers_iqr(df, columns):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, 
+                         column_types: dict) -> pd.DataFrame:
+    """
+    Convert columns to specified data types.
+    """
+    df_converted = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_converted.columns:
+            try:
+                df_converted[column] = df_converted[column].astype(dtype)
+            except (ValueError, TypeError):
+                df_converted[column] = pd.to_numeric(df_converted[column], errors='coerce')
+    return df_converted
+
+def handle_missing_values(df: pd.DataFrame, 
+                          strategy: str = 'drop',
+                          fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    """
     df_clean = df.copy()
-    for col in columns:
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            df_clean = df_clean.fillna(fill_value)
+        else:
+            numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+            df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].mean())
     return df_clean
 
-def normalize_minmax(df, columns):
-    df_norm = df.copy()
-    for col in columns:
-        min_val = df_norm[col].min()
-        max_val = df_norm[col].max()
-        df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
-    return df_norm
+def clean_dataframe(df: pd.DataFrame,
+                    deduplicate: bool = True,
+                    type_conversions: dict = None,
+                    missing_strategy: str = 'drop') -> pd.DataFrame:
+    """
+    Main function to clean DataFrame with multiple operations.
+    """
+    df_clean = df.copy()
+    
+    if deduplicate:
+        df_clean = remove_duplicates(df_clean)
+    
+    if type_conversions:
+        df_clean = convert_column_types(df_clean, type_conversions)
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    return df_clean
 
-def clean_dataset(file_path, numeric_columns):
-    df = pd.read_csv(file_path)
-    df_clean = remove_outliers_iqr(df, numeric_columns)
-    df_normalized = normalize_minmax(df_clean, numeric_columns)
-    return df_normalized
-
-if __name__ == "__main__":
-    cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate DataFrame structure and content.
+    """
+    if df.empty:
+        return False
+    
+    if df.isnull().all().any():
+        return False
+    
+    return True
