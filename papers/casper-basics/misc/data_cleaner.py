@@ -1,111 +1,93 @@
 
-import pandas as pd
 import numpy as np
 
-def clean_dataset(df, missing_strategy='mean', outlier_threshold=3):
+def remove_outliers_iqr(data, column):
     """
-    Clean dataset by handling missing values and removing outliers.
+    Remove outliers from a specified column using the IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input dataframe
-    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'drop')
-    outlier_threshold (float): Z-score threshold for outlier detection
+    data (list or np.array): Input data
+    column (int or str): Column index or name if using pandas
     
     Returns:
-    pd.DataFrame: Cleaned dataframe
+    np.array: Data with outliers removed
     """
-    cleaned_df = df.copy()
+    if isinstance(data, list):
+        data = np.array(data)
     
-    # Handle missing values
-    if missing_strategy == 'mean':
-        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
-    elif missing_strategy == 'median':
-        cleaned_df = cleaned_df.fillna(cleaned_df.median())
-    elif missing_strategy == 'drop':
-        cleaned_df = cleaned_df.dropna()
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
     
-    # Remove outliers using Z-score method
-    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-    z_scores = np.abs((cleaned_df[numeric_cols] - cleaned_df[numeric_cols].mean()) / cleaned_df[numeric_cols].std())
-    outlier_mask = (z_scores < outlier_threshold).all(axis=1)
-    cleaned_df = cleaned_df[outlier_mask]
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
     
-    return cleaned_df.reset_index(drop=True)
+    filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]
+    
+    return filtered_data
 
-def normalize_data(df, method='minmax'):
+def calculate_statistics(data):
     """
-    Normalize numeric columns in the dataframe.
+    Calculate basic statistics for the data.
     
     Parameters:
-    df (pd.DataFrame): Input dataframe
-    method (str): Normalization method ('minmax' or 'zscore')
+    data (np.array): Input data
     
     Returns:
-    pd.DataFrame: Normalized dataframe
+    dict: Dictionary containing mean, median, std
     """
-    normalized_df = df.copy()
-    numeric_cols = normalized_df.select_dtypes(include=[np.number]).columns
+    stats = {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'count': len(data)
+    }
     
-    if method == 'minmax':
-        for col in numeric_cols:
-            col_min = normalized_df[col].min()
-            col_max = normalized_df[col].max()
-            if col_max != col_min:
-                normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
-    
-    elif method == 'zscore':
-        for col in numeric_cols:
-            col_mean = normalized_df[col].mean()
-            col_std = normalized_df[col].std()
-            if col_std > 0:
-                normalized_df[col] = (normalized_df[col] - col_mean) / col_std
-    
-    return normalized_df
+    return stats
 
-def validate_dataframe(df, required_columns=None, min_rows=1):
+def clean_dataset(data_array):
     """
-    Validate dataframe structure and content.
+    Main function to clean dataset by removing outliers.
     
     Parameters:
-    df (pd.DataFrame): Dataframe to validate
-    required_columns (list): List of required column names
-    min_rows (int): Minimum number of rows required
+    data_array (np.array): 2D array of data
     
     Returns:
-    tuple: (is_valid, error_message)
+    tuple: (cleaned_data, removed_indices, statistics)
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
+    if len(data_array.shape) == 1:
+        data_array = data_array.reshape(-1, 1)
     
-    if len(df) < min_rows:
-        return False, f"Dataframe has fewer than {min_rows} rows"
+    cleaned_data = []
+    removed_indices = []
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+    for col in range(data_array.shape[1]):
+        column_data = data_array[:, col]
+        cleaned_column = remove_outliers_iqr(column_data, col)
+        cleaned_data.append(cleaned_column)
+        
+        original_indices = np.arange(len(column_data))
+        filtered_indices = original_indices[
+            (column_data >= np.percentile(column_data, 25) - 1.5 * (np.percentile(column_data, 75) - np.percentile(column_data, 25))) &
+            (column_data <= np.percentile(column_data, 75) + 1.5 * (np.percentile(column_data, 75) - np.percentile(column_data, 25)))
+        ]
+        removed = np.setdiff1d(original_indices, filtered_indices)
+        removed_indices.append(removed)
     
-    return True, "Dataframe is valid"
+    cleaned_data = np.column_stack(cleaned_data) if len(cleaned_data) > 1 else cleaned_data[0]
+    
+    stats = calculate_statistics(cleaned_data.flatten())
+    
+    return cleaned_data, removed_indices, stats
 
 if __name__ == "__main__":
     # Example usage
-    sample_data = {
-        'A': [1, 2, np.nan, 4, 100],
-        'B': [5, 6, 7, np.nan, 8],
-        'C': [9, 10, 11, 12, 13]
-    }
+    sample_data = np.random.randn(100, 3) * 10 + 50
+    sample_data[0, 0] = 200  # Add an outlier
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    cleaned, removed, statistics = clean_dataset(sample_data)
     
-    cleaned = clean_dataset(df, missing_strategy='mean', outlier_threshold=2)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    normalized = normalize_data(cleaned, method='minmax')
-    print("\nNormalized DataFrame:")
-    print(normalized)
-    
-    is_valid, message = validate_dataframe(normalized, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Removed indices per column: {removed}")
+    print(f"Statistics: {statistics}")
