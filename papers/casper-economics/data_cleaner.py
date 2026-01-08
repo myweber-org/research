@@ -1,38 +1,90 @@
+import pandas as pd
+import numpy as np
 
-def remove_duplicates(input_list):
+def clean_missing_data(file_path, strategy='mean', columns=None):
     """
-    Remove duplicate elements from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-
-def clean_data_with_key(input_list, key_func=None):
-    """
-    Remove duplicates based on a key function.
-    If key_func is None, uses the element itself.
-    """
-    seen = set()
-    result = []
-    for item in input_list:
-        key = key_func(item) if key_func else item
-        if key not in seen:
-            seen.add(key)
-            result.append(item)
-    return result
-
-if __name__ == "__main__":
-    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
-    cleaned = remove_duplicates(sample_data)
-    print(f"Original: {sample_data}")
-    print(f"Cleaned: {cleaned}")
+    Clean missing data in a CSV file using specified strategy.
     
-    sample_objects = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 1, "name": "Alice"}]
-    cleaned_objects = clean_data_with_key(sample_objects, key_func=lambda x: x["id"])
-    print(f"Original objects: {sample_objects}")
-    print(f"Cleaned objects: {cleaned_objects}")
+    Args:
+        file_path (str): Path to the CSV file
+        strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns (list): List of columns to apply cleaning to (None for all columns)
+    
+    Returns:
+        pd.DataFrame: Cleaned dataframe
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        if columns is None:
+            columns = df.columns
+        
+        for col in columns:
+            if col in df.columns:
+                if df[col].isnull().any():
+                    if strategy == 'mean':
+                        df[col].fillna(df[col].mean(), inplace=True)
+                    elif strategy == 'median':
+                        df[col].fillna(df[col].median(), inplace=True)
+                    elif strategy == 'mode':
+                        df[col].fillna(df[col].mode()[0], inplace=True)
+                    elif strategy == 'drop':
+                        df.dropna(subset=[col], inplace=True)
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def detect_outliers(df, column, method='iqr'):
+    """
+    Detect outliers in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        column (str): Column name to check for outliers
+        method (str): Method for outlier detection ('iqr' or 'zscore')
+    
+    Returns:
+        pd.Series: Boolean series indicating outliers
+    """
+    if column not in df.columns:
+        return pd.Series([False] * len(df))
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = (df[column] - mean) / std
+        return np.abs(z_scores) > 3
+    
+    return pd.Series([False] * len(df))
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV file.
+    
+    Args:
+        df (pd.DataFrame): Cleaned dataframe
+        output_path (str): Path to save the cleaned data
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        df.to_csv(output_path, index=False)
+        return True
+    except Exception as e:
+        print(f"Error saving cleaned data: {str(e)}")
+        return False
