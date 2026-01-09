@@ -120,3 +120,69 @@ if __name__ == "__main__":
     print("\nValid Emails Only:")
     valid_emails = filter_valid_emails(cleaned, 'Email')
     print(valid_emails)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': data[column].count()
+    }
+    return stats
+
+if __name__ == "__main__":
+    import pandas as pd
+    
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'values': np.concatenate([
+            np.random.normal(100, 15, 95),
+            np.random.normal(300, 50, 5)
+        ])
+    })
+    
+    print("Original data statistics:")
+    original_stats = calculate_statistics(sample_data, 'values')
+    print(original_stats)
+    
+    print("\nCleaned data statistics:")
+    cleaned_data = remove_outliers_iqr(sample_data, 'values')
+    cleaned_stats = calculate_statistics(cleaned_data, 'values')
+    print(cleaned_stats)
+    
+    print(f"\nRemoved {len(sample_data) - len(cleaned_data)} outliers")
