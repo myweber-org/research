@@ -128,3 +128,89 @@ def process_dataset(data, columns_to_clean):
     stats = calculate_statistics(cleaned_data)
     
     return cleaned_data, stats
+import pandas as pd
+import numpy as np
+
+def remove_missing_values(df, threshold=0.5):
+    """
+    Remove columns with missing values exceeding threshold percentage.
+    """
+    missing_percent = df.isnull().sum() / len(df)
+    columns_to_drop = missing_percent[missing_percent > threshold].index
+    return df.drop(columns=columns_to_drop)
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df[col].fillna(df[col].median())
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def cap_outliers(df, column, method='iqr'):
+    """
+    Cap outliers to specified bounds.
+    """
+    df_capped = df.copy()
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+    elif method == 'percentile':
+        lower_bound = df[column].quantile(0.01)
+        upper_bound = df[column].quantile(0.99)
+    else:
+        raise ValueError("Method must be 'iqr' or 'percentile'")
+    
+    df_capped[column] = df_capped[column].clip(lower=lower_bound, upper=upper_bound)
+    return df_capped
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to zero mean and unit variance.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df_standardized[col] = (df[col] - mean) / std
+    return df_standardized
+
+def clean_dataset(df, missing_threshold=0.5, outlier_method='iqr'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    df_clean = remove_missing_values(df, threshold=missing_threshold)
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    df_clean = fill_missing_with_median(df_clean, columns=numeric_cols)
+    
+    for col in numeric_cols:
+        if col in df_clean.columns:
+            df_clean = cap_outliers(df_clean, col, method=outlier_method)
+    
+    df_clean = standardize_columns(df_clean, columns=numeric_cols)
+    return df_clean
