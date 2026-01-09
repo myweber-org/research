@@ -67,3 +67,73 @@ if __name__ == "__main__":
     print(f"Original shape: {df.shape}")
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
     print(f"Cleaned shape: {cleaned_df.shape}")
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, clean missing values, convert data types,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+        
+        for col in numeric_columns:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].median())
+        
+        for col in categorical_columns:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna('Unknown')
+        
+        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+        
+        print(f"Cleaned data shape: {df.shape}")
+        print(f"Missing values after cleaning:\n{df.isnull().sum()}")
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_data_types(df):
+    """
+    Validate that all columns have appropriate data types.
+    """
+    if df is not None:
+        print("\nData type validation:")
+        for column in df.columns:
+            dtype = df[column].dtype
+            unique_count = df[column].nunique()
+            print(f"{column}: {dtype} | Unique values: {unique_count}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = df.select_dtypes(exclude=[np.number]).columns.tolist()
+        
+        print(f"\nNumeric columns: {numeric_cols}")
+        print(f"Categorical columns: {categorical_cols}")
+        
+        return True
+    return False
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        validate_data_types(cleaned_df)
