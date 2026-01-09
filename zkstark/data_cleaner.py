@@ -80,4 +80,119 @@ def example_usage():
         print(f"{key}: {value:.4f}")
 
 if __name__ == "__main__":
-    example_usage()
+    example_usage()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_method='iqr', fill_value=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'constant')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    fill_value: Value to use when strategy='constant'
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    if strategy == 'mean':
+        df_clean = df_clean.fillna(df_clean.mean())
+    elif strategy == 'median':
+        df_clean = df_clean.fillna(df_clean.median())
+    elif strategy == 'mode':
+        df_clean = df_clean.fillna(df_clean.mode().iloc[0])
+    elif strategy == 'constant' and fill_value is not None:
+        df_clean = df_clean.fillna(fill_value)
+    
+    # Handle outliers
+    if outlier_method == 'iqr':
+        for column in df_clean.select_dtypes(include=[np.number]).columns:
+            Q1 = df_clean[column].quantile(0.25)
+            Q3 = df_clean[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            df_clean[column] = np.where(df_clean[column] < lower_bound, lower_bound, df_clean[column])
+            df_clean[column] = np.where(df_clean[column] > upper_bound, upper_bound, df_clean[column])
+    
+    elif outlier_method == 'zscore':
+        for column in df_clean.select_dtypes(include=[np.number]).columns:
+            z_scores = np.abs((df_clean[column] - df_clean[column].mean()) / df_clean[column].std())
+            df_clean[column] = np.where(z_scores > 3, df_clean[column].median(), df_clean[column])
+    
+    return df_clean
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset: Columns to consider for duplicates
+    keep: Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame without duplicates
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_data(df, method='minmax'):
+    """
+    Normalize numerical columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    method (str): Normalization method ('minmax', 'standard')
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame
+    """
+    df_norm = df.copy()
+    
+    numerical_cols = df_norm.select_dtypes(include=[np.number]).columns
+    
+    if method == 'minmax':
+        for col in numerical_cols:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    
+    elif method == 'standard':
+        for col in numerical_cols:
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val > 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, strategy='median', outlier_method='iqr')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Normalize the data
+    normalized_df = normalize_data(cleaned_df, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized_df)
