@@ -492,3 +492,27 @@ def validate_data(data, required_columns=None, allow_nan=False):
         return False, f"NaN values found in columns: {nan_columns}"
     
     return True, "Data validation passed"
+def filter_valid_entries(data_list, required_keys):
+    """
+    Returns a new list containing only dictionaries that have all the specified keys
+    with non-empty string values.
+    """
+    if not isinstance(data_list, list) or not isinstance(required_keys, list):
+        raise TypeError("data_list must be a list and required_keys must be a list")
+
+    filtered_data = []
+    for entry in data_list:
+        if not isinstance(entry, dict):
+            continue
+
+        valid = True
+        for key in required_keys:
+            value = entry.get(key)
+            if not isinstance(value, str) or value.strip() == "":
+                valid = False
+                break
+
+        if valid:
+            filtered_data.append(entry)
+
+    return filtered_data
