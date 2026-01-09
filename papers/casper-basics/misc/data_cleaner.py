@@ -1,93 +1,95 @@
 
+import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(data, column):
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a specified column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Parameters:
-    data (list or np.array): Input data
-    column (int or str): Column index or name if using pandas
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
     Returns:
-    np.array: Data with outliers removed
+        pd.DataFrame: DataFrame with outliers removed
     """
-    if isinstance(data, list):
-        data = np.array(data)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    q1 = np.percentile(data, 25)
-    q3 = np.percentile(data, 75)
-    iqr = q3 - q1
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    filtered_data = data[(data >= lower_bound) & (data <= upper_bound)]
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_data
+    return filtered_df.reset_index(drop=True)
 
-def calculate_statistics(data):
+def calculate_statistics(df, column):
     """
-    Calculate basic statistics for the data.
+    Calculate basic statistics for a column after outlier removal.
     
-    Parameters:
-    data (np.array): Input data
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
     
     Returns:
-    dict: Dictionary containing mean, median, std
+        dict: Dictionary containing statistics
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     stats = {
-        'mean': np.mean(data),
-        'median': np.median(data),
-        'std': np.std(data),
-        'count': len(data)
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column])
     }
     
     return stats
 
-def clean_dataset(data_array):
+def process_dataframe(df, numeric_columns):
     """
-    Main function to clean dataset by removing outliers.
+    Process multiple numeric columns to remove outliers.
     
-    Parameters:
-    data_array (np.array): 2D array of data
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list): List of numeric column names
     
     Returns:
-    tuple: (cleaned_data, removed_indices, statistics)
+        pd.DataFrame: Processed DataFrame
     """
-    if len(data_array.shape) == 1:
-        data_array = data_array.reshape(-1, 1)
+    processed_df = df.copy()
     
-    cleaned_data = []
-    removed_indices = []
+    for column in numeric_columns:
+        if column in processed_df.columns:
+            processed_df = remove_outliers_iqr(processed_df, column)
     
-    for col in range(data_array.shape[1]):
-        column_data = data_array[:, col]
-        cleaned_column = remove_outliers_iqr(column_data, col)
-        cleaned_data.append(cleaned_column)
-        
-        original_indices = np.arange(len(column_data))
-        filtered_indices = original_indices[
-            (column_data >= np.percentile(column_data, 25) - 1.5 * (np.percentile(column_data, 75) - np.percentile(column_data, 25))) &
-            (column_data <= np.percentile(column_data, 75) + 1.5 * (np.percentile(column_data, 75) - np.percentile(column_data, 25)))
-        ]
-        removed = np.setdiff1d(original_indices, filtered_indices)
-        removed_indices.append(removed)
-    
-    cleaned_data = np.column_stack(cleaned_data) if len(cleaned_data) > 1 else cleaned_data[0]
-    
-    stats = calculate_statistics(cleaned_data.flatten())
-    
-    return cleaned_data, removed_indices, stats
+    return processed_df
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = np.random.randn(100, 3) * 10 + 50
-    sample_data[0, 0] = 200  # Add an outlier
+    sample_data = {
+        'temperature': [22, 23, 24, 25, 26, 100, 27, 28, 29, 30, -10],
+        'humidity': [45, 46, 47, 48, 49, 200, 50, 51, 52, 53, -5],
+        'pressure': [1013, 1014, 1015, 1016, 1017, 2000, 1018, 1019, 1020, 1021, 500]
+    }
     
-    cleaned, removed, statistics = clean_dataset(sample_data)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nOriginal Statistics:")
+    for col in ['temperature', 'humidity', 'pressure']:
+        stats = calculate_statistics(df, col)
+        print(f"{col}: {stats}")
     
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {cleaned.shape}")
-    print(f"Removed indices per column: {removed}")
-    print(f"Statistics: {statistics}")
+    processed_df = process_dataframe(df, ['temperature', 'humidity', 'pressure'])
+    print("\nProcessed DataFrame:")
+    print(processed_df)
+    print("\nProcessed Statistics:")
+    for col in ['temperature', 'humidity', 'pressure']:
+        stats = calculate_statistics(processed_df, col)
+        print(f"{col}: {stats}")
