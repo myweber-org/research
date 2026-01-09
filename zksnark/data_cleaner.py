@@ -204,3 +204,125 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from specified column using Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If columns not specified, clean all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        columns (list, optional): List of column names to clean
+    
+    Returns:
+        pd.DataFrame: Cleaned dataframe
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df (pd.DataFrame): Dataframe to validate
+        required_columns (list, optional): List of required column names
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: Dataframe is empty")
+        return True
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for dataframe.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+    
+    Returns:
+        dict: Dictionary containing summary statistics
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object', 'category']).columns.tolist(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    return summary
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 100, 1000),
+        'category': np.random.choice(['X', 'Y', 'Z'], 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500
+    
+    print("Original data shape:", df.shape)
+    print("\nData summary:")
+    summary = get_data_summary(df)
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+    
+    cleaned_df = clean_numeric_data(df, ['A', 'B'])
+    print("\nCleaned data shape:", cleaned_df.shape)
