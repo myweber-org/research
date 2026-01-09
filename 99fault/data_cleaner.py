@@ -210,3 +210,100 @@ if __name__ == "__main__":
     cleaned_data = remove_outliers_iqr(sample_data, 'values')
     print("Cleaned data shape:", cleaned_data.shape)
     print("Cleaned statistics:", calculate_basic_stats(cleaned_data, 'values'))
+import pandas as pd
+import re
+
+def clean_dataset(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_clean (list, optional): List of column names to apply text normalization.
+            If None, all object dtype columns are cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates()
+    removed_duplicates = initial_rows - len(cleaned_df)
+    
+    # Normalize text columns
+    if columns_to_clean is None:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+    else:
+        text_columns = [col for col in columns_to_clean if col in cleaned_df.columns]
+    
+    for col in text_columns:
+        if cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_text)
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    print(f"Removed {removed_duplicates} duplicate rows.")
+    print(f"Normalized text in columns: {list(text_columns)}")
+    
+    return cleaned_df
+
+def _normalize_text(text):
+    """
+    Normalize text by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    
+    Args:
+        text (str): Input text to normalize.
+    
+    Returns:
+        str: Normalized text.
+    """
+    if pd.isna(text):
+        return text
+    
+    # Convert to string if not already
+    text = str(text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Remove special characters (keep alphanumeric and basic punctuation)
+    text = re.sub(r'[^\w\s.,!?-]', '', text)
+    
+    return text
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        email_column (str): Name of the column containing email addresses.
+    
+    Returns:
+        pd.DataFrame: DataFrame with additional 'email_valid' column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
+    
+    validated_df = df.copy()
+    
+    # Simple email validation regex
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validated_df['email_valid'] = validated_df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
+    )
+    
+    valid_count = validated_df['email_valid'].sum()
+    total_count = len(validated_df)
+    
+    print(f"Email validation: {valid_count}/{total_count} valid emails ({valid_count/total_count*100:.1f}%)")
+    
+    return validated_df
