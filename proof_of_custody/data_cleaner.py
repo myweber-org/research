@@ -183,3 +183,83 @@ if __name__ == "__main__":
     no_outliers = remove_outliers(cleaned, 'value', method='iqr')
     print("\nDataFrame without outliers:")
     print(no_outliers)
+import pandas as pd
+import re
+
+def clean_text_column(series):
+    """
+    Standardize text by converting to lowercase, removing extra spaces,
+    and stripping special characters (keeping only alphanumeric and spaces).
+    """
+    if series.dtype != 'object':
+        return series
+    
+    cleaned = series.astype(str).str.lower()
+    cleaned = cleaned.str.strip()
+    cleaned = cleaned.replace(r'\s+', ' ', regex=True)
+    cleaned = cleaned.replace(r'[^a-z0-9\s]', '', regex=True)
+    return cleaned
+
+def remove_duplicate_rows(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_dataframe(df, text_columns=None, deduplicate=True):
+    """
+    Main cleaning function that processes text columns and removes duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    text_columns (list, optional): Specific columns to clean as text
+    deduplicate (bool): Whether to remove duplicate rows
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if text_columns is None:
+        text_columns = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in text_columns:
+        if col in df_clean.columns:
+            df_clean[col] = clean_text_column(df_clean[col])
+    
+    if deduplicate:
+        df_clean = remove_duplicate_rows(df_clean)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Basic validation for DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): Columns that must be present
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            return False, f"Missing required columns: {missing}"
+    
+    return True, "DataFrame is valid"
