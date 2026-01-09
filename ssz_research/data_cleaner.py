@@ -458,3 +458,10 @@ if __name__ == "__main__":
     normalized = normalize_column(no_outliers, 'A', method='minmax')
     print("\nDataFrame with normalized column A:")
     print(normalized)
+def clean_data(data):
+    """
+    Remove None values and empty strings from a list.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
+    return [item for item in data if item is not None and item != ""]
