@@ -102,3 +102,69 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, missing_strategy='mean', outlier_columns=['A'])
     print("\nCleaned DataFrame:")
     print(cleaned)
+import pandas as pd
+
+def clean_dataframe(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values.
+    rename_columns (bool): If True, rename columns to lowercase with underscores.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df.columns = (
+            cleaned_df.columns
+            .str.lower()
+            .str.replace(' ', '_')
+            .str.replace(r'[^\w_]', '', regex=True)
+        )
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for required columns and data types.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "DataFrame is valid"
+
+if __name__ == "__main__":
+    sample_data = {
+        'Product Name': ['Widget A', 'Widget B', None, 'Widget C'],
+        'Price ($)': [10.99, 15.49, 20.99, None],
+        'Quantity in Stock': [100, 50, 75, 200]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataframe(df)
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, ['product_name', 'price'])
+    print(f"\nValidation: {message}")
