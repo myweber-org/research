@@ -153,4 +153,113 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Parameters:
+    filepath (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero').
+    drop_threshold (float): Drop columns with missing values ratio above this threshold.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        # Calculate missing ratio per column
+        missing_ratio = df.isnull().sum() / len(df)
+        
+        # Drop columns with high missing ratio
+        columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+        if len(columns_to_drop) > 0:
+            df = df.drop(columns=columns_to_drop)
+            print(f"Dropped columns: {list(columns_to_drop)}")
+        
+        # Fill remaining missing values
+        for column in df.columns:
+            if df[column].isnull().any():
+                if fill_strategy == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
+                    fill_value = df[column].mean()
+                elif fill_strategy == 'median' and pd.api.types.is_numeric_dtype(df[column]):
+                    fill_value = df[column].median()
+                elif fill_strategy == 'mode':
+                    fill_value = df[column].mode()[0] if not df[column].mode().empty else np.nan
+                elif fill_strategy == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = df[column].ffill().bfill().iloc[0] if not df[column].empty else np.nan
+                
+                df[column] = df[column].fillna(fill_value)
+                print(f"Filled missing values in '{column}' using {fill_strategy}")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        duplicates_removed = initial_rows - len(df)
+        if duplicates_removed > 0:
+            print(f"Removed {duplicates_removed} duplicate rows")
+        
+        print(f"Final data shape: {df.shape}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return pd.DataFrame()
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Validation failed: Missing required columns: {missing_columns}")
+            return False
+    
+    # Check for infinite values
+    if pd.api.types.is_numeric_dtype(df.select_dtypes(include=[np.number])):
+        inf_count = np.isinf(df.select_dtypes(include=[np.number])).sum().sum()
+        if inf_count > 0:
+            print(f"Validation warning: Found {inf_count} infinite values")
+    
+    print("Data validation passed")
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, np.nan, np.nan, 10, 11],
+        'C': [7, 8, 9, 10, 11],
+        'D': ['x', 'y', 'z', np.nan, 'w']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='mean', drop_threshold=0.6)
+    
+    if not cleaned_df.empty:
+        validation_passed = validate_dataframe(cleaned_df, required_columns=['A', 'C'])
+        if validation_passed:
+            print("Data cleaning completed successfully")
+            print(cleaned_df.head())
