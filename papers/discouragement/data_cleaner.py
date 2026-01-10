@@ -292,3 +292,93 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def load_data(file_path):
+    """Load data from CSV file."""
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return None
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    if df is None or df.empty:
+        print("DataFrame is empty or None")
+        return df
+    
+    initial_count = len(df)
+    
+    if subset:
+        df_clean = df.drop_duplicates(subset=subset, keep='first')
+    else:
+        df_clean = df.drop_duplicates(keep='first')
+    
+    removed_count = initial_count - len(df_clean)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return df_clean
+
+def validate_data(df):
+    """Perform basic data validation."""
+    if df is None or df.empty:
+        return False
+    
+    print(f"Data shape after cleaning: {df.shape}")
+    print(f"Missing values per column:")
+    print(df.isnull().sum())
+    
+    return True
+
+def save_clean_data(df, output_path):
+    """Save cleaned data to CSV file."""
+    if df is None or df.empty:
+        print("No data to save")
+        return False
+    
+    try:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
+
+def main():
+    """Main function to execute data cleaning pipeline."""
+    input_file = "data/raw_data.csv"
+    output_file = "data/cleaned_data.csv"
+    
+    print("Starting data cleaning process...")
+    
+    # Load data
+    raw_data = load_data(input_file)
+    if raw_data is None:
+        return
+    
+    # Remove duplicates based on specific columns
+    columns_for_deduplication = ['id', 'email']
+    clean_data = remove_duplicates(raw_data, subset=columns_for_deduplication)
+    
+    # Validate cleaned data
+    if not validate_data(clean_data):
+        print("Data validation failed")
+        return
+    
+    # Save cleaned data
+    save_clean_data(clean_data, output_file)
+    
+    print("Data cleaning completed successfully")
+
+if __name__ == "__main__":
+    main()
