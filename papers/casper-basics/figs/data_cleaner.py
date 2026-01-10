@@ -169,3 +169,38 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specified column in a pandas DataFrame.
+    Removes duplicate rows and normalizes string entries.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().copy()
+
+    # Normalize strings: lowercase and strip whitespace
+    if column_name in df_cleaned.columns:
+        df_cleaned[column_name] = df_cleaned[column_name].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower()) if pd.notnull(x) else x
+        )
+
+    return df_cleaned
+
+def main():
+    # Example usage
+    data = {
+        'Name': ['  Alice  ', 'Bob', 'Alice', '  CHARLIE  ', 'bob'],
+        'Value': [1, 2, 1, 3, 2]
+    }
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+
+    cleaned_df = clean_dataframe(df, 'Name')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
