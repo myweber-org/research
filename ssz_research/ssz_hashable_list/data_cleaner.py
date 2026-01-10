@@ -190,4 +190,83 @@ def validate_dataframe(dataframe, required_columns=None, numeric_columns=None):
     if duplicate_count > 0:
         validation_results['warnings'].append(f"Found {duplicate_count} duplicate rows")
     
-    return validation_results
+    return validation_resultsimport pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and optionally save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Remove leading/trailing whitespace from string columns
+        for col in categorical_cols:
+            df[col] = df[col].str.strip()
+        
+        # Convert date columns if detected
+        date_patterns = ['date', 'time', 'timestamp']
+        for col in df.columns:
+            if any(pattern in col.lower() for pattern in date_patterns):
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                except:
+                    pass
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    """
+    if df is None or df.empty:
+        print("DataFrame is empty or None")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    # Check for remaining null values
+    null_counts = df.isnull().sum()
+    if null_counts.sum() > 0:
+        print("Warning: DataFrame contains null values")
+        for col, count in null_counts.items():
+            if count > 0:
+                print(f"  {col}: {count} nulls")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_df = clean_csv_data("input_data.csv", "cleaned_data.csv")
+    if cleaned_df is not None:
+        is_valid = validate_dataframe(cleaned_df)
+        print(f"Data validation result: {is_valid}")
