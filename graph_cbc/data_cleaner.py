@@ -363,3 +363,125 @@ if __name__ == "__main__":
     
     validation_result = validate_dataset(cleaned_df, required_columns=['id', 'value', 'category'])
     print(f"\nValidation result: {validation_result}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names containing text data
+    fill_strategy (str): Strategy for filling numeric missing values ('mean', 'median', 'zero')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    cleaned_df = df.copy()
+    
+    # Handle missing values in numeric columns
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if cleaned_df[col].isnull().any():
+            if fill_strategy == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_strategy == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+            elif fill_strategy == 'zero':
+                cleaned_df[col].fillna(0, inplace=True)
+    
+    # Standardize text columns
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                # Convert to string, strip whitespace, and convert to lowercase
+                cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+                # Replace empty strings with NaN then fill with 'unknown'
+                cleaned_df[col].replace(['', 'nan', 'none'], np.nan, inplace=True)
+                cleaned_df[col].fillna('unknown', inplace=True)
+    
+    # Remove duplicate rows
+    cleaned_df.drop_duplicates(inplace=True)
+    
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if DataFrame is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_cols}')
+    
+    # Check for all-null columns
+    null_columns = df.columns[df.isnull().all()].tolist()
+    if null_columns:
+        validation_results['warnings'].append(f'Columns with all null values: {null_columns}')
+    
+    # Check data types
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            unique_count = df[col].nunique()
+            if unique_count == 1:
+                validation_results['warnings'].append(f'Column "{col}" has only one unique value')
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Charlie', '', 'Eve'],
+        'age': [25, 30, None, 35, 40],
+        'score': [85.5, 92.0, 78.5, None, 88.0],
+        'department': ['IT', 'HR', 'IT', 'Finance', 'HR']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    text_cols = ['name', 'department']
+    cleaned_df = clean_dataset(df, text_columns=text_cols, fill_strategy='mean')
+    
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age'])
+    print("Validation Results:")
+    print(f"Is Valid: {validation['is_valid']}")
+    print(f"Errors: {validation['errors']}")
+    print(f"Warnings: {validation['warnings']}")
