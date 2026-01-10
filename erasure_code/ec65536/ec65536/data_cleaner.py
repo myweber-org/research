@@ -303,4 +303,61 @@ def validate_dataframe(df, required_columns=None):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import numpy as np
+import pandas as pd
+
+def remove_missing_rows(df, threshold=0.5):
+    """
+    Remove rows with missing values exceeding threshold percentage.
+    """
+    missing_per_row = df.isnull().mean(axis=1)
+    return df[missing_per_row <= threshold].copy()
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            df_filled[col] = df[col].fillna(df[col].median())
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def cap_outliers(df, column, method='iqr'):
+    """
+    Cap outliers to specified bounds.
+    """
+    df_capped = df.copy()
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_capped[column] = df_capped[column].clip(lower=lower_bound, upper=upper_bound)
+    return df_capped
+
+def standardize_column(df, column):
+    """
+    Standardize column to zero mean and unit variance.
+    """
+    df_standardized = df.copy()
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    if std_val > 0:
+        df_standardized[column] = (df[column] - mean_val) / std_val
+    return df_standardized
