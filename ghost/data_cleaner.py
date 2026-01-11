@@ -214,3 +214,152 @@ def clean_dataset(df, missing_threshold=0.5, outlier_method='iqr'):
     
     df_clean = standardize_columns(df_clean, columns=numeric_cols)
     return df_clean
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def zscore_normalize(dataframe, columns=None):
+    """
+    Normalize specified columns using z-score normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if normalized_df[col].dtype not in [np.number]:
+            raise TypeError(f"Column '{col}' must be numeric for normalization")
+        
+        mean_val = normalized_df[col].mean()
+        std_val = normalized_df[col].std()
+        
+        if std_val > 0:
+            normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def minmax_normalize(dataframe, columns=None, feature_range=(0, 1)):
+    """
+    Normalize specified columns using min-max normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    min_range, max_range = feature_range
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if normalized_df[col].dtype not in [np.number]:
+            raise TypeError(f"Column '{col}' must be numeric for normalization")
+        
+        min_val = normalized_df[col].min()
+        max_val = normalized_df[col].max()
+        
+        if max_val > min_val:
+            normalized_df[col] = ((normalized_df[col] - min_val) / (max_val - min_val)) * (max_range - min_range) + min_range
+        else:
+            normalized_df[col] = min_range
+    
+    return normalized_df
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    threshold (float): Absolute skewness threshold for detection
+    
+    Returns:
+    dict: Dictionary with column names and their skewness values
+    """
+    skewed_cols = {}
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        skewness = stats.skew(dataframe[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
+    
+    return skewed_cols
+
+def log_transform(dataframe, columns):
+    """
+    Apply log transformation to specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to transform
+    
+    Returns:
+    pd.DataFrame: DataFrame with transformed columns
+    """
+    transformed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in transformed_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if transformed_df[col].dtype not in [np.number]:
+            raise TypeError(f"Column '{col}' must be numeric for log transformation")
+        
+        min_val = transformed_df[col].min()
+        if min_val <= 0:
+            transformed_df[col] = np.log1p(transformed_df[col] - min_val + 1)
+        else:
+            transformed_df[col] = np.log(transformed_df[col])
+    
+    return transformed_df
