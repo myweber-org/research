@@ -857,4 +857,138 @@ if __name__ == "__main__":
     
     normalized_df = normalize_column(df, 'values', method='minmax')
     print("\nDataFrame with normalized column:")
-    print(normalized_df)
+    print(normalized_df)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    factor (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to standardize
+    
+    Returns:
+    pd.Series: Standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: Dataframe with handled missing values
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return data.dropna(subset=numeric_cols).copy()
+    
+    result = data.copy()
+    
+    for col in numeric_cols:
+        if strategy == 'mean':
+            fill_value = result[col].mean()
+        elif strategy == 'median':
+            fill_value = result[col].median()
+        elif strategy == 'mode':
+            fill_value = result[col].mode()[0] if not result[col].mode().empty else 0
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        result[col] = result[col].fillna(fill_value)
+    
+    return result
+
+def create_cleaned_dataset(data, numeric_columns, outlier_factor=1.5, normalize=True):
+    """
+    Create a cleaned dataset with multiple preprocessing steps.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    outlier_factor (float): Factor for IQR outlier detection
+    normalize (bool): Whether to apply min-max normalization
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if not all(col in data.columns for col in numeric_columns):
+        missing = [col for col in numeric_columns if col not in data.columns]
+        raise ValueError(f"Columns not found: {missing}")
+    
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_factor)
+    
+    cleaned_data = handle_missing_values(cleaned_data, strategy='median')
+    
+    if normalize:
+        for col in numeric_columns:
+            cleaned_data[f"{col}_normalized"] = normalize_minmax(cleaned_data, col)
+    
+    return cleaned_data.reset_index(drop=True)
