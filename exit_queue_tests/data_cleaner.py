@@ -320,3 +320,74 @@ if __name__ == "__main__":
     if sample_df is not None:
         is_valid = validate_dataframe(sample_df)
         print(f"Data validation result: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to clean.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Load a dataset, clean specified columns, and optionally save the cleaned data.
+    
+    Parameters:
+    file_path (str): Path to the input CSV file.
+    output_path (str, optional): Path to save the cleaned CSV file. If None, file is not saved.
+    
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original dataset shape: {df.shape}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for col in numeric_cols:
+            original_len = len(df)
+            df = remove_outliers_iqr(df, col)
+            removed_count = original_len - len(df)
+            if removed_count > 0:
+                print(f"Removed {removed_count} outliers from column '{col}'")
+        
+        print(f"Cleaned dataset shape: {df.shape}")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+    
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_data = clean_dataset(input_file, output_file)
+    
+    if cleaned_data is not None:
+        print("Data cleaning completed successfully.")
+        print(cleaned_data.head())
