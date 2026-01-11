@@ -288,4 +288,80 @@ if __name__ == "__main__":
     
     cleaned_df = cleaner.get_cleaned_data()
     print(f"\nCleaned data shape: {cleaned_df.shape}")
-    print(f"Cleaned data columns: {list(cleaned_df.columns)}")
+    print(f"Cleaned data columns: {list(cleaned_df.columns)}")import pandas as pd
+
+def clean_dataframe(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_na (bool): If True, drop rows with any null values.
+        rename_columns (bool): If True, rename columns to lowercase with underscores.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if rename_columns:
+        df_clean.columns = (
+            df_clean.columns
+            .str.lower()
+            .str.replace(r'[^a-z0-9]+', '_', regex=True)
+            .str.strip('_')
+        )
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes.
+    
+    Raises:
+        ValueError: If validation fails.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def process_csv_file(file_path, **kwargs):
+    """
+    Load and clean data from a CSV file.
+    
+    Args:
+        file_path (str): Path to CSV file.
+        **kwargs: Additional arguments passed to clean_dataframe.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        df_clean = clean_dataframe(df, **kwargs)
+        return df_clean
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    except pd.errors.EmptyDataError:
+        raise ValueError("CSV file is empty")
+    except Exception as e:
+        raise RuntimeError(f"Error processing file: {str(e)}")
