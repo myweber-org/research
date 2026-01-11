@@ -89,4 +89,84 @@ if __name__ == "__main__":
     
     for col in ['temperature', 'humidity', 'pressure']:
         stats = calculate_summary_statistics(cleaned_df, col)
-        print(f"Statistics for {col}: {stats}")
+        print(f"Statistics for {col}: {stats}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def standardize_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def handle_missing_mean(data, column):
+    mean_val = data[column].mean()
+    data[column].fillna(mean_val, inplace=True)
+    return data
+
+def clean_dataset(dataframe, numeric_columns):
+    df_clean = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = handle_missing_mean(df_clean, col)
+            df_clean = remove_outliers(df_clean, col)
+            df_clean = normalize_minmax(df_clean, col)
+    
+    return df_clean
+
+def get_dataset_summary(dataframe):
+    summary = {
+        'original_shape': dataframe.shape,
+        'numeric_columns': dataframe.select_dtypes(include=[np.number]).columns.tolist(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'data_types': dataframe.dtypes.to_dict()
+    }
+    return summary
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 100),
+        'B': np.random.exponential(50, 100),
+        'C': np.random.randint(1, 1000, 100)
+    })
+    
+    sample_data.loc[10:15, 'A'] = np.nan
+    sample_data.loc[20:25, 'B'] = np.nan
+    
+    print("Original dataset shape:", sample_data.shape)
+    print("\nDataset summary:")
+    summary = get_dataset_summary(sample_data)
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+    
+    numeric_cols = ['A', 'B', 'C']
+    cleaned_data = clean_dataset(sample_data, numeric_cols)
+    
+    print("\nCleaned dataset shape:", cleaned_data.shape)
+    print("\nCleaned data preview:")
+    print(cleaned_data.head())
