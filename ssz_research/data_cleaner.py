@@ -1,71 +1,36 @@
 
-import numpy as np
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
 
-def remove_outliers_iqr(data, column):
+def clean_data_with_key(data, key_func=None):
     """
-    Remove outliers from a dataset using the Interquartile Range (IQR) method.
-    
-    Args:
-        data (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    Remove duplicates based on a key function.
+    If key_func is None, uses the element itself.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    
-    return filtered_data
+    seen = set()
+    cleaned = []
+    for item in data:
+        key = key_func(item) if key_func else item
+        if key not in seen:
+            seen.add(key)
+            cleaned.append(item)
+    return cleaned
 
-def calculate_statistics(data, column):
-    """
-    Calculate basic statistics for a column after outlier removal.
+if __name__ == "__main__":
+    sample = [1, 2, 2, 3, 4, 4, 5]
+    print("Original:", sample)
+    print("Cleaned:", remove_duplicates(sample))
     
-    Args:
-        data (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
-    
-    Returns:
-        dict: Dictionary containing statistics
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': np.mean(data[column]),
-        'median': np.median(data[column]),
-        'std': np.std(data[column]),
-        'min': np.min(data[column]),
-        'max': np.max(data[column]),
-        'count': len(data[column])
-    }
-    
-    return stats
-
-def clean_dataset(data, columns_to_clean):
-    """
-    Clean multiple columns in a dataset by removing outliers.
-    
-    Args:
-        data (pd.DataFrame): Input DataFrame
-        columns_to_clean (list): List of column names to clean
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    cleaned_data = data.copy()
-    
-    for column in columns_to_clean:
-        if column in cleaned_data.columns:
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-    
-    return cleaned_data
+    sample_dicts = [{"id": 1}, {"id": 2}, {"id": 1}, {"id": 3}]
+    print("Original dicts:", sample_dicts)
+    print("Cleaned by id:", clean_data_with_key(sample_dicts, key_func=lambda x: x["id"]))
