@@ -100,3 +100,114 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nValidation: {is_valid}, Message: {message}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary mapping old column names to new ones
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+            cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df: Input pandas DataFrame
+        email_column: Name of the column containing email addresses
+    
+    Returns:
+        DataFrame with additional 'email_valid' column
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    df_copy = df.copy()
+    df_copy['email_valid'] = df_copy[email_column].str.match(email_pattern, na=False)
+    
+    valid_count = df_copy['email_valid'].sum()
+    total_count = len(df_copy)
+    
+    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
+    
+    return df_copy
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a numeric column using the IQR method.
+    
+    Args:
+        df: Input pandas DataFrame
+        column: Name of the numeric column
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    removed = len(df) - len(filtered_df)
+    print(f"Removed {removed} outliers from column '{column}'")
+    
+    return filtered_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', '  BOB JONES  ', 'alice@example.com'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.co.uk', 'alice@example.com'],
+        'age': [25, 30, 25, 45, 150],
+        'score': [85.5, 92.0, 85.5, 78.3, 99.9]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    validated = validate_email_column(cleaned, 'email')
+    print("DataFrame with email validation:")
+    print(validated)
+    print("\n" + "="*50 + "\n")
+    
+    no_outliers = remove_outliers_iqr(validated, 'age', multiplier=1.5)
+    print("DataFrame without age outliers:")
+    print(no_outliers)
