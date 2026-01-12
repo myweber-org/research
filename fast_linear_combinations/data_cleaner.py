@@ -1,38 +1,70 @@
 
 import pandas as pd
 import numpy as np
-from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    
+    if drop_duplicates:
+        df = df.drop_duplicates()
+        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows")
+    
+    missing_before = df.isnull().sum().sum()
+    
+    if fill_missing == 'mean':
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_missing == 'median':
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_missing == 'mode':
+        for col in df.columns:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else None)
+    elif fill_missing == 'drop':
+        df = df.dropna()
+    
+    missing_after = df.isnull().sum().sum()
+    print(f"Handled {missing_before - missing_after} missing values")
+    print(f"Final dataset shape: {df.shape}")
+    
     return df
 
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    """
+    if required_columns:
+        missing_cols = set(required_columns) - set(df.columns)
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows")
     
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
-    
-    for col in numeric_columns:
-        df = normalize_minmax(df, col)
-    
-    df = df.dropna()
-    
-    return df
+    return True
 
 if __name__ == "__main__":
-    cleaned_data = clean_dataset('raw_data.csv')
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Original shape: {pd.read_csv('raw_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nCleaning dataset...")
+    
+    cleaned_df = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    try:
+        validate_data(cleaned_df, required_columns=['A', 'B'], min_rows=3)
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
