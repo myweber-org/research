@@ -1,43 +1,70 @@
+import pandas as pd
+import numpy as np
+from scipy import stats
 
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport pandas as pd
+def load_and_clean_data(filepath):
+    """
+    Load a CSV file and perform basic data cleaning operations.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error loading file: {e}")
+        return None
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    # Remove duplicate rows
+    initial_rows = df.shape[0]
+    df.drop_duplicates(inplace=True)
+    removed_duplicates = initial_rows - df.shape[0]
+    if removed_duplicates > 0:
+        print(f"Removed {removed_duplicates} duplicate rows.")
+
+    # Handle missing values for numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().sum() > 0:
+            df[col].fillna(df[col].median(), inplace=True)
+            print(f"Filled missing values in '{col}' with median.")
+
+    # Remove outliers using Z-score for numeric columns
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    outlier_mask = (z_scores < 3).all(axis=1)
+    df_clean = df[outlier_mask].copy()
+    removed_outliers = df.shape[0] - df_clean.shape[0]
+    if removed_outliers > 0:
+        print(f"Removed {removed_outliers} rows containing outliers.")
+
+    # Normalize numeric columns (Min-Max scaling)
+    for col in numeric_cols:
+        min_val = df_clean[col].min()
+        max_val = df_clean[col].max()
+        if max_val > min_val:
+            df_clean[col] = (df_clean[col] - min_val) / (max_val - min_val)
+            print(f"Normalized column '{col}' using Min-Max scaling.")
+
+    print(f"Final cleaned data shape: {df_clean.shape}")
+    return df_clean
+
+def save_cleaned_data(df, output_path):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): If True, remove duplicate rows.
-    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Save the cleaned DataFrame to a CSV file.
     """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
-            elif fill_missing == 'median':
-                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            mode_val = cleaned_df[col].mode()
-            if not mode_val.empty:
-                cleaned_df[col].fillna(mode_val[0], inplace=True)
-    
-    return cleaned_df
+    if df is not None and not df.empty:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+        return True
+    else:
+        print("No data to save.")
+        return False
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+
+    cleaned_df = load_and_clean_data(input_file)
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
