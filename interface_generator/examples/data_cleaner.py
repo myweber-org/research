@@ -365,3 +365,78 @@ if __name__ == "__main__":
     cleaned_df = clean_data_pipeline(df, required_cols=['Name', 'Age'])
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        return self
+        
+    def handle_missing_values(self, strategy: str = 'drop', fill_value: Optional[float] = None) -> 'DataCleaner':
+        if strategy == 'drop':
+            self.df = self.df.dropna()
+        elif strategy == 'fill':
+            if fill_value is not None:
+                self.df = self.df.fillna(fill_value)
+            else:
+                self.df = self.df.fillna(self.df.mean(numeric_only=True))
+        return self
+        
+    def normalize_column(self, column: str, method: str = 'minmax') -> 'DataCleaner':
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        if method == 'minmax':
+            col_min = self.df[column].min()
+            col_max = self.df[column].max()
+            if col_max != col_min:
+                self.df[column] = (self.df[column] - col_min) / (col_max - col_min)
+        elif method == 'zscore':
+            col_mean = self.df[column].mean()
+            col_std = self.df[column].std()
+            if col_std > 0:
+                self.df[column] = (self.df[column] - col_mean) / col_std
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_summary(self) -> dict:
+        cleaned_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': self.original_shape[0] - cleaned_shape[0],
+            'null_values': int(self.df.isnull().sum().sum())
+        }
+
+def create_sample_data() -> pd.DataFrame:
+    data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, np.nan, 15.2, 20.1, 25.0, 25.0, 30.5],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C']
+    }
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    df = create_sample_data()
+    cleaner = DataCleaner(df)
+    
+    result = (cleaner
+              .remove_duplicates(subset=['id'])
+              .handle_missing_values(strategy='fill', fill_value=0)
+              .normalize_column('value', method='minmax')
+              .get_cleaned_data())
+    
+    summary = cleaner.get_summary()
+    print("Cleaning Summary:", summary)
+    print("\nCleaned Data:")
+    print(result)
