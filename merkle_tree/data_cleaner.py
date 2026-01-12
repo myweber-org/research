@@ -391,3 +391,14 @@ def remove_outliers(df, column, threshold=3):
     z_scores = np.abs(stats.zscore(df[column].dropna()))
     filtered_entries = z_scores < threshold
     return df[filtered_entries]
+def clean_data(data):
+    """
+    Remove duplicate entries from a list and sort the remaining items.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
+    # Remove duplicates by converting to set and back to list
+    unique_data = list(set(data))
+    # Sort the list
+    sorted_data = sorted(unique_data)
+    return sorted_data
