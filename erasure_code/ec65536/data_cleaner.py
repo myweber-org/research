@@ -1,65 +1,112 @@
 
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, columns_to_check=None, fill_missing='mean'):
+def clean_csv_data(filepath, missing_strategy='mean', columns_to_drop=None):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Load and clean CSV data by handling missing values and optionally dropping columns.
     
-    Args:
-        df: pandas DataFrame to clean
-        columns_to_check: list of columns to check for duplicates, 
-                         if None checks all columns
-        fill_missing: method to fill missing values ('mean', 'median', 'mode', or value)
+    Parameters:
+    filepath (str): Path to the CSV file.
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop').
+    columns_to_drop (list): List of column names to drop from the dataset.
     
     Returns:
-        Cleaned pandas DataFrame
+    pandas.DataFrame: Cleaned DataFrame.
     """
-    # Create a copy to avoid modifying original
-    cleaned_df = df.copy()
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found at {filepath}")
     
-    # Remove duplicates
-    if columns_to_check:
-        cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if missing_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif missing_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif missing_strategy == 'mode':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mode().iloc[0])
+    elif missing_strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
     else:
-        cleaned_df = cleaned_df.drop_duplicates()
+        raise ValueError("Invalid missing_strategy. Choose from 'mean', 'median', 'mode', 'drop'.")
     
-    # Handle missing values
-    for column in cleaned_df.columns:
-        if cleaned_df[column].isnull().any():
-            if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(cleaned_df[column]):
-                cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
-            elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(cleaned_df[column]):
-                cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
-            elif fill_missing == 'mode':
-                cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
-            elif isinstance(fill_missing, (int, float, str)):
-                cleaned_df[column].fillna(fill_missing, inplace=True)
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = df[col].fillna('Unknown')
     
-    # Reset index after cleaning
-    cleaned_df.reset_index(drop=True, inplace=True)
+    df = df.reset_index(drop=True)
     
-    return cleaned_df
+    return df
 
-def validate_dataframe(df, required_columns=None):
+def remove_outliers_iqr(df, column, multiplier=1.5):
     """
-    Validate that DataFrame meets basic requirements.
+    Remove outliers from a specified column using the IQR method.
     
-    Args:
-        df: pandas DataFrame to validate
-        required_columns: list of required column names
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    multiplier (float): IQR multiplier for outlier detection.
     
     Returns:
-        tuple: (is_valid, error_message)
+    pandas.DataFrame: DataFrame with outliers removed.
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
+    if column not in df.columns:
+        raise KeyError(f"Column '{column}' not found in DataFrame")
     
-    if df.empty:
-        return False, "DataFrame is empty"
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
     
-    return True, "DataFrame is valid"
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def standardize_columns(df, columns):
+    """
+    Standardize specified numeric columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    columns (list): List of column names to standardize.
+    
+    Returns:
+    pandas.DataFrame: DataFrame with standardized columns.
+    """
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df[col] = (df[col] - mean) / std
+        else:
+            print(f"Warning: Column '{col}' is not numeric or does not exist. Skipping.")
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': ['X', 'Y', None, 'Z', 'X']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned = clean_csv_data('sample_data.csv', missing_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    cleaned_no_outliers = remove_outliers_iqr(cleaned, 'A')
+    print("\nDataFrame after outlier removal:")
+    print(cleaned_no_outliers)
+    
+    standardized = standardize_columns(cleaned, ['A', 'B'])
+    print("\nDataFrame after standardization:")
+    print(standardized)
