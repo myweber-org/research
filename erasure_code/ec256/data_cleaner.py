@@ -111,4 +111,122 @@ def sample_data_cleaning():
     print(validation)
 
 if __name__ == "__main__":
-    sample_data_cleaning()
+    sample_data_cleaning()import pandas as pd
+import numpy as np
+
+def clean_missing_data(file_path, strategy='mean', columns=None):
+    """
+    Clean missing data in a CSV file using specified strategy.
+    
+    Args:
+        file_path (str): Path to the CSV file
+        strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns (list): List of columns to apply cleaning to, None for all columns
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        if columns is None:
+            columns = df.columns
+        
+        for column in columns:
+            if column in df.columns:
+                if df[column].isnull().any():
+                    if strategy == 'mean':
+                        df[column].fillna(df[column].mean(), inplace=True)
+                    elif strategy == 'median':
+                        df[column].fillna(df[column].median(), inplace=True)
+                    elif strategy == 'mode':
+                        df[column].fillna(df[column].mode()[0], inplace=True)
+                    elif strategy == 'drop':
+                        df.dropna(subset=[column], inplace=True)
+        
+        return df
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df (pandas.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
+        threshold (float): IQR multiplier threshold
+    
+    Returns:
+        pandas.Series: Boolean mask of outliers
+    """
+    if column not in df.columns:
+        return pd.Series([False] * len(df))
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df (pandas.DataFrame): Input DataFrame
+        column (str): Column name to normalize
+        method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        pandas.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        return df
+    
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to save
+        output_path (str): Path for output CSV file
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': [100, 200, 300, 400, 500]
+    })
+    
+    cleaned_df = clean_missing_data('sample.csv', strategy='mean')
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully")
+        print(cleaned_df.head())
