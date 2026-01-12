@@ -1,135 +1,114 @@
 
-def remove_duplicates(seq):
-    seen = set()
-    result = []
-    for item in seq:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport csv
+import pandas as pd
 import re
-from typing import List, Dict, Any, Optional
 
-def clean_csv_data(input_file: str, output_file: str, columns_to_clean: Optional[List[str]] = None) -> None:
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
     """
-    Clean data in a CSV file by removing extra whitespace and standardizing text.
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
     Args:
-        input_file: Path to the input CSV file.
-        output_file: Path to the output cleaned CSV file.
-        columns_to_clean: List of column names to clean. If None, all columns are cleaned.
-    """
-    cleaned_rows = []
-    
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        for row in reader:
-            cleaned_row = {}
-            for field in fieldnames:
-                value = row[field]
-                
-                if columns_to_clean is None or field in columns_to_clean:
-                    if isinstance(value, str):
-                        # Remove leading/trailing whitespace
-                        value = value.strip()
-                        # Replace multiple spaces with single space
-                        value = re.sub(r'\s+', ' ', value)
-                        # Standardize capitalization for certain fields
-                        if field.lower() in ['name', 'city', 'country']:
-                            value = value.title()
-                
-                cleaned_row[field] = value
-            cleaned_rows.append(cleaned_row)
-    
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(cleaned_rows)
-
-def validate_email_format(email: str) -> bool:
-    """
-    Validate if a string has a basic email format.
-    
-    Args:
-        email: Email string to validate.
+        df (pd.DataFrame): Input DataFrame to clean
+        column_mapping (dict): Optional mapping to rename columns
+        drop_duplicates (bool): Whether to remove duplicate rows
+        normalize_text (bool): Whether to normalize text columns
     
     Returns:
-        True if the email has a valid format, False otherwise.
+        pd.DataFrame: Cleaned DataFrame
     """
-    if not isinstance(email, str):
-        return False
+    cleaned_df = df.copy()
     
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(email_pattern, email))
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
 
-def remove_duplicate_rows(data: List[Dict[str, Any]], key_columns: List[str]) -> List[Dict[str, Any]]:
+def _normalize_string(text):
     """
-    Remove duplicate rows based on specified key columns.
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    text = text.strip()
+    text = re.sub(r'[^\w\s]', '', text)
+    
+    return text
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
     
     Args:
-        data: List of dictionaries representing rows.
-        key_columns: List of column names to use for duplicate detection.
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
     
     Returns:
-        List of unique rows.
+        dict: Validation results
     """
-    seen = set()
-    unique_data = []
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
     
-    for row in data:
-        key = tuple(str(row.get(col, '')) for col in key_columns)
-        if key not in seen:
-            seen.add(key)
-            unique_data.append(row)
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+        return validation_results
     
-    return unique_data
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    null_counts = df.isnull().sum()
+    if null_counts.any():
+        null_info = null_counts[null_counts > 0].to_dict()
+        validation_results['warnings'].append(f'Columns with null values: {null_info}')
+    
+    return validation_results
 
-def standardize_phone_number(phone: str) -> str:
+def sample_data_cleaning():
     """
-    Standardize phone number format by removing non-digit characters.
-    
-    Args:
-        phone: Phone number string to standardize.
-    
-    Returns:
-        Standardized phone number with only digits.
+    Example usage of the data cleaning functions.
     """
-    if not isinstance(phone, str):
-        return ''
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', 'alice@example.com'],
+        'Age': [25, 30, 25, 35, 28],
+        'City': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston']
+    }
     
-    # Remove all non-digit characters
-    digits = re.sub(r'\D', '', phone)
-    return digits
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['Name', 'Email', 'Age'])
+    print("Validation Results:")
+    print(validation)
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = [
-        {"name": "john doe  ", "email": "john@example.com", "phone": "(123) 456-7890"},
-        {"name": "Jane Smith", "email": "jane@example.com", "phone": "987-654-3210"},
-        {"name": "john doe", "email": "john@example.com", "phone": "1234567890"}
-    ]
-    
-    # Write sample data to CSV
-    with open('sample_input.csv', 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=["name", "email", "phone"])
-        writer.writeheader()
-        writer.writerows(sample_data)
-    
-    # Clean the CSV data
-    clean_csv_data('sample_input.csv', 'sample_output.csv', columns_to_clean=["name", "phone"])
-    
-    # Test email validation
-    test_emails = ["test@example.com", "invalid-email", "another@test.co.uk"]
-    for email in test_emails:
-        print(f"{email}: {validate_email_format(email)}")
-    
-    # Test duplicate removal
-    unique_data = remove_duplicate_rows(sample_data, ["email"])
-    print(f"Original rows: {len(sample_data)}, Unique rows: {len(unique_data)}")
-    
-    # Test phone standardization
-    test_phones = ["(123) 456-7890", "987-654-3210", "+1 800 555 1234"]
-    for phone in test_phones:
-        print(f"{phone} -> {standardize_phone_number(phone)}")
+    sample_data_cleaning()
