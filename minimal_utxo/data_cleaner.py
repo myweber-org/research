@@ -705,3 +705,140 @@ if __name__ == '__main__':
     validation = validate_data(cleaned, required_columns=['id', 'value'], unique_constraints=['id'])
     print("\nValidation Results:")
     print(validation)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def normalize_column(df, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df[f'{column}_normalized'] = 0.5
+    else:
+        df[f'{column}_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers from multiple numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            stats_before = calculate_statistics(cleaned_df, column)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            stats_after = calculate_statistics(cleaned_df, column)
+            
+            print(f"Column: {column}")
+            print(f"  Removed {stats_before['count'] - stats_after['count']} outliers")
+            print(f"  Original range: [{stats_before['min']:.2f}, {stats_before['max']:.2f}]")
+            print(f"  Cleaned range: [{stats_after['min']:.2f}, {stats_after['max']:.2f}]")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    
+    # Create sample data with outliers
+    data = {
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.normal(60, 15, 100),
+        'pressure': np.random.normal(1013, 10, 100)
+    }
+    
+    # Add some outliers
+    data['temperature'][0] = 100  # Extreme high
+    data['temperature'][1] = -10  # Extreme low
+    data['humidity'][2] = 200     # Impossible humidity
+    
+    df = pd.DataFrame(data)
+    
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics:")
+    for col in ['temperature', 'humidity', 'pressure']:
+        stats = calculate_statistics(df, col)
+        print(f"{col}: mean={stats['mean']:.2f}, std={stats['std']:.2f}")
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, ['temperature', 'humidity', 'pressure'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned statistics:")
+    for col in ['temperature', 'humidity', 'pressure']:
+        stats = calculate_statistics(cleaned_df, col)
+        print(f"{col}: mean={stats['mean']:.2f}, std={stats['std']:.2f}")
+    
+    # Normalize a column
+    normalized_df = normalize_column(cleaned_df.copy(), 'temperature')
+    print(f"\nNormalized temperature range: [{normalized_df['temperature_normalized'].min():.2f}, "
+          f"{normalized_df['temperature_normalized'].max():.2f}]")
