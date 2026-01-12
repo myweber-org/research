@@ -139,4 +139,57 @@ def validate_dataframe(df, required_columns):
     if df.empty:
         raise ValueError("DataFrame is empty")
     
-    return True
+    return Trueimport numpy as np
+import pandas as pd
+
+def remove_missing_rows(df, columns=None):
+    if columns is None:
+        columns = df.columns
+    return df.dropna(subset=columns)
+
+def fill_missing_with_mean(df, columns=None):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            df_filled[col] = df[col].fillna(df[col].mean())
+    return df_filled
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def standardize_column(df, column):
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    
+    if std_val == 0:
+        return df[column]
+    
+    return (df[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns=None, outlier_multiplier=1.5):
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df_clean = remove_outliers_iqr(df_clean, col, outlier_multiplier)
+    
+    df_clean = fill_missing_with_mean(df_clean, numeric_columns)
+    
+    return df_clean
