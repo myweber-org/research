@@ -615,3 +615,112 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_df, ['A', 'B', 'C'])
     print("Cleaned shape:", cleaned.shape)
     print("Outliers removed:", sample_df.shape[0] - cleaned.shape[0])
+import pandas as pd
+import numpy as np
+
+def clean_data(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (bool): Whether to fill missing values
+    fill_value: Value to use for filling missing data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        missing_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        missing_after = cleaned_df.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Validation failed: DataFrame has less than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Validation failed: Missing columns: {missing_columns}")
+            return False
+    
+    return True
+
+def process_data_file(file_path, output_path=None):
+    """
+    Process a data file by cleaning and validating it.
+    
+    Parameters:
+    file_path (str): Path to input data file
+    output_path (str): Path to save cleaned data (optional)
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame or None if processing fails
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data from {file_path}")
+        print(f"Original shape: {df.shape}")
+        
+        if not validate_data(df):
+            return None
+        
+        cleaned_df = clean_data(df)
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Saved cleaned data to {output_path}")
+        
+        return cleaned_df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'value': [10, 20, 20, np.nan, 40],
+        'category': ['A', 'B', 'B', 'C', np.nan]
+    })
+    
+    print("Sample data before cleaning:")
+    print(sample_data)
+    print("\nCleaning sample data...")
+    
+    cleaned = clean_data(sample_data)
+    print("\nSample data after cleaning:")
+    print(cleaned)
