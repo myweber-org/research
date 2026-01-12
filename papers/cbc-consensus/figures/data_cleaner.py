@@ -181,3 +181,71 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
+import pandas as pd
+import numpy as np
+
+def clean_missing_data(file_path, strategy='mean', columns=None):
+    """
+    Load a CSV file and handle missing values using specified strategy.
+    
+    Parameters:
+    file_path (str): Path to the CSV file.
+    strategy (str): Method to handle missing values ('mean', 'median', 'mode', 'drop').
+    columns (list): Specific columns to clean, if None cleans all columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col not in df.columns:
+            print(f"Warning: Column '{col}' not found in DataFrame.")
+            continue
+        
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'drop':
+                df = df.dropna(subset=[col])
+                continue
+            else:
+                print(f"Warning: Unknown strategy '{strategy}'. Using 'mean'.")
+                fill_value = df[col].mean()
+            
+            df[col] = df[col].fillna(fill_value)
+            print(f"Filled missing values in column '{col}' using {strategy} strategy.")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save.
+    output_path (str): Path for output CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to '{output_path}'.")
+    else:
+        print("Error: No data to save.")
+
+if __name__ == "__main__":
+    input_file = "data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_missing_data(input_file, strategy='median')
+    save_cleaned_data(cleaned_df, output_file)
