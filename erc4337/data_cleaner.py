@@ -90,4 +90,80 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid = validate_data(cleaned_df, required_columns=['id', 'value', 'category'], min_rows=1)
-    print(f"\nData is valid: {is_valid}")
+    print(f"\nData is valid: {is_valid}")import numpy as np
+import pandas as pd
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.cleaned_data = None
+        
+    def remove_outliers_iqr(self, column):
+        Q1 = self.data[column].quantile(0.25)
+        Q3 = self.data[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return self.data[(self.data[column] >= lower_bound) & (self.data[column] <= upper_bound)]
+    
+    def normalize_minmax(self, column):
+        min_val = self.data[column].min()
+        max_val = self.data[column].max()
+        return (self.data[column] - min_val) / (max_val - min_val)
+    
+    def standardize_zscore(self, column):
+        mean_val = self.data[column].mean()
+        std_val = self.data[column].std()
+        return (self.data[column] - mean_val) / std_val
+    
+    def handle_missing_mean(self, column):
+        mean_val = self.data[column].mean()
+        return self.data[column].fillna(mean_val)
+    
+    def clean_pipeline(self, outlier_columns=None, normalize_columns=None, standardize_columns=None):
+        temp_data = self.data.copy()
+        
+        if outlier_columns:
+            for col in outlier_columns:
+                temp_data = self.remove_outliers_iqr(col)
+        
+        if normalize_columns:
+            for col in normalize_columns:
+                temp_data[col] = self.normalize_minmax(col)
+        
+        if standardize_columns:
+            for col in standardize_columns:
+                temp_data[col] = self.standardize_zscore(col)
+        
+        self.cleaned_data = temp_data
+        return self.cleaned_data
+    
+    def save_cleaned_data(self, filename):
+        if self.cleaned_data is not None:
+            self.cleaned_data.to_csv(filename, index=False)
+            return True
+        return False
+
+def example_usage():
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 200, 1000)
+    })
+    
+    cleaner = DataCleaner(sample_data)
+    cleaned = cleaner.clean_pipeline(
+        outlier_columns=['feature1', 'feature2'],
+        normalize_columns=['feature3'],
+        standardize_columns=['feature1']
+    )
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Cleaned data stats:\n{cleaned.describe()}")
+    
+    cleaner.save_cleaned_data('cleaned_data.csv')
+    return cleaned
+
+if __name__ == "__main__":
+    example_usage()
