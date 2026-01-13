@@ -1,155 +1,71 @@
+import csv
+import re
+from typing import List, Dict, Any, Optional
 
-import pandas as pd
-import numpy as np
+def clean_csv_data(input_file: str, output_file: str, columns_to_clean: Optional[List[str]] = None) -> None:
+    """
+    Clean data in a CSV file by removing extra whitespace and standardizing text.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            cleaned_row = {}
+            for key, value in row.items():
+                if columns_to_clean is None or key in columns_to_clean:
+                    if isinstance(value, str):
+                        # Remove extra whitespace
+                        cleaned_value = re.sub(r'\s+', ' ', value.strip())
+                        # Convert to title case for consistency
+                        cleaned_value = cleaned_value.title()
+                    else:
+                        cleaned_value = value
+                else:
+                    cleaned_value = value
+                cleaned_row[key] = cleaned_value
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
 
-def remove_outliers_iqr(df, column):
+def validate_email_format(email: str) -> bool:
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    Validate if a string is in a proper email format.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(email_pattern, email))
 
-def clean_dataset(df, numeric_columns=None):
+def filter_invalid_emails(input_file: str, email_column: str) -> List[Dict[str, Any]]:
     """
-    Clean dataset by removing outliers from all numeric columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
+    Filter rows from a CSV file where the email column contains invalid email addresses.
     """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    valid_rows = []
     
-    cleaned_df = df.copy()
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        
+        for row in reader:
+            if email_column in row and validate_email_format(row[email_column]):
+                valid_rows.append(row)
     
-    for column in numeric_columns:
-        if column in df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
-    
-    return cleaned_df
+    return valid_rows
 
-if __name__ == "__main__":
-    sample_data = {
-        'temperature': [22, 23, 24, 25, 26, 27, 28, 29, 30, 100],
-        'humidity': [45, 46, 47, 48, 49, 50, 51, 52, 53, 200],
-        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned_df = clean_dataset(df, ['temperature', 'humidity'])
-    print(cleaned_df)
-def remove_duplicates(sequence):
+def remove_duplicates(data: List[Dict[str, Any]], key_column: str) -> List[Dict[str, Any]]:
+    """
+    Remove duplicate rows based on a specified key column.
+    """
     seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport pandas as pd
-import numpy as np
-
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    unique_data = []
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to remove duplicate rows.
-    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
+    for row in data:
+        key_value = row.get(key_column)
+        if key_value not in seen:
+            seen.add(key_value)
+            unique_data.append(row)
     
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-        print(f"Removed {len(df) - len(cleaned_df)} duplicate rows.")
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-        print("Dropped rows with missing values.")
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
-            else:
-                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-        print(f"Filled missing numeric values with {fill_missing}.")
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            if cleaned_df[col].dtype == 'object':
-                cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else '', inplace=True)
-        print("Filled missing categorical values with mode.")
-    
-    return cleaned_df
-
-def validate_data(df, required_columns=None, min_rows=1):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    min_rows (int): Minimum number of rows required.
-    
-    Returns:
-    bool: True if validation passes, False otherwise.
-    """
-    if len(df) < min_rows:
-        print(f"Validation failed: DataFrame has less than {min_rows} rows.")
-        return False
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Validation failed: Missing required columns: {missing_cols}")
-            return False
-    
-    print("Data validation passed.")
-    return True
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 4, None],
-        'B': [5, None, 7, 8, 9],
-        'C': ['x', 'y', 'y', None, 'z']
-    }
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned = clean_dataset(df, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nData valid: {is_valid}")
+    return unique_data
