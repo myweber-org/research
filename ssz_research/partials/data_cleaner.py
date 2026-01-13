@@ -106,3 +106,141 @@ def validate_data(df, required_columns=None, check_missing=True, check_duplicate
         validation_report['duplicate_rows'] = duplicate_count
     
     return validation_report
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            print(f"Data loaded successfully. Shape: {self.df.shape}")
+            return True
+        except FileNotFoundError:
+            print(f"File not found: {self.file_path}")
+            return False
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def remove_duplicates(self):
+        if self.df is not None:
+            initial_rows = len(self.df)
+            self.df.drop_duplicates(inplace=True)
+            removed = initial_rows - len(self.df)
+            print(f"Removed {removed} duplicate rows")
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            print("No data loaded")
+            return
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        missing_count = self.df[columns].isnull().sum().sum()
+        print(f"Found {missing_count} missing values in selected columns")
+        
+        for column in columns:
+            if column in self.df.columns:
+                if strategy == 'mean':
+                    fill_value = self.df[column].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[column].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[column].mode()[0]
+                else:
+                    fill_value = strategy
+                
+                self.df[column].fillna(fill_value, inplace=True)
+        
+        print("Missing values handled")
+    
+    def remove_outliers(self, columns=None, threshold=3):
+        if self.df is None:
+            print("No data loaded")
+            return
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        initial_rows = len(self.df)
+        
+        for column in columns:
+            if column in self.df.columns:
+                z_scores = np.abs((self.df[column] - self.df[column].mean()) / self.df[column].std())
+                self.df = self.df[z_scores < threshold]
+        
+        removed = initial_rows - len(self.df)
+        print(f"Removed {removed} outliers")
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            print("No data to save")
+            return
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        self.df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return output_path
+    
+    def get_summary(self):
+        if self.df is None:
+            return "No data loaded"
+        
+        summary = {
+            'rows': len(self.df),
+            'columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'data_types': self.df.dtypes.value_counts().to_dict()
+        }
+        
+        return summary
+
+def clean_csv_file(input_file, output_file=None):
+    cleaner = DataCleaner(input_file)
+    
+    if cleaner.load_data():
+        cleaner.remove_duplicates()
+        cleaner.handle_missing_values(strategy='mean')
+        cleaner.remove_outliers(threshold=3)
+        
+        if output_file:
+            return cleaner.save_cleaned_data(output_file)
+        else:
+            return cleaner.save_cleaned_data()
+    
+    return None
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        'B': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'C': [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+    })
+    
+    sample_data.loc[2, 'B'] = np.nan
+    sample_data.loc[5, 'C'] = np.nan
+    sample_data = pd.concat([sample_data, sample_data.iloc[:2]], ignore_index=True)
+    
+    temp_file = Path("sample_data.csv")
+    sample_data.to_csv(temp_file, index=False)
+    
+    print("Testing DataCleaner...")
+    result = clean_csv_file(temp_file)
+    
+    if result:
+        cleaned_df = pd.read_csv(result)
+        print(f"Original shape: {sample_data.shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        print("Data cleaning completed successfully")
+    
+    temp_file.unlink()
+    if result:
+        Path(result).unlink()
