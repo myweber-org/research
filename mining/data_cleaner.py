@@ -1,55 +1,47 @@
 
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
     """
     Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
     """
-    cleaned_df = df.copy()
+    df_clean = df.copy()
     
     if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+        df_clean = df_clean.drop_duplicates()
     
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
-            elif fill_missing == 'median':
-                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
+    if fill_missing is not None:
+        if fill_missing == 'mean':
+            df_clean = df_clean.fillna(df_clean.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            df_clean = df_clean.fillna(df_clean.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            df_clean = df_clean.fillna(df_clean.mode().iloc[0])
+        else:
+            df_clean = df_clean.fillna(fill_missing)
     
-    return cleaned_df
+    return df_clean
 
-def validate_dataset(df, required_columns=None):
+def validate_dataframe(df):
     """
-    Validate a DataFrame for required columns and data types.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of required column names. Default is None.
-    
-    Returns:
-    tuple: (bool, str) indicating validation result and message.
+    Perform basic validation on a DataFrame.
     """
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
     
     if df.empty:
-        return False, "DataFrame is empty"
+        raise ValueError("DataFrame is empty")
     
-    return True, "Dataset validation passed"
+    return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame including missing values and data types.
+    """
+    summary = {
+        'shape': df.shape,
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'unique_counts': df.nunique().to_dict()
+    }
+    return summary
