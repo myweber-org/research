@@ -327,4 +327,74 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv')
     cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
+    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers.index.tolist()
+    
+    def detect_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        outlier_indices = np.where(z_scores > threshold)[0]
+        return self.df[column].dropna().iloc[outlier_indices].index.tolist()
+    
+    def remove_outliers(self, method='iqr', threshold=1.5):
+        outlier_indices = []
+        for col in self.numeric_columns:
+            if method == 'iqr':
+                indices = self.detect_outliers_iqr(col, threshold)
+            elif method == 'zscore':
+                indices = self.detect_outliers_zscore(col, threshold)
+            else:
+                raise ValueError("Method must be 'iqr' or 'zscore'")
+            outlier_indices.extend(indices)
+        
+        unique_indices = list(set(outlier_indices))
+        cleaned_df = self.df.drop(index=unique_indices)
+        return cleaned_df, unique_indices
+    
+    def impute_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        imputed_df = self.df.copy()
+        for col in columns:
+            if col in imputed_df.columns:
+                mean_value = imputed_df[col].mean()
+                imputed_df[col].fillna(mean_value, inplace=True)
+        return imputed_df
+    
+    def impute_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        imputed_df = self.df.copy()
+        for col in columns:
+            if col in imputed_df.columns:
+                median_value = imputed_df[col].median()
+                imputed_df[col].fillna(median_value, inplace=True)
+        return imputed_df
+    
+    def get_missing_summary(self):
+        missing_data = self.df.isnull().sum()
+        missing_percentage = (missing_data / len(self.df)) * 100
+        summary_df = pd.DataFrame({
+            'missing_count': missing_data,
+            'missing_percentage': missing_percentage
+        })
+        return summary_df[summary_df['missing_count'] > 0].sort_values('missing_percentage', ascending=False)
+    
+    def get_statistical_summary(self):
+        return self.df.describe()
