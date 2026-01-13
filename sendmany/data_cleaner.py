@@ -92,3 +92,76 @@ if __name__ == "__main__":
     sampled_data = sample_dataframe(cleaned_data, sample_size=3)
     print("\nSampled data:")
     print(sampled_data)
+import pandas as pd
+
+def clean_data(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean the input DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (bool): Whether to fill missing values. Default is True.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed_rows = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed_rows} duplicate rows.")
+    
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        
+        categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+        cleaned_df[categorical_cols] = cleaned_df[categorical_cols].fillna('Unknown')
+        
+        print("Filled missing values in numeric and categorical columns.")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    else:
+        print("All required columns are present.")
+        return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, None],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', None, 'Eve'],
+        'age': [25, 30, None, 35, 40, 45],
+        'score': [85.5, 92.0, 78.5, 78.5, None, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_data(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    required_cols = ['id', 'name', 'age']
+    is_valid = validate_data(cleaned_df, required_cols)
+    print(f"\nData validation result: {is_valid}")
