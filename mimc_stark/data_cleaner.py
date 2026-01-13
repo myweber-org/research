@@ -1,49 +1,109 @@
-import csv
-import re
+import pandas as pd
+import numpy as np
 
-def clean_csv(input_file, output_file, columns_to_clean=None):
+def remove_outliers_iqr(df, column):
     """
-    Clean a CSV file by removing extra whitespace and standardizing text.
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    cleaned_rows = []
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        for row in reader:
-            cleaned_row = {}
-            for field in fieldnames:
-                value = row[field]
-                if value and isinstance(value, str):
-                    # Remove extra whitespace
-                    value = re.sub(r'\s+', ' ', value.strip())
-                    # Standardize case for certain fields
-                    if field.lower() in ['email', 'username']:
-                        value = value.lower()
-                cleaned_row[field] = value
-            
-            # Only clean specific columns if provided
-            if columns_to_clean:
-                for col in columns_to_clean:
-                    if col in cleaned_row and cleaned_row[col]:
-                        cleaned_row[col] = re.sub(r'[^\w\s]', '', cleaned_row[col])
-            
-            cleaned_rows.append(cleaned_row)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(cleaned_rows)
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return len(cleaned_rows)
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def validate_email(email):
-    """Validate email format."""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email)) if email else False
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
+    
+    Returns:
+    dict: Dictionary containing summary statistics.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers from multiple numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    numeric_columns (list): List of column names to clean.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    dict: Dictionary of removal statistics for each column.
+    """
+    if not isinstance(numeric_columns, list):
+        numeric_columns = [numeric_columns]
+    
+    cleaned_df = df.copy()
+    removal_stats = {}
+    
+    for col in numeric_columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            removal_stats[col] = {
+                'removed': removed_count,
+                'remaining': len(cleaned_df),
+                'removal_percentage': (removed_count / original_count) * 100
+            }
+    
+    return cleaned_df, removal_stats
 
 if __name__ == "__main__":
-    # Example usage
-    records_processed = clean_csv('input.csv', 'output.csv', ['name', 'address'])
-    print(f"Processed {records_processed} records")
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500
+    
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal summary statistics:")
+    for col in df.columns:
+        print(f"{col}: mean={df[col].mean():.2f}, std={df[col].std():.2f}")
+    
+    cleaned_df, stats = clean_dataset(df, ['A', 'B', 'C'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nRemoval statistics:")
+    for col, stat in stats.items():
+        print(f"{col}: removed {stat['removed']} outliers ({stat['removal_percentage']:.1f}%)")
+    
+    print("\nCleaned summary statistics:")
+    for col in cleaned_df.columns:
+        print(f"{col}: mean={cleaned_df[col].mean():.2f}, std={cleaned_df[col].std():.2f}")
