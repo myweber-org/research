@@ -1,103 +1,93 @@
-
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def clean_csv_data(input_path, output_path):
+    """
+    Load a CSV file, clean missing values, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Original shape: {df.shape}")
+        
+        # Handle missing values
+        df_cleaned = df.copy()
+        
+        # Fill numeric columns with median
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            median_val = df_cleaned[col].median()
+            df_cleaned[col].fillna(median_val, inplace=True)
+        
+        # Fill categorical columns with mode
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            mode_val = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+            df_cleaned[col].fillna(mode_val, inplace=True)
+        
+        # Remove duplicate rows
+        df_cleaned.drop_duplicates(inplace=True)
+        
+        # Reset index after cleaning
+        df_cleaned.reset_index(drop=True, inplace=True)
+        
+        print(f"Cleaned shape: {df_cleaned.shape}")
+        print(f"Missing values after cleaning: {df_cleaned.isnull().sum().sum()}")
+        
+        # Save cleaned data
+        df_cleaned.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
 
-def clean_dataset(input_file, output_file):
-    df = pd.read_csv(input_file)
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
-    
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
-
-if __name__ == "__main__":
-    clean_dataset("raw_data.csv", "cleaned_data.csv")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
+def validate_data(df):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Perform basic data validation checks.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if df is None or df.empty:
+        print("Validation failed: DataFrame is empty or None")
+        return False
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    checks_passed = True
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    # Check for remaining missing values
+    missing_count = df.isnull().sum().sum()
+    if missing_count > 0:
+        print(f"Validation warning: {missing_count} missing values still present")
+        checks_passed = False
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.any(np.isinf(df[col])):
+            print(f"Validation warning: Infinite values found in column {col}")
+            checks_passed = False
     
-    return filtered_df.reset_index(drop=True)
-
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
+    # Check for negative values in columns that shouldn't have them
+    positive_cols = ['age', 'salary', 'price']  # Example columns that should be positive
+    for col in positive_cols:
+        if col in df.columns:
+            if (df[col] < 0).any():
+                print(f"Validation warning: Negative values found in column {col}")
+                checks_passed = False
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    if checks_passed:
+        print("All validation checks passed")
     
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'original_count': len(df),
-        'cleaned_count': len(remove_outliers_iqr(df, column)),
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max()
-    }
-    
-    return stats
-
-def example_usage():
-    """
-    Example demonstrating the usage of data cleaning functions.
-    """
-    np.random.seed(42)
-    data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100)
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame shape:", df.shape)
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    print("Cleaned DataFrame shape:", cleaned_df.shape)
-    
-    stats = calculate_summary_statistics(df, 'value')
-    print("\nSummary Statistics:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+    return checks_passed
 
 if __name__ == "__main__":
-    example_usage()
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, output_file)
+    
+    if cleaned_df is not None:
+        validate_data(cleaned_df)
