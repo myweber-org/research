@@ -133,4 +133,60 @@ if __name__ == "__main__":
     
     normalized_df = normalize_columns(cleaned_df, method='minmax')
     print("\nNormalized DataFrame:")
-    print(normalized_df)
+    print(normalized_df)import re
+import string
+
+def clean_text(text):
+    """
+    Clean and normalize input text by:
+    - Converting to lowercase
+    - Removing extra whitespace
+    - Removing punctuation
+    - Removing numbers
+    """
+    if not isinstance(text, str):
+        return ""
+    
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    text = re.sub(r'\d+', '', text)
+    return text.strip()
+
+def remove_stopwords(text, stopwords=None):
+    """
+    Remove common stopwords from text.
+    If no stopwords provided, uses a basic default set.
+    """
+    if stopwords is None:
+        stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+    
+    words = text.split()
+    filtered_words = [word for word in words if word not in stopwords]
+    return ' '.join(filtered_words)
+
+def normalize_whitespace(text):
+    """
+    Normalize all whitespace characters to single spaces.
+    """
+    return ' '.join(text.split())
+
+def process_text_pipeline(text, clean=True, remove_stop=False, custom_stopwords=None):
+    """
+    Pipeline function to process text through multiple cleaning steps.
+    """
+    processed = text
+    
+    if clean:
+        processed = clean_text(processed)
+        processed = normalize_whitespace(processed)
+    
+    if remove_stop:
+        processed = remove_stopwords(processed, custom_stopwords)
+    
+    return processed
+
+if __name__ == "__main__":
+    sample_text = "Hello World! This is a TEST string with 123 numbers and some punctuation!!!"
+    print("Original:", sample_text)
+    print("Cleaned:", process_text_pipeline(sample_text, clean=True, remove_stop=True))
