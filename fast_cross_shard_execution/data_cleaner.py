@@ -1,91 +1,113 @@
-import numpy as np
+
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(df, columns, factor=1.5):
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers using IQR method.
-    """
-    clean_df = df.copy()
-    for col in columns:
-        if col in clean_df.columns:
-            Q1 = clean_df[col].quantile(0.25)
-            Q3 = clean_df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - factor * IQR
-            upper_bound = Q3 + factor * IQR
-            clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
-    return clean_df
-
-def remove_outliers_zscore(df, columns, threshold=3):
-    """
-    Remove outliers using Z-score method.
-    """
-    clean_df = df.copy()
-    for col in columns:
-        if col in clean_df.columns:
-            z_scores = np.abs(stats.zscore(clean_df[col]))
-            clean_df = clean_df[z_scores < threshold]
-    return clean_df
-
-def normalize_minmax(df, columns):
-    """
-    Normalize data using Min-Max scaling.
-    """
-    normalized_df = df.copy()
-    for col in columns:
-        if col in normalized_df.columns:
-            min_val = normalized_df[col].min()
-            max_val = normalized_df[col].max()
-            if max_val != min_val:
-                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
-    return normalized_df
-
-def normalize_zscore(df, columns):
-    """
-    Normalize data using Z-score standardization.
-    """
-    normalized_df = df.copy()
-    for col in columns:
-        if col in normalized_df.columns:
-            mean_val = normalized_df[col].mean()
-            std_val = normalized_df[col].std()
-            if std_val != 0:
-                normalized_df[col] = (normalized_df[col] - mean_val) / std_val
-    return normalized_df
-
-def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Main function to clean dataset by removing outliers and normalizing.
-    """
-    if outlier_method == 'iqr':
-        df_clean = remove_outliers_iqr(df, numeric_columns)
-    elif outlier_method == 'zscore':
-        df_clean = remove_outliers_zscore(df, numeric_columns)
-    else:
-        df_clean = df.copy()
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    if normalize_method == 'minmax':
-        df_final = normalize_minmax(df_clean, numeric_columns)
-    elif normalize_method == 'zscore':
-        df_final = normalize_zscore(df_clean, numeric_columns)
-    else:
-        df_final = df_clean
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
-    return df_final
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a DataFrame column using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_copy
 
 if __name__ == "__main__":
     sample_data = {
-        'feature1': [10, 12, 12, 13, 12, 50, 11, 14, 13, 12],
-        'feature2': [100, 120, 115, 118, 122, 500, 112, 119, 117, 121],
-        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 13, 12, 11, 14]
     }
     
-    df_sample = pd.DataFrame(sample_data)
-    numeric_cols = ['feature1', 'feature2']
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
     
-    print("Original dataset:")
-    print(df_sample)
-    print("\nCleaned dataset (IQR + MinMax):")
-    cleaned_df = clean_dataset(df_sample, numeric_cols, outlier_method='iqr', normalize_method='minmax')
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("DataFrame after removing outliers:")
     print(cleaned_df)
+    print()
+    
+    stats = calculate_summary_statistics(df, 'values')
+    print("Summary statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
+    print()
+    
+    normalized_df = normalize_column(df, 'values', method='minmax')
+    print("DataFrame with normalized column:")
+    print(normalized_df)
