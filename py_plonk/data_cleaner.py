@@ -356,3 +356,11 @@ if __name__ == "__main__":
     # For demonstration, use the sample dataframe
     validation = validate_dataframe(df, required_columns=['Name', 'Age'])
     print(f"Validation results: {validation}")
+def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
