@@ -107,3 +107,37 @@ if __name__ == "__main__":
     print("\nCleaned summary statistics:")
     for col in cleaned_df.columns:
         print(f"{col}: mean={cleaned_df[col].mean():.2f}, std={cleaned_df[col].std():.2f}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    Returns a new DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def main():
+    # Example usage
+    data = {'values': [10, 12, 12, 13, 14, 15, 16, 100, 18, 19, 20]}
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nDataFrame after removing outliers:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
