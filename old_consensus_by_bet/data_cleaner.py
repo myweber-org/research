@@ -643,4 +643,85 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    print(calculate_basic_stats(cleaned_df, 'values'))import pandas as pd
+
+def clean_dataframe(df, column_names=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_names (list, optional): List of column names to normalize. 
+                                      If None, all object dtype columns are normalized.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Determine which columns to normalize
+    if column_names is None:
+        # Get all object dtype columns (typically strings)
+        column_names = cleaned_df.select_dtypes(include=['object']).columns.tolist()
+    
+    # Normalize string columns: strip whitespace and convert to lowercase
+    for col in column_names:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     sample_data = {
+#         'name': ['  John  ', 'Jane', 'JOHN', '  Jane  ', 'Bob'],
+#         'age': [25, 30, 25, 30, 35],
+#         'city': ['New York', '  los angeles  ', 'NEW YORK', 'Los Angeles', 'Chicago']
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print(f"\nShape: {df.shape}")
+#     
+#     # Clean the data
+#     cleaned = clean_dataframe(df)
+#     print("\nCleaned DataFrame:")
+#     print(cleaned)
+#     print(f"\nShape: {cleaned.shape}")
+#     
+#     # Validate the cleaned data
+#     is_valid, message = validate_dataframe(cleaned, ['name', 'age', 'city'])
+#     print(f"\nValidation: {is_valid} - {message}")
