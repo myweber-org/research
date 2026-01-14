@@ -241,4 +241,118 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
-    return df[mask]
+    return df[mask]import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, drop_na_threshold=0.8):
+    """
+    Clean CSV data by handling missing values, removing duplicates,
+    and standardizing column names.
+    
+    Parameters:
+    input_path (str): Path to input CSV file
+    output_path (str, optional): Path for cleaned output CSV
+    drop_na_threshold (float): Threshold for dropping columns with missing values
+    
+    Returns:
+    pandas.DataFrame: Cleaned dataframe
+    """
+    # Read the CSV file
+    df = pd.read_csv(input_path)
+    
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Calculate missing value percentage per column
+    missing_percent = df.isnull().sum() / len(df)
+    
+    # Drop columns with too many missing values
+    columns_to_drop = missing_percent[missing_percent > drop_na_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values with appropriate defaults
+    for column in df.columns:
+        if df[column].dtype == 'object':
+            df[column] = df[column].fillna('unknown')
+        elif np.issubdtype(df[column].dtype, np.number):
+            df[column] = df[column].fillna(df[column].median())
+    
+    # Remove outliers using IQR method for numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+    
+    # Save cleaned data if output path is provided
+    if output_path:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): Dataframe to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if dataframe is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Dataframe is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for all-null columns
+    null_columns = df.columns[df.isnull().all()].tolist()
+    if null_columns:
+        validation_results['warnings'].append(f'Columns with all null values: {null_columns}')
+    
+    # Check data types
+    for column in df.columns:
+        if df[column].dtype == 'object' and df[column].str.contains('^\s*$').any():
+            validation_results['warnings'].append(f'Column "{column}" contains empty strings')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Charlie', None, 'Eve'],
+        'Age': [25, 30, None, 40, 35],
+        'Salary': [50000, 60000, 70000, 80000, 90000],
+        'Department': ['IT', 'HR', 'IT', 'Finance', 'IT']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    cleaned_df = clean_csv_data('dummy_path', drop_na_threshold=0.5)
+    
+    # For demonstration, use the sample dataframe
+    validation = validate_dataframe(df, required_columns=['Name', 'Age'])
+    print(f"Validation results: {validation}")
