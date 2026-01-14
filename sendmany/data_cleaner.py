@@ -165,3 +165,105 @@ if __name__ == "__main__":
     required_cols = ['id', 'name', 'age']
     is_valid = validate_data(cleaned_df, required_cols)
     print(f"\nData validation result: {is_valid}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(
+    data: pd.DataFrame,
+    subset: Optional[List[str]] = None,
+    keep: str = 'first',
+    inplace: bool = False
+) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a DataFrame with configurable parameters.
+    
+    Args:
+        data: Input DataFrame
+        subset: Column labels to consider for identifying duplicates
+        keep: Which duplicates to keep ('first', 'last', False)
+        inplace: Whether to modify the DataFrame in place
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if not inplace:
+        data = data.copy()
+    
+    if subset is None:
+        subset = data.columns.tolist()
+    
+    cleaned_data = data.drop_duplicates(subset=subset, keep=keep, inplace=False)
+    
+    if inplace:
+        data.drop_duplicates(subset=subset, keep=keep, inplace=True)
+        return data
+    
+    return cleaned_data
+
+def validate_dataframe(data: pd.DataFrame) -> bool:
+    """
+    Basic validation of DataFrame structure.
+    
+    Args:
+        data: DataFrame to validate
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False
+    
+    if data.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if data.isnull().all().any():
+        print("Warning: Some columns contain only null values")
+    
+    return True
+
+def clean_numeric_columns(
+    data: pd.DataFrame,
+    columns: List[str],
+    fill_value: float = 0.0
+) -> pd.DataFrame:
+    """
+    Clean numeric columns by filling NaN values.
+    
+    Args:
+        data: Input DataFrame
+        columns: List of column names to clean
+        fill_value: Value to use for filling NaN
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    cleaned_data = data.copy()
+    
+    for col in columns:
+        if col in cleaned_data.columns:
+            cleaned_data[col] = pd.to_numeric(
+                cleaned_data[col], 
+                errors='coerce'
+            ).fillna(fill_value)
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David'],
+        'score': [85, 90, 90, 78, np.nan],
+        'age': [25, 30, 30, 35, 40]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nAfter removing duplicates:")
+    cleaned = remove_duplicates(sample_data, subset=['id', 'name'])
+    print(cleaned)
+    
+    print("\nAfter cleaning numeric columns:")
+    numeric_cleaned = clean_numeric_columns(cleaned, columns=['score'])
+    print(numeric_cleaned)
