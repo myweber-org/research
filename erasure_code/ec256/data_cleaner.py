@@ -230,3 +230,67 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         print("Data cleaning completed successfully")
         print(cleaned_df.head())
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data):
+    """
+    Main cleaning function that processes the input data.
+    Handles None values and ensures proper data types.
+    """
+    if data is None:
+        return []
+    
+    if not isinstance(data, list):
+        try:
+            data = list(data)
+        except TypeError:
+            return []
+    
+    cleaned = remove_duplicates(data)
+    return cleaned
+
+def validate_input(data):
+    """
+    Validate that input is suitable for cleaning operations.
+    Returns boolean indicating if data can be processed.
+    """
+    if data is None:
+        return False
+    
+    try:
+        iter(data)
+        return True
+    except TypeError:
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    print(f"Original data: {sample_data}")
+    cleaned = clean_data(sample_data)
+    print(f"Cleaned data: {cleaned}")
+    
+    # Test with invalid input
+    test_cases = [
+        [1, 2, 3],
+        [],
+        None,
+        "string",
+        (1, 2, 2, 3)
+    ]
+    
+    for test in test_cases:
+        print(f"\nTesting: {test}")
+        print(f"Valid: {validate_input(test)}")
+        print(f"Result: {clean_data(test)}")
