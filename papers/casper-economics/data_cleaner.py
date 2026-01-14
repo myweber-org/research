@@ -384,3 +384,33 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import re
+import string
+
+def clean_text(text):
+    """
+    Clean and normalize a given text string.
+    Lowercases, removes punctuation, and strips extra whitespace.
+    """
+    if not isinstance(text, str):
+        return ""
+
+    # Convert to lowercase
+    text = text.lower()
+
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+
+    # Remove extra whitespace and newlines
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    return text
+
+def tokenize_text(text):
+    """
+    Tokenize the cleaned text into a list of words.
+    """
+    cleaned = clean_text(text)
+    if not cleaned:
+        return []
+    return cleaned.split()
