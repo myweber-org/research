@@ -85,4 +85,198 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
-    return filtered_df
+    return filtered_dfimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        data[f'{column}_normalized'] = 0.5
+    else:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    return data
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: Column name to standardize
+    
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        data[f'{column}_standardized'] = 0
+    else:
+        data[f'{column}_standardized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return data.dropna(subset=numeric_cols)
+    
+    for col in numeric_cols:
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data[col] = data[col].fillna(fill_value)
+    
+    return data
+
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, 
+                  normalize=True, standardize=False, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: List of numeric columns to process (None for all numeric)
+        outlier_multiplier: IQR multiplier for outlier removal
+        normalize: Whether to apply Min-Max normalization
+        standardize: Whether to apply Z-score standardization
+        missing_strategy: Strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_multiplier)
+            
+            if normalize:
+                cleaned_data = normalize_minmax(cleaned_data, col)
+            
+            if standardize:
+                cleaned_data = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+def validate_data(data, check_duplicates=True, check_infinite=True):
+    """
+    Validate data quality.
+    
+    Args:
+        data: pandas DataFrame
+        check_duplicates: Check for duplicate rows
+        check_infinite: Check for infinite values
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'duplicate_rows': 0,
+        'infinite_values': False
+    }
+    
+    if check_duplicates:
+        validation_results['duplicate_rows'] = data.duplicated().sum()
+    
+    if check_infinite:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if np.any(np.isinf(data[col])):
+                validation_results['infinite_values'] = True
+                break
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'feature3': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\n" + "="*50)
+    
+    cleaned = clean_dataset(sample_data, normalize=True, standardize=True)
+    print("\nCleaned data:")
+    print(cleaned)
+    print("\n" + "="*50)
+    
+    validation = validate_data(cleaned)
+    print("\nValidation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
