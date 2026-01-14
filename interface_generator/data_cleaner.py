@@ -319,4 +319,84 @@ if __name__ == "__main__":
     print("\nCleaned summary statistics:")
     print(get_summary_statistics(cleaned, numeric_cols))
     
-    print("\nNormalized columns:", [col for col in cleaned.columns if 'normalized' in col])
+    print("\nNormalized columns:", [col for col in cleaned.columns if 'normalized' in col])import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_missing(self, threshold=0.3):
+        missing_percent = self.df.isnull().sum() / len(self.df)
+        columns_to_drop = missing_percent[missing_percent > threshold].index
+        self.df = self.df.drop(columns=columns_to_drop)
+        return self
+    
+    def fill_numeric_missing(self, method='median'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'mean':
+            fill_values = self.df[numeric_cols].mean()
+        elif method == 'median':
+            fill_values = self.df[numeric_cols].median()
+        elif method == 'mode':
+            fill_values = self.df[numeric_cols].mode().iloc[0]
+        else:
+            fill_values = 0
+            
+        self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_values)
+        return self
+    
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        return self
+    
+    def normalize_data(self, method='zscore'):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if method == 'zscore':
+            self.df[numeric_cols] = stats.zscore(self.df[numeric_cols])
+        elif method == 'minmax':
+            self.df[numeric_cols] = (self.df[numeric_cols] - self.df[numeric_cols].min()) / (self.df[numeric_cols].max() - self.df[numeric_cols].min())
+        elif method == 'robust':
+            median = self.df[numeric_cols].median()
+            iqr = self.df[numeric_cols].quantile(0.75) - self.df[numeric_cols].quantile(0.25)
+            self.df[numeric_cols] = (self.df[numeric_cols] - median) / iqr
+            
+        return self
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'current_rows': self.df.shape[0],
+            'current_columns': self.df.shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        return summary
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
