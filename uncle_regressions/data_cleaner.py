@@ -1,92 +1,92 @@
+
 import pandas as pd
 import numpy as np
 
-def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+def remove_outliers_iqr(df, column):
     """
-    Load a CSV file, handle missing values, and save cleaned data.
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
     
-    Args:
-        input_file (str): Path to input CSV file.
-        output_file (str): Path to save cleaned CSV file.
-        missing_strategy (str): Strategy for handling missing values.
-            Options: 'mean', 'median', 'drop', 'zero'.
-    """
-    try:
-        df = pd.read_csv(input_file)
-        print(f"Original data shape: {df.shape}")
-        
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        
-        if missing_strategy == 'mean':
-            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
-        elif missing_strategy == 'median':
-            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-        elif missing_strategy == 'zero':
-            df[numeric_cols] = df[numeric_cols].fillna(0)
-        elif missing_strategy == 'drop':
-            df = df.dropna(subset=numeric_cols)
-        else:
-            raise ValueError(f"Unknown strategy: {missing_strategy}")
-        
-        df.to_csv(output_file, index=False)
-        print(f"Cleaned data shape: {df.shape}")
-        print(f"Cleaned data saved to: {output_file}")
-        
-        return df
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-        return None
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty.")
-        return None
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return None
-
-def validate_data(df, column_name, min_value=None, max_value=None):
-    """
-    Validate data in a specific column.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        column_name (str): Column to check.
-        min_value (float): Minimum allowed value.
-        max_value (float): Maximum allowed value.
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-        bool: True if validation passes.
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
     """
-    if column_name not in df.columns:
-        print(f"Column '{column_name}' not found.")
-        return False
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if min_value is not None:
-        if (df[column_name] < min_value).any():
-            print(f"Values below minimum {min_value} found in '{column_name}'.")
-            return False
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if max_value is not None:
-        if (df[column_name] > max_value).any():
-            print(f"Values above maximum {max_value} found in '{column_name}'.")
-            return False
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return True
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
+    
+    Returns:
+    dict: Dictionary containing count, mean, std, min, max, and IQR.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'count': df[column].count(),
+        'mean': df[column].mean(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'q1': df[column].quantile(0.25),
+        'q3': df[column].quantile(0.75),
+        'iqr': df[column].quantile(0.75) - df[column].quantile(0.25)
+    }
+    
+    return stats
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'id': range(1, 101),
+        'value': np.concatenate([
+            np.random.normal(100, 10, 90),
+            np.random.normal(300, 50, 10)
+        ])
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary statistics:")
+    original_stats = calculate_summary_statistics(df, 'value')
+    for key, value in original_stats.items():
+        print(f"  {key}: {value:.2f}")
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary statistics:")
+    cleaned_stats = calculate_summary_statistics(cleaned_df, 'value')
+    for key, value in cleaned_stats.items():
+        print(f"  {key}: {value:.2f}")
+    
+    outliers_removed = df.shape[0] - cleaned_df.shape[0]
+    print(f"\nOutliers removed: {outliers_removed}")
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_df = clean_csv_data('raw_data.csv', 'cleaned_data.csv', 'mean')
-    
-    if cleaned_df is not None:
-        is_valid = validate_data(cleaned_df, 'temperature', min_value=-50, max_value=100)
-        if is_valid:
-            print("Data validation passed.")
-        else:
-            print("Data validation failed.")
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    cleaned_data = example_usage()
