@@ -1,95 +1,46 @@
+import numpy as np
 import pandas as pd
+from scipy import stats
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (bool): Whether to fill missing values. Default is False.
-    fill_value: Value to use for filling missing values. Default is 0.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        return df[column].apply(lambda x: 0.5)
+    return (df[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    if std_val == 0:
+        return df[column].apply(lambda x: 0)
+    return (df[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns):
     cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
-    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col + '_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[col + '_standardized'] = standardize_zscore(cleaned_df, col)
     return cleaned_df
 
-def validate_data(df, required_columns=None):
-    """
-    Validate that the DataFrame meets certain criteria.
+def validate_data(df, required_columns):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    bool: True if validation passes, False otherwise.
-    """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
-    
-    if df.empty:
-        print("DataFrame is empty")
-        return False
+    numeric_check = df[required_columns].select_dtypes(include=[np.number])
+    if len(numeric_check.columns) != len(required_columns):
+        non_numeric = [col for col in required_columns if col not in numeric_check.columns]
+        raise TypeError(f"Non-numeric columns found: {non_numeric}")
     
     return True
-
-def process_data(file_path, output_path=None):
-    """
-    Load, clean, and optionally save a dataset.
-    
-    Parameters:
-    file_path (str): Path to the input CSV file.
-    output_path (str): Path to save the cleaned CSV file. If None, file is not saved.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    try:
-        df = pd.read_csv(file_path)
-        
-        if not validate_data(df):
-            return None
-        
-        cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True)
-        
-        if output_path:
-            cleaned_df.to_csv(output_path, index=False)
-            print(f"Cleaned data saved to: {output_path}")
-        
-        return cleaned_df
-        
-    except FileNotFoundError:
-        print(f"File not found: {file_path}")
-        return None
-    except Exception as e:
-        print(f"Error processing data: {e}")
-        return None
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = pd.DataFrame({
-        'A': [1, 2, 2, None, 5],
-        'B': [10, 20, 20, 40, None],
-        'C': ['x', 'y', 'y', 'z', 'z']
-    })
-    
-    print("Original data:")
-    print(sample_data)
-    
-    cleaned = clean_dataset(sample_data, drop_duplicates=True, fill_missing=True)
-    
-    print("\nCleaned data:")
-    print(cleaned)
