@@ -48,3 +48,71 @@ if __name__ == "__main__":
     df_filled = handle_missing_values(df_cleaned, strategy='mean')
     print("\nAfter handling missing values:")
     print(df_filled)
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_missing: If True, fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if fill_missing:
+        df_clean = df_clean.fillna(fill_value)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def remove_outliers(df, column, threshold=3):
+    """
+    Remove outliers from a DataFrame column using z-score method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+        threshold: Z-score threshold for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    from scipy import stats
+    
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = stats.zscore(df[column].dropna())
+    abs_z_scores = abs(z_scores)
+    
+    filtered_entries = (abs_z_scores < threshold)
+    return df[filtered_entries]
