@@ -1,81 +1,54 @@
-import pandas as pd
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+import numpy as np
+
+def remove_outliers_iqr(data, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a specified column using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows.
-        fill_missing (bool): Whether to fill missing values.
-        fill_value: Value to use for filling missing data.
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    cleaned_df = df.copy()
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
-    
-    return cleaned_df
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def validate_dataframe(df, required_columns=None):
+def calculate_summary_statistics(data, column):
     """
-    Validate DataFrame structure and content.
+    Calculate summary statistics for a specified column.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names.
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-        tuple: (is_valid, error_message)
+    dict: Dictionary containing mean, median, and standard deviation.
     """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std()
+    }
+    return stats
 
-def remove_outliers(df, column, method='iqr', threshold=1.5):
-    """
-    Remove outliers from a DataFrame column.
+if __name__ == "__main__":
+    import pandas as pd
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        column (str): Column name to process.
-        method (str): Method for outlier detection ('iqr' or 'zscore').
-        threshold (float): Threshold for outlier detection.
+    sample_data = pd.DataFrame({
+        'values': np.random.normal(100, 15, 1000)
+    })
     
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_data = remove_outliers_iqr(sample_data, 'values')
+    stats = calculate_summary_statistics(cleaned_data, 'values')
     
-    data = df[column].dropna()
-    
-    if method == 'iqr':
-        Q1 = data.quantile(0.25)
-        Q3 = data.quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - threshold * IQR
-        upper_bound = Q3 + threshold * IQR
-        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
-    elif method == 'zscore':
-        from scipy import stats
-        z_scores = stats.zscore(data)
-        mask = abs(z_scores) < threshold
-        # Reindex mask to match original DataFrame
-        mask = pd.Series(mask, index=data.index).reindex(df.index, fill_value=True)
-    else:
-        raise ValueError("Method must be 'iqr' or 'zscore'")
-    
-    return df[mask]
+    print(f"Original data shape: {sample_data.shape}")
+    print(f"Cleaned data shape: {cleaned_data.shape}")
+    print(f"Summary statistics: {stats}")
