@@ -90,3 +90,29 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Remove duplicate rows and normalize text in specified column.
+    """
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    def normalize_text(text):
+        text = str(text)
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+    
+    df_clean[text_column] = df_clean[text_column].apply(normalize_text)
+    return df_clean
+
+def validate_email_column(df, email_column):
+    """
+    Validate email format in specified column.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    mask = df[email_column].astype(str).str.match(pattern)
+    return df[mask].reset_index(drop=True)
