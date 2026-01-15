@@ -312,3 +312,96 @@ if __name__ == "__main__":
         print("\nCleaned DataFrame:")
         print(cleaned_df)
         print(f"Cleaned shape: {cleaned_df.shape}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        column_mapping (dict): Optional dictionary to rename columns
+        drop_duplicates (bool): Whether to drop duplicate rows
+        fill_missing (bool): Whether to fill missing values
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype in ['int64', 'float64']:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+            elif cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].fillna('Unknown')
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    print(f"Dataset cleaned: {len(cleaned_df)} rows, {len(cleaned_df.columns)} columns")
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the structure and content of a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of columns that must be present
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Validation failed: Less than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing columns: {missing_cols}")
+            return False
+    
+    print("Data validation passed")
+    return True
+
+def sample_usage():
+    """Example usage of the data cleaning functions."""
+    np.random.seed(42)
+    
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, 35, None, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing=True)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_data(cleaned, required_columns=['id', 'name', 'age'], min_rows=3)
+    print(f"\nData is valid: {is_valid}")
+
+if __name__ == "__main__":
+    sample_usage()
