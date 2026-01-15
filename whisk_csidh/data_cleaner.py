@@ -286,4 +286,98 @@ if __name__ == "__main__":
     print("Removed rows:", summary['removed_rows'])
     print("Missing values after cleaning:", summary['missing_values'])
     print("\nFirst 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    print(cleaned_df.head())import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to process
+    factor (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Normalize columns using Min-Max scaling to range [0, 1].
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df_norm.columns:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def standardize_zscore(df, columns):
+    """
+    Standardize columns using Z-score normalization.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to standardize
+    
+    Returns:
+    pd.DataFrame: Dataframe with standardized columns
+    """
+    df_std = df.copy()
+    for col in columns:
+        if col in df_std.columns:
+            mean_val = df_std[col].mean()
+            std_val = df_std[col].std()
+            if std_val > 0:
+                df_std[col] = (df_std[col] - mean_val) / std_val
+    return df_std
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in dataframe columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process (None for all numeric columns)
+    
+    Returns:
+    pd.DataFrame: Dataframe with handled missing values
+    """
+    df_processed = df.copy()
+    
+    if columns is None:
+        columns = df_processed.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col in df_processed.columns:
+            if strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+            elif strategy == 'mean':
+                df_processed[col] = df_processed[col].fillna(df_processed[col].mean())
+            elif strategy == 'median':
+                df_processed[col] = df_processed[col].fillna(df_processed[col].median())
+            elif strategy == 'mode':
+                df_processed[col] = df_processed[col].fillna(df_processed[col].mode()[0])
+    
+    return df_processed.reset_index(drop=True)
