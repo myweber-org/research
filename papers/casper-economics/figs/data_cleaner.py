@@ -276,3 +276,63 @@ if __name__ == "__main__":
     validated = validate_email_column(cleaned, 'email')
     print("\nDataFrame with email validation:")
     print(validated)
+import pandas as pd
+import numpy as np
+
+def clean_data(file_path):
+    """
+    Load and clean a CSV file by removing duplicates,
+    handling missing values, and standardizing formats.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Remove leading/trailing whitespace from string columns
+        for col in categorical_cols:
+            df[col] = df[col].str.strip()
+        
+        # Convert date columns to datetime if possible
+        for col in df.columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='ignore')
+            except:
+                continue
+        
+        return df
+    
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return None
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+    return False
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_data(input_file)
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
