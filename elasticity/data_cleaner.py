@@ -130,4 +130,70 @@ def clean_dataset(data, numeric_columns):
             removed_count = original_count - len(cleaned_data)
             print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return cleaned_data
+    return cleaned_dataimport pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, z_threshold=3):
+    """
+    Clean dataset by handling missing values, normalizing numeric columns,
+    and removing outliers based on z-score.
+    """
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    # Handle missing values
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # Normalize numeric columns
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            if std_val > 0:
+                df_clean[col] = (df_clean[col] - mean_val) / std_val
+    
+    # Remove outliers using z-score
+    z_scores = np.abs(stats.zscore(df_clean[numeric_columns]))
+    outlier_mask = (z_scores < z_threshold).all(axis=1)
+    df_clean = df_clean[outlier_mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def validate_data(df, required_columns, min_rows=10):
+    """
+    Validate dataset structure and content.
+    """
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows")
+    
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'feature_a': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'feature_b': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned_data = clean_dataset(sample_data, numeric_columns=['feature_a', 'feature_b'])
+    print("\nCleaned data:")
+    print(cleaned_data)
+    
+    try:
+        validate_data(cleaned_data, required_columns=['feature_a', 'feature_b'])
+        print("\nData validation passed")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
