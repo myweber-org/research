@@ -49,3 +49,73 @@ def clean_numeric_columns(df, columns):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
     return df
+import pandas as pd
+import numpy as np
+import re
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean and preprocess CSV data by handling missing values,
+    standardizing formats, and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Standardize column names
+        df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        df[categorical_cols] = df[categorical_cols].fillna('unknown')
+        
+        # Clean string columns
+        for col in categorical_cols:
+            df[col] = df[col].apply(lambda x: re.sub(r'\s+', ' ', str(x)).strip())
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned file saved as: {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    required_columns = ['id', 'name', 'value']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    if df['id'].duplicated().any():
+        return False, "Duplicate IDs found"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    success = clean_csv_data(input_csv, output_csv)
+    
+    if success:
+        cleaned_df = pd.read_csv(output_csv)
+        is_valid, message = validate_dataframe(cleaned_df)
+        print(f"Validation result: {is_valid} - {message}")
