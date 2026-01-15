@@ -1,93 +1,116 @@
+
 import pandas as pd
 import numpy as np
+from scipy import stats
 
-def clean_csv_data(input_path, output_path):
-    """
-    Load a CSV file, clean missing values, and save cleaned data.
-    """
-    try:
-        df = pd.read_csv(input_path)
-        print(f"Original shape: {df.shape}")
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if strategy == 'mean':
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].mean()
+            )
+        elif strategy == 'median':
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].median()
+            )
+        elif strategy == 'mode':
+            for col in self.numeric_columns:
+                self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
+        elif strategy == 'custom' and fill_value is not None:
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(fill_value)
         
-        # Handle missing values
-        df_cleaned = df.copy()
+        self.df[self.categorical_columns] = self.df[self.categorical_columns].fillna('Unknown')
+        return self
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
         
-        # Fill numeric columns with median
-        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            median_val = df_cleaned[col].median()
-            df_cleaned[col].fillna(median_val, inplace=True)
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
         
-        # Fill categorical columns with mode
-        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
-        for col in categorical_cols:
-            mode_val = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
-            df_cleaned[col].fillna(mode_val, inplace=True)
+        return self
+    
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.numeric_columns
         
-        # Remove duplicate rows
-        df_cleaned.drop_duplicates(inplace=True)
+        for col in columns:
+            if col in self.numeric_columns:
+                z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                valid_indices = np.where(z_scores < threshold)[0]
+                original_indices = self.df[col].dropna().index[valid_indices]
+                self.df = self.df.loc[original_indices.union(self.df[self.df[col].isna()].index)]
         
-        # Reset index after cleaning
-        df_cleaned.reset_index(drop=True, inplace=True)
+        return self
+    
+    def normalize_data(self, method='minmax'):
+        if method == 'minmax':
+            for col in self.numeric_columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            for col in self.numeric_columns:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
         
-        print(f"Cleaned shape: {df_cleaned.shape}")
-        print(f"Missing values after cleaning: {df_cleaned.isnull().sum().sum()}")
-        
-        # Save cleaned data
-        df_cleaned.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to: {output_path}")
-        
-        return df_cleaned
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {input_path}")
-        return None
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return None
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': self.df.shape,
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.numeric_columns),
+            'categorical_columns': list(self.categorical_columns)
+        }
+        return summary
 
-def validate_data(df):
-    """
-    Perform basic data validation checks.
-    """
-    if df is None or df.empty:
-        print("Validation failed: DataFrame is empty or None")
-        return False
+def example_usage():
+    data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['a', 'b', 'a', 'b', 'a', np.nan],
+        'D': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    }
     
-    checks_passed = True
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nSummary:")
+    print(df.info())
     
-    # Check for remaining missing values
-    missing_count = df.isnull().sum().sum()
-    if missing_count > 0:
-        print(f"Validation warning: {missing_count} missing values still present")
-        checks_passed = False
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                 .handle_missing_values(strategy='mean')
+                 .remove_outliers_iqr(multiplier=1.5)
+                 .normalize_data(method='minmax')
+                 .get_cleaned_data())
     
-    # Check for infinite values in numeric columns
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if np.any(np.isinf(df[col])):
-            print(f"Validation warning: Infinite values found in column {col}")
-            checks_passed = False
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nCleaning Summary:")
+    print(cleaner.get_summary())
     
-    # Check for negative values in columns that shouldn't have them
-    positive_cols = ['age', 'salary', 'price']  # Example columns that should be positive
-    for col in positive_cols:
-        if col in df.columns:
-            if (df[col] < 0).any():
-                print(f"Validation warning: Negative values found in column {col}")
-                checks_passed = False
-    
-    if checks_passed:
-        print("All validation checks passed")
-    
-    return checks_passed
+    return cleaned_df
 
 if __name__ == "__main__":
-    # Example usage
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    
-    cleaned_df = clean_csv_data(input_file, output_file)
-    
-    if cleaned_df is not None:
-        validate_data(cleaned_df)
+    example_usage()
