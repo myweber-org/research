@@ -95,4 +95,72 @@ class DataCleaner:
         return self.df
         
     def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
+        return self.original_shape[0] - self.df.shape[0]import pandas as pd
+import numpy as np
+
+def remove_duplicates(df):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates()
+
+def fill_missing_values(df, strategy='mean'):
+    """
+    Fill missing values in numeric columns.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    
+    return df
+
+def normalize_columns(df, columns=None):
+    """
+    Normalize specified columns to range [0, 1].
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            col_min = df[col].min()
+            col_max = df[col].max()
+            
+            if col_max != col_min:
+                df[col] = (df[col] - col_min) / (col_max - col_min)
+    
+    return df
+
+def clean_dataframe(df, remove_dups=True, fill_na=True, normalize=True):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    """
+    if remove_dups:
+        df = remove_duplicates(df)
+    
+    if fill_na:
+        df = fill_missing_values(df)
+    
+    if normalize:
+        df = normalize_columns(df)
+    
+    return df
+
+def load_and_clean_csv(filepath):
+    """
+    Load CSV file and apply cleaning operations.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        return clean_dataframe(df)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error loading file: {e}")
+        return None
