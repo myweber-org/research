@@ -80,4 +80,89 @@ def sample_dataframe(df, sample_size=1000, random_state=42):
     if len(df) <= sample_size:
         return df
     
-    return df.sample(n=sample_size, random_state=random_state)
+    return df.sample(n=sample_size, random_state=random_state)import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path, missing_strategy='mean'):
+    """
+    Load a CSV file, clean missing values, and save the cleaned data.
+    
+    Args:
+        input_path (str): Path to the input CSV file.
+        output_path (str): Path to save the cleaned CSV file.
+        missing_strategy (str): Strategy for handling missing values.
+            Options: 'mean', 'median', 'drop', 'zero'.
+    
+    Returns:
+        pandas.DataFrame: The cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if missing_strategy == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif missing_strategy == 'median':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif missing_strategy == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
+        elif missing_strategy == 'drop':
+            df = df.dropna(subset=numeric_cols)
+        else:
+            raise ValueError(f"Unknown strategy: {missing_strategy}")
+        
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Final shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if df is None or df.empty:
+        print("Validation failed: DataFrame is empty or None")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing columns {missing_cols}")
+            return False
+    
+    if df.isnull().any().any():
+        print("Validation warning: DataFrame contains missing values")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    })
+    
+    sample_data.to_csv('sample_input.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_input.csv', 'sample_output.csv', 'mean')
+    
+    if cleaned_df is not None:
+        is_valid = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+        print(f"Data validation result: {is_valid}")
