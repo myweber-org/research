@@ -1,60 +1,134 @@
-import pandas as pd
-import sys
 
-def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
     """
-    Remove duplicate rows from a CSV file.
+    Remove outliers from specified columns using the Interquartile Range method.
     
-    Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. If None, overwrites input file
-        subset (list, optional): Columns to consider for identifying duplicates
-        keep (str): Which duplicate to keep - 'first', 'last', or False to drop all duplicates
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    threshold (float): Multiplier for IQR (default 1.5)
     
     Returns:
-        int: Number of duplicate rows removed
+    pd.DataFrame: DataFrame with outliers removed
     """
-    try:
-        df = pd.read_csv(input_file)
-        initial_rows = len(df)
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
         
-        df_clean = df.drop_duplicates(subset=subset, keep=keep)
-        final_rows = len(df_clean)
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
         
-        duplicates_removed = initial_rows - final_rows
-        
-        if output_file is None:
-            output_file = input_file
-        
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original rows: {initial_rows}, Cleaned rows: {final_rows}")
-        print(f"Saved to: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty")
-        return -1
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return -1
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        sys.exit(1)
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns using selected method.
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
     
-    result = remove_duplicates(input_file, output_file)
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    if result >= 0:
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val != 0:
+                df_norm[col] = (df[col] - mean_val) / std_val
+    
+    return df_norm
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns.tolist()
+    
+    df_processed = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if df[col].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_processed[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+    
+    return df_processed.reset_index(drop=True)
+
+def clean_dataset(df, config=None):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    config (dict): Configuration dictionary with cleaning options
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if config is None:
+        config = {
+            'missing_values': 'mean',
+            'outliers': True,
+            'normalize': False
+        }
+    
+    df_clean = df.copy()
+    
+    df_clean = handle_missing_values(df_clean, strategy=config.get('missing_values', 'mean'))
+    
+    if config.get('outliers', False):
+        df_clean = remove_outliers_iqr(df_clean)
+    
+    if config.get('normalize', False):
+        df_clean = normalize_data(df_clean, method=config.get('normalize_method', 'minmax'))
+    
+    return df_clean
