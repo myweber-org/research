@@ -76,3 +76,95 @@ def process_numerical_data(data, numerical_columns):
             all_stats[column] = stats
     
     return cleaned_data, all_stats
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_text_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize text column by converting to lowercase and stripping whitespace.
+    
+    Args:
+        df: Input DataFrame
+        column: Name of column to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    df = df.copy()
+    df[column] = df[column].astype(str).str.lower().str.strip()
+    return df
+
+def fill_missing_values(df: pd.DataFrame, strategy: str = 'mean', columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Fill missing values in specified columns.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'mean', 'median', 'mode', or 'constant'
+        columns: Columns to fill (None for all numeric columns)
+    
+    Returns:
+        DataFrame with filled missing values
+    """
+    df = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean':
+                df[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'constant':
+                df[col].fillna(0, inplace=True)
+    
+    return df
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   text_columns: Optional[List[str]] = None,
+                   fill_na: bool = True) -> pd.DataFrame:
+    """
+    Main function to clean DataFrame with multiple operations.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        text_columns: Columns to normalize text
+        fill_na: Whether to fill missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_text_column(cleaned_df, col)
+    
+    if fill_na:
+        cleaned_df = fill_missing_values(cleaned_df)
+    
+    return cleaned_df
