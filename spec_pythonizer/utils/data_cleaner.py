@@ -117,3 +117,106 @@ if __name__ == "__main__":
     
     is_valid = validate_dataset(cleaned_df, required_columns=['id', 'name', 'age', 'score'], min_rows=1)
     print(f"\nDataset validation: {'PASSED' if is_valid else 'FAILED'}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_na (bool): Whether to drop rows with null values
+    rename_columns (bool): Whether to standardize column names
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if rename_columns:
+        df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
+    
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing columns: {missing_cols}')
+    
+    null_count = df.isnull().sum().sum()
+    if null_count > 0:
+        validation_results['warnings'].append(f'Found {null_count} null values in DataFrame')
+    
+    return validation_results
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list): Columns to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_numeric_columns(df, columns=None):
+    """
+    Normalize numeric columns to range [0, 1].
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): Specific columns to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+    else:
+        numeric_cols = [col for col in columns if col in df.columns]
+    
+    for col in numeric_cols:
+        col_min = df_normalized[col].min()
+        col_max = df_normalized[col].max()
+        
+        if col_max > col_min:
+            df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+    
+    return df_normalized
