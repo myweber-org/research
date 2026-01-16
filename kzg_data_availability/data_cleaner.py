@@ -426,4 +426,53 @@ def get_data_summary(df):
         'missing_values': df.isnull().sum().to_dict(),
         'data_types': df.dtypes.to_dict()
     }
-    return summary
+    return summaryimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, column):
+    """
+    Normalize a DataFrame column using Min-Max scaling.
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val - min_val == 0:
+        return dataframe[column].apply(lambda x: 0.0)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataset(dataframe, numeric_columns):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    """
+    cleaned_df = dataframe.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': [10, 12, 12, 13, 12, 50, 11, 14, 13, 12],
+        'feature2': [100, 120, 130, 110, 115, 500, 105, 125, 135, 140],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature1', 'feature2']
+    result_df = clean_dataset(df, numeric_cols)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    print(result_df)
