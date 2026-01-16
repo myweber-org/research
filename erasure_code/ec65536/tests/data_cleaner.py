@@ -80,4 +80,36 @@ def clean_dataset(df, config):
             strategy = config.get('fill_strategy', 'mean')
             cleaner.fill_missing(column, strategy)
     
-    return cleaner.get_cleaned_data()
+    return cleaner.get_cleaned_data()import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing numeric values with column median.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+        df_cleaned[numeric_cols].median()
+    )
+    
+    return df_cleaned
+
+def validate_dataset(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns
+    and has no completely empty columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    empty_columns = df.columns[df.isnull().all()].tolist()
+    if empty_columns:
+        print(f"Warning: Found empty columns: {empty_columns}")
+    
+    return True
