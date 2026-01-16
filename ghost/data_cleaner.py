@@ -103,4 +103,72 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv')
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
-    print("Data cleaning completed successfully.")
+    print("Data cleaning completed successfully.")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    df_cleaned = df.copy()
+    
+    df_cleaned = df_cleaned.dropna()
+    
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
+        'age': [25, 30, 35, 40, 25],
+        'score': [85.5, 92.0, None, 78.5, 85.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid = validate_data(cleaned_df, required_columns=['name', 'age'])
+    print(f"\nData validation result: {is_valid}")
