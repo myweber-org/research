@@ -440,3 +440,152 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using Interquartile Range method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column not in df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, column)
+        
+        if normalize_method == 'minmax':
+            cleaned_df[column] = normalize_minmax(cleaned_df, column)
+        elif normalize_method == 'zscore':
+            cleaned_df[column] = normalize_zscore(cleaned_df, column)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, check_missing=True, check_duplicates=True):
+    """
+    Validate dataset for common data quality issues
+    """
+    validation_report = {}
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_report['missing_columns'] = missing_columns
+    
+    if check_missing:
+        missing_values = df.isnull().sum().sum()
+        validation_report['total_missing_values'] = missing_values
+        
+        columns_with_missing = df.columns[df.isnull().any()].tolist()
+        if columns_with_missing:
+            validation_report['columns_with_missing'] = columns_with_missing
+    
+    if check_duplicates:
+        duplicate_rows = df.duplicated().sum()
+        validation_report['duplicate_rows'] = duplicate_rows
+    
+    return validation_report
+
+def example_usage():
+    """
+    Example usage of the data cleaning utilities
+    """
+    np.random.seed(42)
+    sample_data = {
+        'id': range(100),
+        'feature_a': np.random.normal(50, 15, 100),
+        'feature_b': np.random.exponential(10, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'feature_a'] = 200
+    df.loc[20, 'feature_b'] = 300
+    
+    print("Original dataset shape:", df.shape)
+    
+    validation = validate_data(df)
+    print("Validation report:", validation)
+    
+    cleaned = clean_dataset(
+        df, 
+        numeric_columns=['feature_a', 'feature_b'],
+        outlier_method='iqr',
+        normalize_method='zscore'
+    )
+    
+    print("Cleaned dataset shape:", cleaned.shape)
+    print("Cleaned data summary:")
+    print(cleaned[['feature_a', 'feature_b']].describe())
+    
+    return cleaned
+
+if __name__ == "__main__":
+    cleaned_data = example_usage()
