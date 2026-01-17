@@ -190,3 +190,11 @@ if __name__ == "__main__":
     print(f"Original dataset shape: {sample_df.shape}")
     cleaned_df = clean_dataset(sample_df, ['A', 'B'])
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
