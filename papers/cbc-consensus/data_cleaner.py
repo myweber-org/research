@@ -156,3 +156,144 @@ if __name__ == "__main__":
     
     validated, message = validate_dataframe(cleaned, required_columns=['customer_id', 'price'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy to handle missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of columns to apply the strategy to. If None, applies to all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    if strategy == 'drop':
+        return df_copy.dropna(subset=columns)
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df_copy[col].mean()
+        elif strategy == 'median':
+            fill_value = df_copy[col].median()
+        elif strategy == 'mode':
+            fill_value = df_copy[col].mode()[0] if not df_copy[col].mode().empty else np.nan
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        df_copy[col] = df_copy[col].fillna(fill_value)
+    
+    return df_copy
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to check for outliers. If None, uses all numeric columns.
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    mask = pd.Series([True] * len(df_copy))
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            continue
+            
+        Q1 = df_copy[col].quantile(0.25)
+        Q3 = df_copy[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        col_mask = (df_copy[col] >= lower_bound) & (df_copy[col] <= upper_bound)
+        mask = mask & col_mask
+    
+    return df_copy[mask]
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize data in specified columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to normalize. If None, uses all numeric columns.
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_copy.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df_copy[col].min()
+            max_val = df_copy[col].max()
+            if max_val != min_val:
+                df_copy[col] = (df_copy[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = df_copy[col].mean()
+            std_val = df_copy[col].std()
+            if std_val != 0:
+                df_copy[col] = (df_copy[col] - mean_val) / std_val
+        
+        else:
+            raise ValueError(f"Unknown normalization method: {method}")
+    
+    return df_copy
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=1.5, normalize=False):
+    """
+    Complete data cleaning pipeline.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for handling missing values
+    outlier_threshold (float): IQR threshold for outlier removal
+    normalize (bool): Whether to normalize the data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    if len(numeric_cols) > 0:
+        cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+        cleaned_df = remove_outliers_iqr(cleaned_df, threshold=outlier_threshold)
+        
+        if normalize:
+            cleaned_df = normalize_data(cleaned_df, method='minmax')
+    
+    return cleaned_df
