@@ -1,0 +1,106 @@
+
+import os
+import base64
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+
+class FileEncryptor:
+    def __init__(self, password: str, salt: bytes = None):
+        self.password = password.encode()
+        self.salt = salt or os.urandom(16)
+        self.key = self._derive_key()
+    
+    def _derive_key(self) -> bytes:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=self.salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        return kdf.derive(self.password)
+    
+    def encrypt_file(self, input_path: str, output_path: str) -> None:
+        iv = os.urandom(16)
+        cipher = Cipher(
+            algorithms.AES(self.key),
+            modes.CBC(iv),
+            backend=default_backend()
+        )
+        encryptor = cipher.encryptor()
+        padder = padding.PKCS7(128).padder()
+        
+        with open(input_path, 'rb') as f_in, open(output_path, 'wb') as f_out:
+            f_out.write(self.salt + iv)
+            
+            while True:
+                chunk = f_in.read(4096)
+                if not chunk:
+                    break
+                padded_data = padder.update(chunk)
+                encrypted_chunk = encryptor.update(padded_data)
+                f_out.write(encrypted_chunk)
+            
+            final_padded = padder.finalize()
+            final_encrypted = encryptor.update(final_padded) + encryptor.finalize()
+            f_out.write(final_encrypted)
+    
+    def decrypt_file(self, input_path: str, output_path: str) -> None:
+        with open(input_path, 'rb') as f_in:
+            self.salt = f_in.read(16)
+            iv = f_in.read(16)
+            self.key = self._derive_key()
+            
+            cipher = Cipher(
+                algorithms.AES(self.key),
+                modes.CBC(iv),
+                backend=default_backend()
+            )
+            decryptor = cipher.decryptor()
+            unpadder = padding.PKCS7(128).unpadder()
+            
+            with open(output_path, 'wb') as f_out:
+                while True:
+                    chunk = f_in.read(4096)
+                    if not chunk:
+                        break
+                    decrypted_chunk = decryptor.update(chunk)
+                    unpadded_data = unpadder.update(decrypted_chunk)
+                    f_out.write(unpadded_data)
+                
+                final_decrypted = decryptor.finalize()
+                final_unpadded = unpadder.update(final_decrypted) + unpadder.finalize()
+                f_out.write(final_unpadded)
+
+def generate_random_key() -> str:
+    return base64.urlsafe_b64encode(os.urandom(32)).decode()
+
+if __name__ == "__main__":
+    test_data = b"Test encryption and decryption functionality."
+    test_file = "test_original.txt"
+    encrypted_file = "test_encrypted.bin"
+    decrypted_file = "test_decrypted.txt"
+    
+    with open(test_file, 'wb') as f:
+        f.write(test_data)
+    
+    password = generate_random_key()
+    encryptor = FileEncryptor(password)
+    
+    encryptor.encrypt_file(test_file, encrypted_file)
+    encryptor.decrypt_file(encrypted_file, decrypted_file)
+    
+    with open(decrypted_file, 'rb') as f:
+        result = f.read()
+    
+    os.remove(test_file)
+    os.remove(encrypted_file)
+    os.remove(decrypted_file)
+    
+    if result == test_data:
+        print("Encryption/decryption test passed")
+    else:
+        print("Encryption/decryption test failed")
