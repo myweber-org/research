@@ -3,6 +3,10 @@ import os
 import shutil
 
 def organize_files(directory):
+    """
+    Organize files in the given directory by moving them into subdirectories
+    based on their file extensions.
+    """
     if not os.path.isdir(directory):
         print(f"Error: {directory} is not a valid directory.")
         return
@@ -15,18 +19,15 @@ def organize_files(directory):
             extension = extension.lower()
 
             if extension:
-                folder_name = extension[1:] + "_files"
+                target_dir = os.path.join(directory, extension[1:])
             else:
-                folder_name = "no_extension_files"
+                target_dir = os.path.join(directory, "no_extension")
 
-            target_folder = os.path.join(directory, folder_name)
-
-            if not os.path.exists(target_folder):
-                os.makedirs(target_folder)
+            os.makedirs(target_dir, exist_ok=True)
 
             try:
-                shutil.move(file_path, os.path.join(target_folder, filename))
-                print(f"Moved: {filename} -> {folder_name}/")
+                shutil.move(file_path, os.path.join(target_dir, filename))
+                print(f"Moved: {filename} -> {target_dir}")
             except Exception as e:
                 print(f"Failed to move {filename}: {e}")
 
