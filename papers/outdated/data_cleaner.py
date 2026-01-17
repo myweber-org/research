@@ -112,3 +112,62 @@ if __name__ == "__main__":
     
     is_valid, msg = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {msg}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        df_clean = self.df.copy()
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
+        return df_clean.reset_index(drop=True)
+    
+    def normalize_minmax(self):
+        df_normalized = self.df.copy()
+        for col in self.numeric_columns:
+            col_min = df_normalized[col].min()
+            col_max = df_normalized[col].max()
+            if col_max > col_min:
+                df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+        return df_normalized
+    
+    def fill_missing_median(self):
+        df_filled = self.df.copy()
+        for col in self.numeric_columns:
+            median_val = df_filled[col].median()
+            df_filled[col] = df_filled[col].fillna(median_val)
+        return df_filled
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'original_columns': len(self.df.columns),
+            'numeric_columns': list(self.numeric_columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicate_rows': self.df.duplicated().sum()
+        }
+        return summary
+
+def process_dataset(filepath):
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    print("Dataset Summary:")
+    for key, value in cleaner.get_summary().items():
+        print(f"{key}: {value}")
+    
+    df_clean = cleaner.remove_outliers_zscore()
+    df_filled = cleaner.fill_missing_median()
+    df_normalized = cleaner.normalize_minmax()
+    
+    return {
+        'cleaned': df_clean,
+        'filled': df_filled,
+        'normalized': df_normalized
+    }
