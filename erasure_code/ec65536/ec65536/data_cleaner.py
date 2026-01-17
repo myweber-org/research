@@ -1,84 +1,75 @@
 
 import pandas as pd
-import numpy as np
-from scipy import stats
 
-def remove_outliers_iqr(df, columns):
-    df_clean = df.copy()
-    for col in columns:
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-    return df_clean
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
+    
+    return cleaned_df
 
-def normalize_data(df, columns, method='minmax'):
-    df_norm = df.copy()
-    for col in columns:
-        if method == 'minmax':
-            min_val = df_norm[col].min()
-            max_val = df_norm[col].max()
-            df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
-        elif method == 'zscore':
-            mean_val = df_norm[col].mean()
-            std_val = df_norm[col].std()
-            df_norm[col] = (df_norm[col] - mean_val) / std_val
-    return df_norm
-
-def clean_dataset(file_path, output_path, numeric_columns):
-    df = pd.read_csv(file_path)
-    df_cleaned = remove_outliers_iqr(df, numeric_columns)
-    df_normalized = normalize_data(df_cleaned, numeric_columns, method='zscore')
-    df_normalized.to_csv(output_path, index=False)
-    return df_normalized
-
-if __name__ == "__main__":
-    numeric_cols = ['age', 'income', 'score']
-    cleaned_data = clean_dataset('raw_data.csv', 'cleaned_data.csv', numeric_cols)
-    print(f"Data cleaning complete. Shape: {cleaned_data.shape}")
-import pandas as pd
-import numpy as np
-
-def clean_csv_data(input_file, output_file):
-    df = pd.read_csv(input_file)
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame for required columns and data types.
     
-    # Remove duplicate rows
-    df = df.drop_duplicates()
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
-    # Handle missing values
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
     
-    categorical_cols = df.select_dtypes(include=['object']).columns
-    df[categorical_cols] = df[categorical_cols].fillna('Unknown')
+    if df.empty:
+        print("DataFrame is empty")
+        return False
     
-    # Convert date columns if present
-    date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
-    for col in date_columns:
-        try:
-            df[col] = pd.to_datetime(df[col])
-        except:
-            pass
-    
-    # Remove outliers using IQR method for numeric columns
-    for col in numeric_cols:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        df[col] = np.where(df[col] < lower_bound, lower_bound, df[col])
-        df[col] = np.where(df[col] > upper_bound, upper_bound, df[col])
-    
-    # Save cleaned data
-    df.to_csv(output_file, index=False)
-    print(f"Data cleaning completed. Cleaned data saved to {output_file}")
-    
-    return df
+    return True
 
 if __name__ == "__main__":
-    input_path = "raw_data.csv"
-    output_path = "cleaned_data.csv"
-    cleaned_df = clean_csv_data(input_path, output_path)
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 30, 40, 50],
+        'C': ['x', 'y', 'y', 'z', None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_data(cleaned, required_columns=['A', 'B'])
+    print(f"\nData validation passed: {is_valid}")
