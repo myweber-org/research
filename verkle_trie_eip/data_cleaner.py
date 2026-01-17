@@ -232,4 +232,72 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(df, remove_duplicates=True, fill_missing='mean')
     print("\nCleaned dataset:")
-    print(cleaned)
+    print(cleaned)import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Cleans a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df_cleaned[col].isnull().any():
+            median_val = df_cleaned[col].median()
+            df_cleaned[col].fillna(median_val, inplace=True)
+
+    # Drop rows where non-numeric critical columns have missing values
+    critical_cols = ['id', 'name', 'category']
+    existing_critical = [col for col in critical_cols if col in df_cleaned.columns]
+    if existing_critical:
+        df_cleaned.dropna(subset=existing_critical, inplace=True)
+
+    # Reset index after cleaning
+    df_cleaned.reset_index(drop=True, inplace=True)
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validates the DataFrame for basic integrity checks.
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+
+    if 'id' in df.columns:
+        if df['id'].duplicated().any():
+            raise ValueError("Duplicate IDs found after cleaning")
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            raise ValueError(f"Missing values found in numeric column: {col}")
+
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve'],
+        'age': [25, 30, 30, None, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaning data...")
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df)
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
