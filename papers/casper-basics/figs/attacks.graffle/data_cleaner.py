@@ -147,4 +147,82 @@ if __name__ == "__main__":
     print(cleaned.describe())
     
     is_valid, message = validate_data(cleaned)
-    print(f"\nData validation: {is_valid} - {message}")
+    print(f"\nData validation: {is_valid} - {message}")import pandas as pd
+import numpy as np
+
+def load_and_clean_csv(filepath, drop_na=True, fill_strategy='mean'):
+    """
+    Load a CSV file and perform basic cleaning operations.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        drop_na (bool): Whether to drop rows with missing values.
+        fill_strategy (str): Strategy to fill missing values if drop_na is False.
+                             Options: 'mean', 'median', 'zero'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    if drop_na:
+        df = df.dropna()
+    else:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if fill_strategy == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif fill_strategy == 'median':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif fill_strategy == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
+    
+    return df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to standardize. If None, all numeric columns are used.
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df[col] = (df[col] - mean) / std
+    
+    return df
