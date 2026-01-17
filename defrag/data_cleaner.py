@@ -1,133 +1,103 @@
-import csv
-import re
-from typing import List, Dict, Any, Optional
 
-def clean_csv_data(input_file: str, output_file: str, columns_to_clean: Optional[List[str]] = None) -> None:
-    """
-    Clean data in a CSV file by removing extra whitespace and standardizing text.
-    """
-    cleaned_rows = []
-    
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        for row in reader:
-            cleaned_row = {}
-            for key, value in row.items():
-                if columns_to_clean is None or key in columns_to_clean:
-                    if isinstance(value, str):
-                        # Remove extra whitespace
-                        cleaned_value = re.sub(r'\s+', ' ', value.strip())
-                        # Convert to title case for consistency
-                        cleaned_value = cleaned_value.title()
-                    else:
-                        cleaned_value = value
-                else:
-                    cleaned_value = value
-                cleaned_row[key] = cleaned_value
-            cleaned_rows.append(cleaned_row)
-    
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(cleaned_rows)
+import numpy as np
+import pandas as pd
 
-def validate_email_format(email: str) -> bool:
+def remove_outliers_iqr(df, column):
     """
-    Validate if a string is in a proper email format.
-    """
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(email_pattern, email))
-
-def filter_invalid_emails(input_file: str, email_column: str) -> List[Dict[str, Any]]:
-    """
-    Filter rows from a CSV file where the email column contains invalid email addresses.
-    """
-    valid_rows = []
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        
-        for row in reader:
-            if email_column in row and validate_email_format(row[email_column]):
-                valid_rows.append(row)
-    
-    return valid_rows
-
-def remove_duplicates(data: List[Dict[str, Any]], key_column: str) -> List[Dict[str, Any]]:
-    """
-    Remove duplicate rows based on a specified key column.
-    """
-    seen = set()
-    unique_data = []
-    
-    for row in data:
-        key_value = row.get(key_column)
-        if key_value not in seen:
-            seen.add(key_value)
-            unique_data.append(row)
-    
-    return unique_dataimport pandas as pd
-
-def clean_dataset(df, drop_na=True, rename_columns=True):
-    """
-    Clean a pandas DataFrame by handling missing values and standardizing column names.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_na (bool): Whether to drop rows with null values
-        rename_columns (bool): Whether to standardize column names
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with outliers removed
     """
-    df_clean = df.copy()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if drop_na:
-        df_clean = df_clean.dropna()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    if rename_columns:
-        df_clean.columns = (
-            df_clean.columns
-            .str.lower()
-            .str.replace(' ', '_')
-            .str.replace(r'[^a-z0-9_]', '', regex=True)
-        )
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return df_clean
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.copy()
 
-def validate_dataset(df, required_columns=None):
+def calculate_summary_stats(df, column):
     """
-    Validate dataset structure and required columns.
+    Calculate summary statistics for a column after outlier removal.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
     Returns:
-        tuple: (is_valid, error_message)
+    dict: Dictionary containing summary statistics
     """
-    if df.empty:
-        return False, "DataFrame is empty"
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
     
-    return True, "Dataset is valid"
+    return stats
 
-def remove_duplicates(df, subset=None, keep='first'):
+def process_dataframe(df, columns_to_clean):
     """
-    Remove duplicate rows from DataFrame.
+    Process DataFrame by cleaning multiple columns for outliers.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        subset (list): Columns to consider for duplicates
-        keep (str): Which duplicates to keep ('first', 'last', False)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each cleaned column
     """
-    return df.drop_duplicates(subset=subset, keep=keep)
+    cleaned_df = df.copy()
+    stats_dict = {}
+    
+    for column in columns_to_clean:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_summary_stats(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            stats_dict[column] = stats
+    
+    return cleaned_df, stats_dict
+
+if __name__ == "__main__":
+    sample_data = {
+        'temperature': np.random.normal(25, 5, 1000),
+        'humidity': np.random.normal(60, 15, 1000),
+        'pressure': np.random.normal(1013, 10, 1000)
+    }
+    
+    sample_data['temperature'][:50] = np.random.uniform(100, 150, 50)
+    sample_data['humidity'][:30] = np.random.uniform(150, 200, 30)
+    
+    df = pd.DataFrame(sample_data)
+    
+    columns_to_process = ['temperature', 'humidity', 'pressure']
+    cleaned_df, statistics = process_dataframe(df, columns_to_process)
+    
+    print(f"Original data shape: {df.shape}")
+    print(f"Cleaned data shape: {cleaned_df.shape}")
+    
+    for col, stats in statistics.items():
+        print(f"\nStatistics for {col}:")
+        for key, value in stats.items():
+            print(f"  {key}: {value:.2f}")
