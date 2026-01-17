@@ -1,110 +1,73 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    For numeric columns, missing values are filled with the column median.
+    For categorical columns, missing values are filled with the most frequent value.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    # Separate numeric and categorical columns
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    categorical_cols = df_cleaned.select_dtypes(exclude=[np.number]).columns
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    # Fill missing values for numeric columns with median
+    for col in numeric_cols:
+        if df_cleaned[col].isnull().any():
+            median_value = df_cleaned[col].median()
+            df_cleaned[col] = df_cleaned[col].fillna(median_value)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    # Fill missing values for categorical columns with mode
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
     
-    return filtered_df.reset_index(drop=True)
+    return df_cleaned
 
-def calculate_statistics(df, column):
+def validate_data(df, required_columns=None):
     """
-    Calculate basic statistics for a column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistics
+    Validate the DataFrame structure and content.
+    Checks for required columns and ensures no missing values remain.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
+    # Check for any remaining missing values
+    if df.isnull().any().any():
+        null_counts = df.isnull().sum()
+        null_cols = null_counts[null_counts > 0].index.tolist()
+        raise ValueError(f"Data still contains missing values in columns: {null_cols}")
     
-    return stats
-
-def normalize_column(df, column, method='minmax'):
-    """
-    Normalize a column using specified method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to normalize
-    method (str): Normalization method ('minmax' or 'zscore')
-    
-    Returns:
-    pd.DataFrame: DataFrame with normalized column
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    df_copy = df.copy()
-    
-    if method == 'minmax':
-        min_val = df_copy[column].min()
-        max_val = df_copy[column].max()
-        if max_val != min_val:
-            df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
-        else:
-            df_copy[f'{column}_normalized'] = 0.5
-    
-    elif method == 'zscore':
-        mean_val = df_copy[column].mean()
-        std_val = df_copy[column].std()
-        if std_val > 0:
-            df_copy[f'{column}_normalized'] = (df_copy[column] - mean_val) / std_val
-        else:
-            df_copy[f'{column}_normalized'] = 0
-    
-    else:
-        raise ValueError("Method must be 'minmax' or 'zscore'")
-    
-    return df_copy
+    return True
 
 if __name__ == "__main__":
     # Example usage
-    sample_data = {'values': [1, 2, 3, 4, 5, 100, 200, 300]}
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+    }
+    
     df = pd.DataFrame(sample_data)
-    
-    print("Original data:")
+    print("Original DataFrame:")
     print(df)
-    print("\nStatistics:")
-    print(calculate_statistics(df, 'values'))
+    print("\nMissing values count:")
+    print(df.isnull().sum())
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned data (IQR method):")
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
     print(cleaned_df)
     
-    normalized_df = normalize_column(df, 'values', method='minmax')
-    print("\nNormalized data (min-max):")
-    print(normalized_df)
+    try:
+        validate_data(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
