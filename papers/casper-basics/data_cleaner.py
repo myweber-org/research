@@ -414,4 +414,89 @@ def clean_dataframe(df: pd.DataFrame,
     
     cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    strategy (str): Strategy for missing value imputation ('mean', 'median', 'mode').
+    threshold (float): Z-score threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+        if cleaned_df[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = cleaned_df[column].mean()
+            elif strategy == 'median':
+                fill_value = cleaned_df[column].median()
+            elif strategy == 'mode':
+                fill_value = cleaned_df[column].mode()[0]
+            else:
+                fill_value = 0
+            cleaned_df[column].fillna(fill_value, inplace=True)
+    
+    # Remove outliers using Z-score method
+    numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs((cleaned_df[numeric_columns] - cleaned_df[numeric_columns].mean()) / cleaned_df[numeric_columns].std())
+    outlier_mask = (z_scores < threshold).all(axis=1)
+    cleaned_df = cleaned_df[outlier_mask].reset_index(drop=True)
+    
     return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    dict: Validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'empty_rows': 0,
+        'duplicate_rows': 0
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    validation_results['empty_rows'] = df.isnull().all(axis=1).sum()
+    validation_results['duplicate_rows'] = df.duplicated().sum()
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 8],
+        'C': [9, 10, 11, 12, 13]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, strategy='median', threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    validation = validate_data(cleaned, required_columns=['A', 'B', 'C'])
+    print("\nValidation Results:")
+    print(validation)
