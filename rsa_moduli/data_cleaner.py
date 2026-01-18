@@ -180,4 +180,29 @@ def clean_dataset(df, missing_strategy='remove', outlier_strategy='cap'):
         for col in numeric_cols:
             cleaned_df = cap_outliers(cleaned_df, col)
     
-    return cleaned_df
+    return cleaned_dfimport re
+import pandas as pd
+
+def remove_special_characters(text):
+    if isinstance(text, str):
+        return re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    return text
+
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email)) if isinstance(email, str) else False
+
+def clean_dataframe(df, columns_to_clean=None):
+    df_clean = df.copy()
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(remove_special_characters)
+    
+    return df_clean
+
+def check_missing_values(df):
+    missing = df.isnull().sum()
+    return missing[missing > 0]
