@@ -1,115 +1,103 @@
-
 import pandas as pd
-import numpy as np
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
     """
     Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows.
-    fill_missing (bool): Whether to fill missing values with column means.
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to remove duplicate rows. Default is True.
+        fill_missing (str or dict): Strategy to fill missing values. 
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+            If None, missing values are not filled.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: Cleaned DataFrame.
     """
     cleaned_df = df.copy()
     
     if drop_duplicates:
-        initial_rows = len(cleaned_df)
         cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
     
-    if fill_missing:
-        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
-            if cleaned_df[column].isnull().any():
-                mean_value = cleaned_df[column].mean()
-                cleaned_df[column].fillna(mean_value, inplace=True)
-                print(f"Filled missing values in column '{column}' with mean: {mean_value:.2f}")
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
     
     return cleaned_df
 
-def validate_dataframe(df, check_missing=True, check_types=True):
+def remove_outliers_iqr(df, columns, multiplier=1.5):
     """
-    Validate DataFrame structure and content.
+    Remove outliers from specified columns using the Interquartile Range (IQR) method.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    check_missing (bool): Check for missing values.
-    check_types (bool): Check column data types.
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to process.
+        multiplier (float): IQR multiplier for outlier detection. Default is 1.5.
     
     Returns:
-    dict: Validation results.
+        pd.DataFrame: DataFrame with outliers removed.
     """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'missing_values': {},
-        'column_types': {}
-    }
+    df_clean = df.copy()
     
-    if check_missing:
-        missing_counts = df.isnull().sum()
-        validation_results['missing_values'] = missing_counts[missing_counts > 0].to_dict()
+    for col in columns:
+        if col in df_clean.columns and pd.api.types.is_numeric_dtype(df_clean[col]):
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
     
-    if check_types:
-        validation_results['column_types'] = df.dtypes.astype(str).to_dict()
-    
-    return validation_results
+    return df_clean
 
-def process_csv_file(input_path, output_path=None):
+def standardize_columns(df, columns):
     """
-    Process a CSV file through the data cleaning pipeline.
+    Standardize specified columns to have zero mean and unit variance.
     
-    Parameters:
-    input_path (str): Path to input CSV file.
-    output_path (str): Path to save cleaned CSV file.
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to standardize.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: DataFrame with standardized columns.
     """
-    try:
-        df = pd.read_csv(input_path)
-        print(f"Loaded data from {input_path}")
-        print(f"Original shape: {df.shape}")
-        
-        validation = validate_dataframe(df)
-        print(f"Validation results: {validation}")
-        
-        cleaned_df = clean_dataframe(df)
-        print(f"Cleaned shape: {cleaned_df.shape}")
-        
-        if output_path:
-            cleaned_df.to_csv(output_path, index=False)
-            print(f"Saved cleaned data to {output_path}")
-        
-        return cleaned_df
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {input_path}")
-        return None
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return None
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df_standardized.columns and pd.api.types.is_numeric_dtype(df_standardized[col]):
+            mean = df_standardized[col].mean()
+            std = df_standardized[col].std()
+            if std > 0:
+                df_standardized[col] = (df_standardized[col] - mean) / std
+    
+    return df_standardized
 
 if __name__ == "__main__":
     sample_data = {
-        'id': [1, 2, 3, 3, 4, 5],
-        'value': [10.5, 20.3, np.nan, 30.1, 40.0, np.nan],
-        'category': ['A', 'B', 'A', 'A', 'C', 'B']
+        'A': [1, 2, 2, 3, 4, 5, 100],
+        'B': [10, 20, 20, 30, None, 50, 60],
+        'C': [100, 200, 200, 300, 400, 500, 600]
     }
     
     df = pd.DataFrame(sample_data)
-    print("Sample DataFrame:")
+    print("Original DataFrame:")
     print(df)
-    print("\nCleaning data...")
     
-    cleaned = clean_dataframe(df)
+    cleaned = clean_dataset(df, fill_missing='mean')
     print("\nCleaned DataFrame:")
     print(cleaned)
     
-    validation = validate_dataframe(cleaned)
-    print("\nFinal validation:")
-    print(validation)
+    no_outliers = remove_outliers_iqr(cleaned, ['A', 'C'])
+    print("\nDataFrame without outliers:")
+    print(no_outliers)
+    
+    standardized = standardize_columns(no_outliers, ['A', 'C'])
+    print("\nStandardized DataFrame:")
+    print(standardized)
