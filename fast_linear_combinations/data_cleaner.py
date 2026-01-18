@@ -74,3 +74,28 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(input_file, output_file):
+    df = pd.read_csv(input_file)
+    
+    df.drop_duplicates(inplace=True)
+    
+    df['date_column'] = pd.to_datetime(df['date_column'], errors='coerce')
+    
+    df['numeric_column'] = pd.to_numeric(df['numeric_column'], errors='coerce')
+    df['numeric_column'].fillna(df['numeric_column'].mean(), inplace=True)
+    
+    df['text_column'] = df['text_column'].str.strip().str.lower()
+    
+    df = df.dropna(subset=['required_column'])
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    return df
+
+if __name__ == "__main__":
+    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    print(f"Dataset cleaned. Remaining rows: {len(cleaned_df)}")
