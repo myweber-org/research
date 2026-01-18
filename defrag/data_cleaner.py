@@ -1,103 +1,107 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
+from typing import List, Optional
 
-def remove_outliers_iqr(df, column):
+def remove_duplicate_rows(
+    df: pd.DataFrame,
+    subset: Optional[List[str]] = None,
+    keep: str = 'first',
+    inplace: bool = False
+) -> pd.DataFrame:
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove duplicate rows from a DataFrame with configurable parameters.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        df: Input pandas DataFrame
+        subset: Column labels to consider for identifying duplicates
+        keep: Which duplicates to keep - 'first', 'last', or False
+        inplace: Whether to modify the DataFrame in place
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        DataFrame with duplicates removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not inplace:
+        df = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if subset is None:
+        subset = df.columns.tolist()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    # Remove duplicates
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    if inplace:
+        df.drop(df.index, inplace=True)
+        df.update(cleaned_df)
+        return df
     
-    return filtered_df.copy()
+    return cleaned_df
 
-def calculate_summary_stats(df, column):
+def validate_dataframe(df: pd.DataFrame) -> bool:
     """
-    Calculate summary statistics for a column after outlier removal.
+    Basic validation of DataFrame structure and content.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    Args:
+        df: DataFrame to validate
     
     Returns:
-    dict: Dictionary containing summary statistics
+        Boolean indicating if DataFrame is valid
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(df, pd.DataFrame):
+        return False
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
     
-    return stats
+    # Check for infinite values
+    if np.any(np.isinf(df.select_dtypes(include=[np.number]))):
+        print("Warning: DataFrame contains infinite values")
+    
+    return True
 
-def process_dataframe(df, columns_to_clean):
+def clean_numeric_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
     """
-    Process DataFrame by cleaning multiple columns for outliers.
+    Clean numeric columns by converting to appropriate dtype and handling NaN.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
+    Args:
+        df: Input DataFrame
+        columns: List of column names to clean
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
+        DataFrame with cleaned numeric columns
     """
-    cleaned_df = df.copy()
-    stats_dict = {}
+    df_clean = df.copy()
     
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            
-            stats = calculate_summary_stats(cleaned_df, column)
-            stats['outliers_removed'] = removed_count
-            stats_dict[column] = stats
+    for col in columns:
+        if col in df_clean.columns:
+            # Convert to numeric, coercing errors to NaN
+            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+            # Fill NaN with column mean
+            df_clean[col].fillna(df_clean[col].mean(), inplace=True)
     
-    return cleaned_df, stats_dict
+    return df_clean
 
 if __name__ == "__main__":
+    # Example usage
     sample_data = {
-        'temperature': np.random.normal(25, 5, 1000),
-        'humidity': np.random.normal(60, 15, 1000),
-        'pressure': np.random.normal(1013, 10, 1000)
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David', 'Eve'],
+        'score': [85, 90, 90, 78, 92, 92, 88],
+        'age': [25, 30, 30, 22, 35, 35, 28]
     }
     
-    sample_data['temperature'][:50] = np.random.uniform(100, 150, 50)
-    sample_data['humidity'][:30] = np.random.uniform(150, 200, 30)
-    
     df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
     
-    columns_to_process = ['temperature', 'humidity', 'pressure']
-    cleaned_df, statistics = process_dataframe(df, columns_to_process)
+    # Remove duplicates based on 'id' and 'name'
+    cleaned_df = remove_duplicate_rows(df, subset=['id', 'name'], keep='first')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nShape after cleaning:", cleaned_df.shape)
     
-    print(f"Original data shape: {df.shape}")
-    print(f"Cleaned data shape: {cleaned_df.shape}")
-    
-    for col, stats in statistics.items():
-        print(f"\nStatistics for {col}:")
-        for key, value in stats.items():
-            print(f"  {key}: {value:.2f}")
+    # Validate the cleaned DataFrame
+    is_valid = validate_dataframe(cleaned_df)
+    print(f"\nDataFrame validation: {is_valid}")
