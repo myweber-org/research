@@ -196,4 +196,79 @@ if __name__ == "__main__":
         validate_data(cleaned_data, required_columns=['feature_a', 'feature_b'])
         print("\nData validation passed")
     except ValueError as e:
-        print(f"\nData validation failed: {e}")
+        print(f"\nData validation failed: {e}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """Fill missing values using specified strategy."""
+    if columns is None:
+        columns = df.columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if df[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+            elif strategy == 'zero':
+                df_filled[col] = df[col].fillna(0)
+        else:
+            df_filled[col] = df[col].fillna('Unknown')
+    
+    return df_filled
+
+def normalize_column(df, column, method='minmax'):
+    """Normalize specified column using given method."""
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df[column] = (df[column] - mean_val) / std_val
+    
+    return df
+
+def clean_dataframe(df, operations=None):
+    """Apply multiple cleaning operations to DataFrame."""
+    if operations is None:
+        operations = ['remove_duplicates', 'fill_missing']
+    
+    cleaned_df = df.copy()
+    
+    if 'remove_duplicates' in operations:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if 'fill_missing' in operations:
+        cleaned_df = fill_missing_values(cleaned_df)
+    
+    return cleaned_df
+
+def validate_dataframe(df, rules=None):
+    """Validate DataFrame against specified rules."""
+    if rules is None:
+        rules = {}
+    
+    validation_results = {}
+    
+    for column, rule in rules.items():
+        if column in df.columns:
+            if 'min' in rule:
+                validation_results[f'{column}_min'] = df[column].min() >= rule['min']
+            if 'max' in rule:
+                validation_results[f'{column}_max'] = df[column].max() <= rule['max']
+            if 'unique' in rule:
+                validation_results[f'{column}_unique'] = df[column].nunique() == rule['unique']
+    
+    return validation_results
