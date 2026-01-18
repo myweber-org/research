@@ -186,3 +186,11 @@ def load_and_clean_csv(filepath: str, cleaning_steps: Optional[Dict] = None) -> 
                 cleaner.remove_outliers(**outlier_config)
     
     return cleaner.get_cleaned_data()
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
