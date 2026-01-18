@@ -151,3 +151,77 @@ def validate_data(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_column_zscore(dataframe, column):
+    """
+    Normalize a column using Z-score normalization.
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    normalized_col = stats.zscore(dataframe[column])
+    result_df = dataframe.copy()
+    result_df[f"{column}_normalized"] = normalized_col
+    
+    return result_df
+
+def clean_dataset(dataframe, numeric_columns, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning: remove outliers and normalize numeric columns.
+    """
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_threshold)
+            cleaned_df = normalize_column_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns):
+    """
+    Validate that DataFrame contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in dataframe.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def get_summary_statistics(dataframe):
+    """
+    Generate summary statistics for numeric columns.
+    """
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
+    
+    summary = dataframe[numeric_cols].describe()
+    summary.loc['missing'] = dataframe[numeric_cols].isnull().sum()
+    summary.loc['zeros'] = (dataframe[numeric_cols] == 0).sum()
+    
+    return summary
