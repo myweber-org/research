@@ -105,3 +105,11 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
