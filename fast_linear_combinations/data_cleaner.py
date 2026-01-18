@@ -99,3 +99,87 @@ def clean_dataset(input_file, output_file):
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
     print(f"Dataset cleaned. Remaining rows: {len(cleaned_df)}")
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, missing_strategy='drop', fill_value=None):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        missing_strategy (str): Strategy for handling missing values.
+            Options: 'drop', 'fill', 'ignore'. Default is 'drop'.
+        fill_value: Value to fill missing entries if strategy is 'fill'.
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    original_rows = len(df)
+    
+    if missing_strategy == 'drop':
+        df_cleaned = df.dropna()
+        removed = original_rows - len(df_cleaned)
+        print(f"Removed {removed} rows with missing values.")
+    
+    elif missing_strategy == 'fill':
+        if fill_value is None:
+            fill_value = df.select_dtypes(include=[np.number]).mean().mean()
+        df_cleaned = df.fillna(fill_value)
+        print(f"Filled missing values with: {fill_value}")
+    
+    elif missing_strategy == 'ignore':
+        df_cleaned = df
+        print("Missing values preserved.")
+    
+    else:
+        raise ValueError("Invalid missing_strategy. Use 'drop', 'fill', or 'ignore'.")
+    
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame.")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        print("Warning: DataFrame is empty.")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4],
+        'B': [5, np.nan, 7, 8],
+        'C': [9, 10, 11, 12]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned = clean_csv_data('test_data.csv', missing_strategy='fill', fill_value=0)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    validation_result = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"Validation passed: {validation_result}")
