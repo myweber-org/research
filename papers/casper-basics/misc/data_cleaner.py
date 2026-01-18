@@ -75,3 +75,98 @@ class DataCleaner:
             'data_types': self.df.dtypes.to_dict()
         }
         return summary
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_na_method='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): List of column names to check for duplicates.
+            If None, uses all columns. Defaults to None.
+        fill_na_method (str, optional): Method to fill missing values.
+            Options: 'mean', 'median', 'mode', or 'drop'. Defaults to 'mean'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    if columns_to_check is None:
+        columns_to_check = cleaned_df.columns.tolist()
+    
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check, keep='first')
+    removed_duplicates = initial_rows - len(cleaned_df)
+    
+    # Handle missing values
+    if fill_na_method == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_na_method in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_na_method == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_na_method == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                mode_value = cleaned_df[col].mode()
+                if not mode_value.empty:
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
+    
+    # Print cleaning summary
+    print(f"Removed {removed_duplicates} duplicate rows")
+    print(f"Final dataset shape: {cleaned_df.shape}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'id': [1, 2, 2, 3, 4, 5],
+#         'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+#         'age': [25, 30, 30, None, 35, 40],
+#         'score': [85.5, 90.0, 90.0, 78.5, None, 95.0]
+#     }
+#     
+#     df = pd.DataFrame(data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\nCleaning dataset...")
+#     
+#     cleaned = clean_dataset(df, fill_na_method='mean')
+#     print("\nCleaned DataFrame:")
+#     print(cleaned)
