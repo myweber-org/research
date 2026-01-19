@@ -108,4 +108,24 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     removed_count = initial_count - len(filtered_df)
     
     print(f"Removed {removed_count} outliers from column '{column}' using {method} method")
-    return filtered_df
+    return filtered_dfimport re
+
+def clean_text(text):
+    """
+    Clean and normalize a given text string.
+    Removes leading/trailing whitespace, reduces multiple spaces to a single space,
+    and converts the text to lowercase.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+    
+    # Remove leading and trailing whitespace
+    text = text.strip()
+    
+    # Replace multiple spaces/newlines/tabs with a single space
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    return text
