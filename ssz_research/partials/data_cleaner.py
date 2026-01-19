@@ -1,81 +1,63 @@
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        filtered = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        removed_count = len(self.df) - len(filtered)
+        self.df = filtered
+        return removed_count
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    def zscore_normalize(self, column):
+        mean = self.df[column].mean()
+        std = self.df[column].std()
+        if std > 0:
+            self.df[f'{column}_normalized'] = (self.df[column] - mean) / std
+            return True
+        return False
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def fill_missing_median(self, column):
+        median_value = self.df[column].median()
+        missing_count = self.df[column].isna().sum()
+        self.df[column].fillna(median_value, inplace=True)
+        return missing_count
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    def get_summary(self):
+        return {
+            'original_rows': self.original_shape[0],
+            'current_rows': len(self.df),
+            'removed_rows': self.original_shape[0] - len(self.df),
+            'columns': list(self.df.columns)
+        }
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    def get_cleaned_data(self):
+        return self.df.copy()
 
-def calculate_summary_stats(df, column):
-    """
-    Calculate summary statistics for a column.
+def process_dataset(filepath):
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    for col in numeric_cols:
+        cleaner.fill_missing_median(col)
+        removed = cleaner.remove_outliers_iqr(col)
+        if removed > 0:
+            print(f"Removed {removed} outliers from {col}")
+        cleaner.zscore_normalize(col)
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
+    summary = cleaner.get_summary()
+    print(f"Data cleaning complete. Removed {summary['removed_rows']} rows total.")
     
-    return stats
-
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100)
-    }
-    
-    df = pd.DataFrame(data)
-    df.loc[10, 'value'] = 500
-    df.loc[20, 'value'] = -100
-    
-    print("Original DataFrame shape:", df.shape)
-    print("Original summary stats:", calculate_summary_stats(df, 'value'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned summary stats:", calculate_summary_stats(cleaned_df, 'value'))
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    cleaned_data = example_usage()
+    return cleaner.get_cleaned_data()
