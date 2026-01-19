@@ -153,4 +153,60 @@ if __name__ == "__main__":
     output_file = "cleaned_data.csv"
     
     cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    save_cleaned_data(cleaned_df, output_file)import pandas as pd
+import numpy as np
+
+def normalize_data(df, columns):
+    """
+    Normalize specified columns to range [0,1]
+    """
+    result = df.copy()
+    for col in columns:
+        if col in result.columns:
+            min_val = result[col].min()
+            max_val = result[col].max()
+            if max_val > min_val:
+                result[col] = (result[col] - min_val) / (max_val - min_val)
+    return result
+
+def remove_outliers(df, columns, threshold=3):
+    """
+    Remove outliers using z-score method
+    """
+    result = df.copy()
+    for col in columns:
+        if col in result.columns:
+            z_scores = np.abs((result[col] - result[col].mean()) / result[col].std())
+            result = result[z_scores < threshold]
+    return result.reset_index(drop=True)
+
+def clean_dataset(df, numeric_columns):
+    """
+    Main cleaning pipeline
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.copy()
+    
+    cleaned_df = cleaned_df.dropna(subset=numeric_columns)
+    
+    cleaned_df = remove_outliers(cleaned_df, numeric_columns)
+    
+    cleaned_df = normalize_data(cleaned_df, numeric_columns)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate dataset structure
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("Dataset is empty")
+    
+    return True
