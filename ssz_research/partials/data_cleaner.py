@@ -1,63 +1,99 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, column, multiplier=1.5):
-        Q1 = self.df[column].quantile(0.25)
-        Q3 = self.df[column].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - multiplier * IQR
-        upper_bound = Q3 + multiplier * IQR
-        filtered = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
-        removed_count = len(self.df) - len(filtered)
-        self.df = filtered
-        return removed_count
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
     
-    def zscore_normalize(self, column):
-        mean = self.df[column].mean()
-        std = self.df[column].std()
-        if std > 0:
-            self.df[f'{column}_normalized'] = (self.df[column] - mean) / std
-            return True
-        return False
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_missing: Strategy for handling missing values ('mean', 'median', 'mode', or 'drop')
     
-    def fill_missing_median(self, column):
-        median_value = self.df[column].median()
-        missing_count = self.df[column].isna().sum()
-        self.df[column].fillna(median_value, inplace=True)
-        return missing_count
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
     
-    def get_summary(self):
-        return {
-            'original_rows': self.original_shape[0],
-            'current_rows': len(self.df),
-            'removed_rows': self.original_shape[0] - len(self.df),
-            'columns': list(self.df.columns)
-        }
-    
-    def get_cleaned_data(self):
-        return self.df.copy()
-
-def process_dataset(filepath):
-    df = pd.read_csv(filepath)
-    cleaner = DataCleaner(df)
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        cleaner.fill_missing_median(col)
-        removed = cleaner.remove_outliers_iqr(col)
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
         if removed > 0:
-            print(f"Removed {removed} outliers from {col}")
-        cleaner.zscore_normalize(col)
+            print(f"Removed {removed} duplicate rows")
     
-    summary = cleaner.get_summary()
-    print(f"Data cleaning complete. Removed {summary['removed_rows']} rows total.")
+    # Handle missing values
+    missing_count = cleaned_df.isnull().sum().sum()
+    if missing_count > 0:
+        print(f"Found {missing_count} missing values")
+        
+        if fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print(f"Dropped rows with missing values")
+        elif fill_missing in ['mean', 'median']:
+            numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+            for col in numeric_cols:
+                if fill_missing == 'mean':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+                elif fill_missing == 'median':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+            print(f"Filled missing numeric values with {fill_missing}")
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                mode_value = cleaned_df[col].mode()
+                if not mode_value.empty:
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
+            print("Filled missing values with mode")
     
-    return cleaner.get_cleaned_data()
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate a DataFrame for basic data quality checks.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+        validation_results['has_all_required_columns'] = len(missing_columns) == 0
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with issues
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, None, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nValidation results:")
+    print(validate_dataset(df))
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned dataset:")
+    print(cleaned)
+    print("\nCleaned validation results:")
+    print(validate_dataset(cleaned))
