@@ -92,3 +92,17 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+def remove_duplicates_preserve_order(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_list = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned = remove_duplicates_preserve_order(sample_list)
+    print(f"Original list: {sample_list}")
+    print(f"Cleaned list: {cleaned}")
