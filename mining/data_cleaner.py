@@ -74,4 +74,130 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nData validation passed: {is_valid}")
+    print(f"\nData validation passed: {is_valid}")import pandas as pd
+import numpy as np
+from typing import Union, List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df: pd.DataFrame, 
+                         strategy: str = 'drop', 
+                         fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to fill when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            return df.fillna(df.mean(numeric_only=True))
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def normalize_column(df: pd.DataFrame, 
+                    column: str, 
+                    method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize specified column in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_copy
+
+def filter_outliers(df: pd.DataFrame, 
+                   column: str, 
+                   threshold: float = 3.0) -> pd.DataFrame:
+    """
+    Filter outliers using z-score method.
+    
+    Args:
+        df: Input DataFrame
+        column: Column name to check for outliers
+        threshold: Z-score threshold for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+    return df[z_scores < threshold]
+
+def clean_dataset(df: pd.DataFrame,
+                 remove_dups: bool = True,
+                 handle_nulls: str = 'drop',
+                 normalize_cols: Optional[List[str]] = None,
+                 outlier_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        remove_dups: Whether to remove duplicates
+        handle_nulls: Strategy for handling null values
+        normalize_cols: Columns to normalize
+        outlier_cols: Columns to filter outliers from
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=handle_nulls)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    if outlier_cols:
+        for col in outlier_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = filter_outliers(cleaned_df, col)
+    
+    return cleaned_df
