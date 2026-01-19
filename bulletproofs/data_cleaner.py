@@ -73,4 +73,34 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nData validation passed: {is_valid}")
+    print(f"\nData validation passed: {is_valid}")def remove_duplicates(data):
+    """
+    Remove duplicate entries from a list while preserving order.
+    """
+    seen = set()
+    result = []
+    for item in data:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data_with_key(data, key_func=None):
+    """
+    Remove duplicates based on a key function.
+    If key_func is None, uses the item itself.
+    """
+    seen = set()
+    result = []
+    for item in data:
+        key = key_func(item) if key_func else item
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample = [1, 2, 2, 3, 4, 4, 5]
+    cleaned = remove_duplicates(sample)
+    print(f"Original: {sample}")
+    print(f"Cleaned: {cleaned}")
