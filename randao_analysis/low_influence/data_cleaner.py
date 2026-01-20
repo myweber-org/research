@@ -184,4 +184,62 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         raise ValueError(f"Unsupported outlier detection method: {method}")
     
-    return filtered_df
+    return filtered_dfimport csv
+import re
+
+def clean_numeric_string(value):
+    """Remove non-numeric characters from a string and convert to float."""
+    if not value or not isinstance(value, str):
+        return None
+    cleaned = re.sub(r'[^\d.-]', '', value)
+    try:
+        return float(cleaned) if cleaned else None
+    except ValueError:
+        return None
+
+def standardize_phone_number(phone):
+    """Standardize phone number format to (XXX) XXX-XXXX."""
+    if not phone:
+        return None
+    digits = re.sub(r'\D', '', str(phone))
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    return phone
+
+def read_csv_with_cleaning(filepath):
+    """Read CSV file and apply basic cleaning transformations."""
+    cleaned_data = []
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                cleaned_row = {}
+                for key, value in row.items():
+                    if 'phone' in key.lower():
+                        cleaned_row[key] = standardize_phone_number(value)
+                    elif any(num_key in key.lower() for num_key in ['price', 'amount', 'quantity']):
+                        cleaned_row[key] = clean_numeric_string(value)
+                    else:
+                        cleaned_row[key] = value.strip() if isinstance(value, str) else value
+                cleaned_data.append(cleaned_row)
+        return cleaned_data
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return []
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return []
+
+def write_cleaned_csv(data, output_path):
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        return False
+    try:
+        with open(output_path, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=data[0].keys())
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing file: {e}")
+        return False
