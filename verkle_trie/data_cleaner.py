@@ -121,4 +121,78 @@ def clean_dataset(data, config):
     if 'normalize_columns' in config:
         cleaned_data = normalize_minmax(cleaned_data, config['normalize_columns'])
     
-    return cleaned_data
+    return cleaned_dataimport pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_missing: If True, fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        if removed > 0:
+            print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        missing_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        missing_after = cleaned_df.isnull().sum().sum()
+        if missing_before > 0:
+            print(f"Filled {missing_before} missing values")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def get_dataframe_stats(df):
+    """
+    Get basic statistics about a DataFrame.
+    
+    Args:
+        df: pandas DataFrame to analyze
+    
+    Returns:
+        Dictionary with statistics
+    """
+    stats = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicates': df.duplicated().sum(),
+        'memory_usage': df.memory_usage(deep=True).sum() / 1024 / 1024  # MB
+    }
+    
+    return stats
