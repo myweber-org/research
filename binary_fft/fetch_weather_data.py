@@ -1,27 +1,24 @@
+
 import requests
-import os
+import json
 
-def get_current_weather(city_name, api_key=None):
-    """
-    Fetch current weather data for a given city.
-    """
-    if api_key is None:
-        api_key = os.getenv("OPENWEATHER_API_KEY")
-        if api_key is None:
-            raise ValueError("API key must be provided or set as OPENWEATHER_API_KEY environment variable")
-
+def get_weather(api_key, city):
     base_url = "http://api.openweathermap.org/data/2.5/weather"
     params = {
-        'q': city_name,
+        'q': city,
         'appid': api_key,
         'units': 'metric'
     }
-
+    
     try:
         response = requests.get(base_url, params=params)
         response.raise_for_status()
         data = response.json()
-
+        
+        if data['cod'] != 200:
+            print(f"Error: {data.get('message', 'Unknown error')}")
+            return None
+            
         weather_info = {
             'city': data['name'],
             'country': data['sys']['country'],
@@ -29,24 +26,41 @@ def get_current_weather(city_name, api_key=None):
             'feels_like': data['main']['feels_like'],
             'humidity': data['main']['humidity'],
             'pressure': data['main']['pressure'],
-            'weather_description': data['weather'][0]['description'],
+            'weather': data['weather'][0]['description'],
             'wind_speed': data['wind']['speed']
         }
+        
         return weather_info
-
+        
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching weather data: {e}")
+        print(f"Network error occurred: {e}")
+        return None
+    except json.JSONDecodeError:
+        print("Error decoding JSON response")
+        return None
+    except KeyError as e:
+        print(f"Unexpected data structure: missing key {e}")
         return None
 
+def display_weather(weather_data):
+    if not weather_data:
+        print("No weather data to display.")
+        return
+    
+    print("\n" + "="*40)
+    print(f"Weather in {weather_data['city']}, {weather_data['country']}")
+    print("="*40)
+    print(f"Temperature: {weather_data['temperature']}°C")
+    print(f"Feels like: {weather_data['feels_like']}°C")
+    print(f"Weather: {weather_data['weather'].title()}")
+    print(f"Humidity: {weather_data['humidity']}%")
+    print(f"Pressure: {weather_data['pressure']} hPa")
+    print(f"Wind Speed: {weather_data['wind_speed']} m/s")
+    print("="*40)
+
 if __name__ == "__main__":
-    # Example usage
-    api_key = "your_api_key_here"  # Replace with actual API key or use env variable
-    city = "London"
-    weather = get_current_weather(city, api_key)
-    if weather:
-        print(f"Weather in {weather['city']}, {weather['country']}:")
-        print(f"Temperature: {weather['temperature']}°C")
-        print(f"Feels like: {weather['feels_like']}°C")
-        print(f"Humidity: {weather['humidity']}%")
-        print(f"Weather: {weather['weather_description']}")
-        print(f"Wind Speed: {weather['wind_speed']} m/s")
+    API_KEY = "your_api_key_here"
+    CITY = "London"
+    
+    weather = get_weather(API_KEY, CITY)
+    display_weather(weather)
