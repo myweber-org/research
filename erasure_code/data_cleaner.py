@@ -55,3 +55,65 @@ if __name__ == "__main__":
     )
     print(f"Cleaned dataset shape: {cleaned_data.shape}")
     print(cleaned_data.head())
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        mode_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+        df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_data(df):
+    """
+    Validate that the cleaned dataset meets basic quality criteria.
+    """
+    validation_results = {
+        'has_duplicates': df.duplicated().any(),
+        'has_missing_values': df.isnull().any().any(),
+        'total_rows': len(df),
+        'total_columns': len(df.columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nDataset info:")
+    print(df.info())
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    validation = validate_data(cleaned_df)
+    print("\nValidation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
