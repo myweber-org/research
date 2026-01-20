@@ -86,3 +86,87 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nValidation: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using min-max scaling
+    """
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def standardize_zscore(df, columns):
+    """
+    Standardize specified columns using z-score normalization
+    """
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
+    return df_standardized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            df_clean[col] = df[col].fillna(fill_value)
+    
+    return df_clean
+
+def create_data_summary(df):
+    """
+    Create comprehensive data summary
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist()
+    }
+    
+    return summary
