@@ -133,4 +133,38 @@ def get_summary_statistics(data, numeric_columns):
                 'missing': int(col_data.isnull().sum())
             }
     
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path, numeric_columns):
+    df = pd.read_csv(file_path)
+    original_shape = df.shape
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+    
+    print(f"Original shape: {original_shape}")
+    print(f"Cleaned shape: {df.shape}")
+    print(f"Removed {original_shape[0] - df.shape[0]} rows")
+    
+    return df
+
+if __name__ == "__main__":
+    cleaned_df = clean_dataset('sample_data.csv', ['age', 'salary', 'score'])
+    cleaned_df.to_csv('cleaned_data.csv', index=False)
