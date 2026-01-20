@@ -1,107 +1,35 @@
-
 import pandas as pd
 import numpy as np
+from scipy import stats
 
-def clean_dataset(df, missing_strategy='mean', outlier_threshold=3):
-    """
-    Clean dataset by handling missing values and removing outliers.
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    print(f"Initial shape: {df.shape}")
     
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'drop')
-    outlier_threshold (float): Z-score threshold for outlier detection
+    df = df.dropna()
+    print(f"After dropping NA: {df.shape}")
     
-    Returns:
-    pd.DataFrame: Cleaned dataframe
-    """
-    cleaned_df = df.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    df = df[(z_scores < 3).all(axis=1)]
+    print(f"After outlier removal: {df.shape}")
     
-    # Handle missing values
-    if missing_strategy == 'mean':
-        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
-    elif missing_strategy == 'median':
-        cleaned_df = cleaned_df.fillna(cleaned_df.median())
-    elif missing_strategy == 'drop':
-        cleaned_df = cleaned_df.dropna()
+    df[numeric_cols] = (df[numeric_cols] - df[numeric_cols].min()) / (df[numeric_cols].max() - df[numeric_cols].min())
     
-    # Remove outliers using Z-score method
-    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-    z_scores = np.abs((cleaned_df[numeric_cols] - cleaned_df[numeric_cols].mean()) / cleaned_df[numeric_cols].std())
-    outlier_mask = (z_scores < outlier_threshold).all(axis=1)
-    cleaned_df = cleaned_df[outlier_mask]
-    
-    return cleaned_df.reset_index(drop=True)
+    return df
 
-def normalize_data(df, method='minmax'):
-    """
-    Normalize numeric columns in dataframe.
-    
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    method (str): Normalization method ('minmax', 'standard')
-    
-    Returns:
-    pd.DataFrame: Normalized dataframe
-    """
-    normalized_df = df.copy()
-    numeric_cols = normalized_df.select_dtypes(include=[np.number]).columns
-    
-    if method == 'minmax':
-        for col in numeric_cols:
-            col_min = normalized_df[col].min()
-            col_max = normalized_df[col].max()
-            if col_max != col_min:
-                normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
-    
-    elif method == 'standard':
-        for col in numeric_cols:
-            col_mean = normalized_df[col].mean()
-            col_std = normalized_df[col].std()
-            if col_std != 0:
-                normalized_df[col] = (normalized_df[col] - col_mean) / col_std
-    
-    return normalized_df
-
-def validate_dataframe(df):
-    """
-    Validate dataframe structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): Dataframe to validate
-    
-    Returns:
-    dict: Validation results
-    """
-    validation_results = {
-        'has_data': not df.empty,
-        'row_count': len(df),
-        'column_count': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
-        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
-    }
-    
-    return validation_results
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': [1, 2, np.nan, 4, 100],
-        'B': [5, 6, 7, np.nan, 9],
-        'C': ['x', 'y', 'z', 'x', 'y']
-    }
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nValidation Results:")
-    print(validate_dataframe(df))
-    
-    cleaned = clean_dataset(df, missing_strategy='mean', outlier_threshold=2)
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    normalized = normalize_data(cleaned, method='minmax')
-    print("\nNormalized DataFrame:")
-    print(normalized)
+    try:
+        cleaned_df = load_and_clean_data(input_file)
+        save_cleaned_data(cleaned_df, output_file)
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
