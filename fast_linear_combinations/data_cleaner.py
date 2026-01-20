@@ -194,4 +194,48 @@ if __name__ == "__main__":
 def clean_data(data):
     if not isinstance(data, list):
         raise TypeError("Input must be a list")
-    return remove_duplicates(data)
+    return remove_duplicates(data)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fillna_strategy='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fillna_strategy:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fillna_strategy == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fillna_strategy == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fillna_strategy == 'zero':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+        print(f"Filled missing values in numeric columns using {fillna_strategy}.")
+    
+    object_cols = cleaned_df.select_dtypes(include=['object']).columns
+    cleaned_df[object_cols] = cleaned_df[object_cols].fillna('Unknown')
+    print("Filled missing values in object columns with 'Unknown'.")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame for required columns and basic integrity.
+    """
+    if required_columns:
+        missing = set(required_columns) - set(df.columns)
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty.")
+    
+    print("Data validation passed.")
+    return True
