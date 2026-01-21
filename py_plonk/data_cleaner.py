@@ -213,3 +213,16 @@ def example_usage():
 
 if __name__ == "__main__":
     result_df = example_usage()
+import pandas as pd
+
+def clean_missing_with_mean(df):
+    """
+    Fill missing values in numeric columns with the column's mean.
+    Non-numeric columns are left unchanged.
+    """
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    df_cleaned = df.copy()
+    for col in numeric_cols:
+        col_mean = df[col].mean()
+        df_cleaned[col].fillna(col_mean, inplace=True)
+    return df_cleaned
