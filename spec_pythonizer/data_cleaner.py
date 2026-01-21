@@ -178,4 +178,68 @@ def normalize_column(df, column, method='minmax'):
     else:
         raise ValueError("Method must be 'minmax' or 'zscore'")
     
-    return df_copy
+    return df_copyimport csv
+import os
+
+def read_csv(file_path):
+    """
+    Read a CSV file and return its data as a list of dictionaries.
+    """
+    data = []
+    if not os.path.exists(file_path):
+        print(f"Error: File '{file_path}' not found.")
+        return data
+    try:
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+    return data
+
+def clean_empty_rows(data):
+    """
+    Remove rows where all values are empty strings.
+    """
+    cleaned_data = []
+    for row in data:
+        if any(value.strip() for value in row.values()):
+            cleaned_data.append(row)
+    return cleaned_data
+
+def write_csv(data, file_path):
+    """
+    Write data to a CSV file.
+    """
+    if not data:
+        print("No data to write.")
+        return False
+    try:
+        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV file: {e}")
+        return False
+
+def main():
+    input_file = "input.csv"
+    output_file = "cleaned_output.csv"
+    
+    data = read_csv(input_file)
+    if data:
+        print(f"Read {len(data)} rows from '{input_file}'.")
+        cleaned_data = clean_empty_rows(data)
+        print(f"After cleaning, {len(cleaned_data)} rows remain.")
+        
+        if write_csv(cleaned_data, output_file):
+            print(f"Cleaned data written to '{output_file}'.")
+    else:
+        print("No data processed.")
+
+if __name__ == "__main__":
+    main()
