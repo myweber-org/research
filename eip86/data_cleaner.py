@@ -4,11 +4,11 @@ import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    column (str): Column name to process
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
@@ -25,9 +25,9 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df.reset_index(drop=True)
+    return filtered_df
 
-def calculate_summary_statistics(df, column):
+def calculate_summary_stats(df, column):
     """
     Calculate summary statistics for a column after outlier removal.
     
@@ -47,41 +47,52 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': len(df[column])
+        'count': df[column].count()
     }
     
     return stats
 
-def clean_dataset(df, columns_to_clean):
+def process_dataset(file_path, column_to_clean):
     """
-    Clean multiple columns in a DataFrame by removing outliers.
+    Load a dataset from file and clean specified column.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
+    file_path (str): Path to CSV file
+    column_to_clean (str): Column name to clean
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+    tuple: (cleaned DataFrame, original stats, cleaned stats)
     """
-    cleaned_df = df.copy()
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
     
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+    original_stats = calculate_summary_stats(df, column_to_clean)
+    cleaned_df = remove_outliers_iqr(df, column_to_clean)
+    cleaned_stats = calculate_summary_stats(cleaned_df, column_to_clean)
     
-    return cleaned_df
+    return cleaned_df, original_stats, cleaned_stats
 
 if __name__ == "__main__":
     # Example usage
-    data = {
-        'values': np.random.normal(100, 15, 1000).tolist() + [500, -100, 1000]
+    sample_data = {
+        'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 15, 12, 11, 10, 9, 8, 12, 13, 14, 15, 200]
     }
-    df = pd.DataFrame(data)
     
-    print("Original dataset shape:", df.shape)
-    print("Original statistics:", calculate_summary_statistics(df, 'values'))
+    df = pd.DataFrame(sample_data)
+    print("Original data shape:", df.shape)
     
     cleaned_df = remove_outliers_iqr(df, 'values')
+    print("Cleaned data shape:", cleaned_df.shape)
     
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'values'))
+    original_stats = calculate_summary_stats(df, 'values')
+    cleaned_stats = calculate_summary_stats(cleaned_df, 'values')
+    
+    print("\nOriginal statistics:")
+    for key, value in original_stats.items():
+        print(f"{key}: {value:.2f}")
+    
+    print("\nCleaned statistics:")
+    for key, value in cleaned_stats.items():
+        print(f"{key}: {value:.2f}")
