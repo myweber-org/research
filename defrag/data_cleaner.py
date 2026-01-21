@@ -105,4 +105,49 @@ if __name__ == "__main__":
                  .get_cleaned_data())
     
     cleaner.summary()
-    print(f"\nCleaned data preview:\n{cleaned_df.head()}")
+    print(f"\nCleaned data preview:\n{cleaned_df.head()}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Clean a CSV file by handling missing values and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df_cleaned = df.drop_duplicates()
+        
+        # Handle missing values
+        if missing_strategy == 'mean':
+            numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+                df_cleaned[numeric_cols].mean()
+            )
+        elif missing_strategy == 'median':
+            numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+                df_cleaned[numeric_cols].median()
+            )
+        elif missing_strategy == 'drop':
+            df_cleaned = df_cleaned.dropna()
+        else:
+            raise ValueError("Invalid missing_strategy. Use 'mean', 'median', or 'drop'.")
+        
+        # Save cleaned data
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Saved to {output_file}")
+        print(f"Original rows: {len(df)}, Cleaned rows: {len(df_cleaned)}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty.")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_data = clean_csv_data('raw_data.csv', 'cleaned_data.csv', 'mean')
