@@ -1,99 +1,101 @@
-
-import pandas as pd
+import csv
 import re
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
-    """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+def remove_duplicates(input_file, output_file):
+    """Remove duplicate rows from a CSV file."""
+    seen = set()
+    unique_rows = []
     
-    Args:
-        df: Input pandas DataFrame
-        column_mapping: Dictionary to rename columns
-        drop_duplicates: Whether to remove duplicate rows
-        normalize_text: Whether to normalize text columns
+    with open(input_file, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        for row in reader:
+            row_tuple = tuple(row)
+            if row_tuple not in seen:
+                seen.add(row_tuple)
+                unique_rows.append(row)
     
-    Returns:
-        Cleaned pandas DataFrame
-    """
-    cleaned_df = df.copy()
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(unique_rows)
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
-    
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
-    
-    if normalize_text:
-        text_columns = cleaned_df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
-    
-    return cleaned_df
+    return len(unique_rows)
 
-def _normalize_string(text):
-    """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
-    """
-    if pd.isna(text):
-        return text
+def clean_numeric_columns(input_file, output_file, columns):
+    """Clean numeric columns by removing non-numeric characters."""
+    cleaned_data = []
     
-    normalized = str(text).lower().strip()
-    normalized = re.sub(r'\s+', ' ', normalized)
-    normalized = re.sub(r'[^\w\s]', '', normalized)
+    with open(input_file, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        cleaned_data.append(fieldnames)
+        
+        for row in reader:
+            cleaned_row = []
+            for field in fieldnames:
+                value = row[field]
+                if field in columns:
+                    # Remove all non-numeric characters except decimal point
+                    value = re.sub(r'[^\d.]', '', value)
+                    # Handle empty results
+                    if value == '':
+                        value = '0'
+                cleaned_row.append(value)
+            cleaned_data.append(cleaned_row)
     
-    return normalized
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerows(cleaned_data)
+    
+    return len(cleaned_data) - 1
 
-def validate_dataframe(df, required_columns=None, min_rows=1):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df: DataFrame to validate
-        required_columns: List of columns that must be present
-        min_rows: Minimum number of rows required
-    
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if len(df) < min_rows:
-        return False, f"DataFrame has fewer than {min_rows} rows"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+def validate_email_format(email):
+    """Validate email format using regex."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
 
-def sample_data():
-    """
-    Create a sample DataFrame for testing.
-    """
-    data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
-        'email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', 'alice@example.com'],
-        'age': [25, 30, 25, 35, 28],
-        'city': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston']
-    }
+def filter_valid_emails(input_file, output_file, email_column):
+    """Filter rows with valid email addresses."""
+    valid_rows = []
     
-    return pd.DataFrame(data)
+    with open(input_file, 'r', newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        valid_rows.append(fieldnames)
+        
+        for row in reader:
+            if validate_email_format(row[email_column]):
+                valid_rows.append([row[field] for field in fieldnames])
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerows(valid_rows)
+    
+    return len(valid_rows) - 1
 
-if __name__ == "__main__":
-    df = sample_data()
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50 + "\n")
+def merge_csv_files(file_list, output_file):
+    """Merge multiple CSV files into one."""
+    all_data = []
+    headers_set = set()
     
-    cleaned_df = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
+    for file_path in file_list:
+        with open(file_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            headers_set.add(tuple(headers))
+            
+            if not all_data:
+                all_data.append(headers)
+            
+            for row in reader:
+                all_data.append(row)
     
-    is_valid, message = validate_dataframe(cleaned_df, required_columns=['name', 'email'])
-    print(f"\nValidation: {message}")
+    if len(headers_set) > 1:
+        raise ValueError("CSV files have different headers")
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerows(all_data)
+    
+    return len(all_data) - 1
