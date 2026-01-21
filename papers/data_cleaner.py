@@ -1,85 +1,50 @@
 
-import pandas as pd
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
 
-def remove_duplicates(df, subset=None, keep='first'):
+def clean_numeric_strings(string_list):
     """
-    Remove duplicate rows from a DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        subset (list, optional): Columns to consider for duplicates
-        keep (str): Which duplicates to keep - 'first', 'last', or False
-    
-    Returns:
-        pd.DataFrame: DataFrame with duplicates removed
+    Clean a list of strings by converting numeric strings to integers.
+    Non-numeric strings are kept as-is.
     """
-    if df.empty:
-        return df
-    
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    
-    removed_count = len(df) - len(cleaned_df)
-    if removed_count > 0:
-        print(f"Removed {removed_count} duplicate rows")
-    
-    return cleaned_df
+    cleaned = []
+    for item in string_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    return cleaned
 
-def validate_dataframe(df, required_columns=None):
+def filter_by_type(data_list, data_type):
     """
-    Basic validation of DataFrame structure.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        bool: True if validation passes
+    Filter a list to include only elements of a specific type.
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-    
-    if df.empty:
-        print("Warning: DataFrame is empty")
-        return True
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
-    
-    return True
+    return [item for item in data_list if isinstance(item, data_type)]
 
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by removing non-numeric values.
+def main():
+    # Example usage
+    sample_data = [1, 2, 2, 3, "4", "4", "five", 5.0, 5.0]
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): List of column names to clean
+    print("Original data:", sample_data)
     
-    Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns
-    """
-    df_clean = df.copy()
+    unique_data = remove_duplicates(sample_data)
+    print("After removing duplicates:", unique_data)
     
-    for col in columns:
-        if col in df_clean.columns:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+    cleaned_data = clean_numeric_strings(unique_data)
+    print("After cleaning numeric strings:", cleaned_data)
     
-    return df_clean
+    integers_only = filter_by_type(cleaned_data, int)
+    print("Integers only:", integers_only)
 
 if __name__ == "__main__":
-    sample_data = {
-        'id': [1, 2, 2, 3, 4, 4],
-        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David'],
-        'score': [85, 90, 90, 78, 92, 92]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print()
-    
-    cleaned_df = remove_duplicates(df, subset=['id', 'name'])
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
+    main()
