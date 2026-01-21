@@ -98,3 +98,80 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Args:
+        data (list or np.array): Input data array
+        column (int): Column index to process (for 2D arrays)
+        
+    Returns:
+        np.array: Data with outliers removed
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    if data.ndim == 2:
+        column_data = data[:, column]
+    else:
+        column_data = data
+    
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    if data.ndim == 2:
+        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+        return data[mask]
+    else:
+        return column_data[(column_data >= lower_bound) & (column_data <= upper_bound)]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Args:
+        data (np.array): Input data array
+        
+    Returns:
+        dict: Dictionary containing mean, median, std, min, max
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    stats = {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data)
+    }
+    
+    return stats
+
+def normalize_data(data):
+    """
+    Normalize data to range [0, 1] using min-max scaling.
+    
+    Args:
+        data (np.array): Input data array
+        
+    Returns:
+        np.array: Normalized data
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    data_min = np.min(data)
+    data_max = np.max(data)
+    
+    if data_max == data_min:
+        return np.zeros_like(data)
+    
+    return (data - data_min) / (data_max - data_min)
