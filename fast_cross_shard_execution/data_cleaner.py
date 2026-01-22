@@ -1,18 +1,21 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    column (str): Column name to process
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
@@ -35,8 +38,8 @@ def calculate_summary_statistics(df, column):
     Returns:
     dict: Dictionary containing summary statistics
     """
-    if df.empty:
-        return {}
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
     stats = {
         'mean': df[column].mean(),
@@ -44,59 +47,52 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': len(df)
+        'count': df[column].count()
     }
     
     return stats
 
-def clean_dataset(df, columns_to_clean):
+def clean_dataset(df, numeric_columns=None):
     """
-    Clean multiple columns in a dataset by removing outliers.
+    Clean dataset by removing outliers from all numeric columns.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
+    numeric_columns (list): List of numeric column names to clean
     
     Returns:
     pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
     """
-    cleaned_df = df.copy()
-    statistics = {}
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in df.columns:
             original_count = len(cleaned_df)
             cleaned_df = remove_outliers_iqr(cleaned_df, column)
             removed_count = original_count - len(cleaned_df)
-            
-            stats = calculate_summary_statistics(cleaned_df, column)
-            stats['outliers_removed'] = removed_count
-            statistics[column] = stats
+            print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return cleaned_df, statistics
+    return cleaned_df
 
 if __name__ == "__main__":
     sample_data = {
-        'temperature': [22, 23, 24, 25, 26, 27, 28, 29, 100, -10],
-        'humidity': [45, 46, 47, 48, 49, 50, 51, 52, 90, 10],
-        'pressure': [1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1100, 900]
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original dataset:")
-    print(df)
-    print("\nDataset shape:", df.shape)
+    sample_df = pd.DataFrame(sample_data)
+    sample_df.loc[:50, 'A'] = 500
     
-    columns_to_clean = ['temperature', 'humidity', 'pressure']
-    cleaned_df, stats = clean_dataset(df, columns_to_clean)
+    print("Original dataset shape:", sample_df.shape)
+    print("\nOriginal statistics for column 'A':")
+    print(calculate_summary_statistics(sample_df, 'A'))
     
-    print("\nCleaned dataset:")
-    print(cleaned_df)
+    cleaned_df = clean_dataset(sample_df, ['A', 'B'])
+    
     print("\nCleaned dataset shape:", cleaned_df.shape)
-    
-    print("\nSummary statistics:")
-    for column, column_stats in stats.items():
-        print(f"\n{column}:")
-        for stat_name, stat_value in column_stats.items():
-            print(f"  {stat_name}: {stat_value}")
+    print("\nCleaned statistics for column 'A':")
+    print(calculate_summary_statistics(cleaned_df, 'A'))
