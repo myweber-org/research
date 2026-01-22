@@ -1,92 +1,52 @@
-import pandas as pd
-import numpy as np
+import re
+import json
+from datetime import datetime
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+def clean_string(text):
+    if not isinstance(text, str):
+        return ""
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    return text
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
-    
-    Returns:
-        dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
+def validate_email(email):
+    if not isinstance(email, str):
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
 
-def process_dataset(file_path, column_name):
-    """
-    Complete pipeline to load data, remove outliers, and return cleaned data with statistics.
-    
-    Args:
-        file_path (str): Path to CSV file
-        column_name (str): Column to process
-    
-    Returns:
-        tuple: (cleaned DataFrame, statistics dictionary)
-    """
+def parse_date(date_str, fmt='%Y-%m-%d'):
     try:
-        df = pd.read_csv(file_path)
-        cleaned_df = remove_outliers_iqr(df, column_name)
-        stats = calculate_summary_statistics(cleaned_df, column_name)
-        
-        return cleaned_df, stats
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found")
-        return None, None
-    except Exception as e:
-        print(f"Error processing dataset: {str(e)}")
-        return None, None
+        return datetime.strptime(date_str, fmt).date()
+    except (ValueError, TypeError):
+        return None
 
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)
-        ])
-    })
+def clean_json_data(raw_data):
+    if not raw_data:
+        return {}
+    if isinstance(raw_data, str):
+        try:
+            data = json.loads(raw_data)
+        except json.JSONDecodeError:
+            return {}
+    elif isinstance(raw_data, dict):
+        data = raw_data
+    else:
+        return {}
     
-    cleaned_data = remove_outliers_iqr(sample_data, 'values')
-    statistics = calculate_summary_statistics(cleaned_data, 'values')
-    
-    print(f"Original data points: {len(sample_data)}")
-    print(f"Cleaned data points: {len(cleaned_data)}")
-    print(f"Removed outliers: {len(sample_data) - len(cleaned_data)}")
-    print(f"Summary statistics: {statistics}")
+    cleaned = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            cleaned[key] = clean_string(value)
+        elif isinstance(value, (int, float, bool)):
+            cleaned[key] = value
+        elif value is None:
+            cleaned[key] = None
+        else:
+            cleaned[key] = str(value)
+    return cleaned
+
+def filter_dict_by_keys(original_dict, allowed_keys):
+    if not isinstance(original_dict, dict) or not isinstance(allowed_keys, list):
+        return {}
+    return {k: v for k, v in original_dict.items() if k in allowed_keys}
