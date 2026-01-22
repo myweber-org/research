@@ -65,3 +65,74 @@ def remove_duplicates_preserve_order(iterable):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Columns to check for duplicates. 
+            If None, checks all columns.
+        fill_missing (bool): Whether to fill missing values.
+        fill_value: Value to use for filling missing data.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    if columns_to_check is None:
+        columns_to_check = cleaned_df.columns.tolist()
+    
+    cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check, keep='first')
+    
+    # Handle missing values
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that DataFrame contains required columns and has no infinite values.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    if not numeric_cols.empty:
+        inf_check = df[numeric_cols].applymap(lambda x: pd.isna(x) or not pd.api.types.is_number(x) or not pd.api.types.is_scalar(x) or not np.isfinite(x) if hasattr(x, '__float__') else False)
+        if inf_check.any().any():
+            return False, "DataFrame contains infinite or non-numeric values"
+    
+    return True, "Data validation passed"
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = pd.DataFrame({
+#         'A': [1, 2, 2, None, 5],
+#         'B': [10, 20, 20, 40, None],
+#         'C': ['x', 'y', 'y', 'z', 'z']
+#     })
+#     
+#     cleaned = clean_dataset(sample_data, fill_value=0)
+#     print("Original shape:", sample_data.shape)
+#     print("Cleaned shape:", cleaned.shape)
+#     print("\nCleaned data:")
+#     print(cleaned)
