@@ -1,52 +1,69 @@
-import re
-import json
-from datetime import datetime
+import pandas as pd
 
-def clean_string(text):
-    if not isinstance(text, str):
-        return ""
-    text = text.strip()
-    text = re.sub(r'\s+', ' ', text)
-    return text
-
-def validate_email(email):
-    if not isinstance(email, str):
-        return False
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
-
-def parse_date(date_str, fmt='%Y-%m-%d'):
-    try:
-        return datetime.strptime(date_str, fmt).date()
-    except (ValueError, TypeError):
-        return None
-
-def clean_json_data(raw_data):
-    if not raw_data:
-        return {}
-    if isinstance(raw_data, str):
-        try:
-            data = json.loads(raw_data)
-        except json.JSONDecodeError:
-            return {}
-    elif isinstance(raw_data, dict):
-        data = raw_data
-    else:
-        return {}
+def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    cleaned = {}
-    for key, value in data.items():
-        if isinstance(value, str):
-            cleaned[key] = clean_string(value)
-        elif isinstance(value, (int, float, bool)):
-            cleaned[key] = value
-        elif value is None:
-            cleaned[key] = None
-        else:
-            cleaned[key] = str(value)
-    return cleaned
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (bool): Whether to fill missing values. Default is False.
+    fill_value: Value to use for filling missing data. Default is 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
 
-def filter_dict_by_keys(original_dict, allowed_keys):
-    if not isinstance(original_dict, dict) or not isinstance(allowed_keys, list):
-        return {}
-    return {k: v for k, v in original_dict.items() if k in allowed_keys}
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets certain criteria.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    tuple: (bool, str) indicating validation result and message.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+def remove_outliers(df, column, threshold=3):
+    """
+    Remove outliers from a specific column using z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to check for outliers.
+    threshold (float): Z-score threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    from scipy import stats
+    import numpy as np
+    
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(df[column].dropna()))
+    outlier_mask = z_scores < threshold
+    filtered_df = df[outlier_mask].reset_index(drop=True)
+    
+    return filtered_df
