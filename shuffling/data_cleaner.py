@@ -100,3 +100,11 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print("\nValidation Results:")
     print(validation)
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
