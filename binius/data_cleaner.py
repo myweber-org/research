@@ -303,3 +303,162 @@ def clean_numeric_columns(df, columns=None):
                 print(f"Warning: Could not convert column '{col}': {e}")
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    factor (float): Multiplier for IQR
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using Z-score method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Z-score normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    z_scores = (data[column] - mean_val) / std_val
+    return z_scores
+
+def detect_skewness(data, column, threshold=0.5):
+    """
+    Detect skewness in data column.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to check
+    threshold (float): Absolute skewness threshold
+    
+    Returns:
+    tuple: (skewness_value, is_skewed)
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    skewness = data[column].skew()
+    is_skewed = abs(skewness) > threshold
+    
+    return skewness, is_skewed
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5):
+    """
+    Comprehensive dataset cleaning function.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric columns to process
+    outlier_factor (float): IQR factor for outlier removal
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            # Remove outliers
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_factor)
+            
+            # Normalize using min-max
+            cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+            
+            # Add z-score normalized version
+            cleaned_data[f'{column}_zscore'] = z_score_normalize(cleaned_data, column)
+    
+    return cleaned_data
+
+def generate_summary(data, numeric_columns=None):
+    """
+    Generate statistical summary for numeric columns.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric columns to summarize
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    summary_stats = []
+    
+    for column in numeric_columns:
+        if column in data.columns:
+            col_data = data[column]
+            stats_dict = {
+                'column': column,
+                'count': len(col_data),
+                'mean': col_data.mean(),
+                'std': col_data.std(),
+                'min': col_data.min(),
+                '25%': col_data.quantile(0.25),
+                'median': col_data.median(),
+                '75%': col_data.quantile(0.75),
+                'max': col_data.max(),
+                'skewness': col_data.skew(),
+                'missing': col_data.isnull().sum()
+            }
+            summary_stats.append(stats_dict)
+    
+    return pd.DataFrame(summary_stats)
