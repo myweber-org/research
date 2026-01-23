@@ -1,76 +1,55 @@
-
 import pandas as pd
+import numpy as np
+from datetime import datetime
 
-def remove_duplicates(df, subset=None, keep='first'):
+def clean_dataset(input_file, output_file):
     """
-    Remove duplicate rows from a DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    subset (list, optional): Column labels to consider for duplicates
-    keep (str, optional): Which duplicates to keep - 'first', 'last', or False
-    
-    Returns:
-    pd.DataFrame: DataFrame with duplicates removed
+    Load a dataset, remove duplicate rows, standardize date formats,
+    and fill missing numeric values with column median.
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-    
-    return df.drop_duplicates(subset=subset, keep=keep)
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove exact duplicates
+        initial_count = len(df)
+        df.drop_duplicates(inplace=True)
+        duplicates_removed = initial_count - len(df)
+        
+        # Standardize date columns (assuming columns with 'date' in name)
+        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        # Fill numeric missing values with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            median_val = df[col].median()
+            df[col].fillna(median_val, inplace=True)
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        
+        print(f"Cleaning complete:")
+        print(f"  - Removed {duplicates_removed} duplicate rows")
+        print(f"  - Standardized {len(date_columns)} date columns")
+        print(f"  - Processed {len(numeric_cols)} numeric columns")
+        print(f"  - Output saved to: {output_file}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
 
-def clean_numeric_column(df, column_name, fill_method='mean'):
-    """
-    Clean a numeric column by handling missing values.
+if __name__ == "__main__":
+    # Example usage
+    input_path = "raw_data.csv"
+    output_path = "cleaned_data.csv"
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column_name (str): Name of column to clean
-    fill_method (str): Method to fill missing values - 'mean', 'median', or 'zero'
+    cleaned_data = clean_dataset(input_path, output_path)
     
-    Returns:
-    pd.DataFrame: DataFrame with cleaned column
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
-    
-    if not pd.api.types.is_numeric_dtype(df[column_name]):
-        raise TypeError(f"Column '{column_name}' must be numeric")
-    
-    df_clean = df.copy()
-    
-    if fill_method == 'mean':
-        fill_value = df[column_name].mean()
-    elif fill_method == 'median':
-        fill_value = df[column_name].median()
-    elif fill_method == 'zero':
-        fill_value = 0
-    else:
-        raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
-    
-    df_clean[column_name] = df[column_name].fillna(fill_value)
-    
-    return df_clean
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list, optional): List of required column names
-    
-    Returns:
-    bool: True if validation passes
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False
-    
-    if df.empty:
-        return False
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False
-    
-    return True
+    if cleaned_data is not None:
+        print(f"Final dataset shape: {cleaned_data.shape}")
