@@ -329,3 +329,11 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_dataset(cleaned, required_columns=['id', 'value'], min_rows=3)
     print(f"\nValidation: {is_valid} - {message}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
