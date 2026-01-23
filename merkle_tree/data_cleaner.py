@@ -1,119 +1,103 @@
-import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(data, column, threshold=1.5):
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers using IQR method
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
     """
-    if column not in data.columns:
+    if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
     
-    lower_bound = Q1 - threshold * IQR
-    upper_bound = Q3 + threshold * IQR
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def normalize_minmax(data, column):
+def calculate_summary_statistics(df, column):
     """
-    Normalize data using min-max scaling
+    Calculate summary statistics for a column after outlier removal.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing summary statistics
     """
-    if column not in data.columns:
+    if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    min_val = data[column].min()
-    max_val = data[column].max()
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
     
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
+    return stats
 
-def standardize_zscore(data, column):
+def clean_dataset(df, columns_to_clean=None):
     """
-    Standardize data using z-score normalization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    Clean multiple columns in a DataFrame by removing outliers.
     
-    mean_val = data[column].mean()
-    std_val = data[column].std()
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns_to_clean (list, optional): List of columns to clean. 
+                                          If None, clean all numeric columns.
     
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def clean_dataset(df, numeric_columns=None, outlier_threshold=1.5):
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
     """
-    Comprehensive data cleaning pipeline
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    if columns_to_clean is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns_to_clean = list(numeric_cols)
     
     cleaned_df = df.copy()
     
-    for col in numeric_columns:
-        if col in df.columns:
-            # Remove outliers
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - outlier_threshold * IQR
-            upper_bound = Q3 + outlier_threshold * IQR
-            
-            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            cleaned_df = cleaned_df[mask]
-            
-            # Normalize the column
-            if cleaned_df[col].std() > 0:
-                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    for column in columns_to_clean:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return cleaned_df.reset_index(drop=True)
+    return cleaned_df
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content
-    """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-    
-    if df.empty:
-        raise ValueError("DataFrame is empty")
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
-    
-    return True
-
-# Example usage
 if __name__ == "__main__":
-    # Create sample data
-    sample_data = pd.DataFrame({
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(50, 1000),
-        'feature3': np.random.uniform(0, 1, 1000)
-    })
+    sample_data = {
+        'temperature': [22, 23, 24, 25, 26, 100, 27, 28, 29, -10],
+        'humidity': [45, 46, 47, 48, 49, 50, 200, 51, 52, -5],
+        'pressure': [1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 2000, 500]
+    }
     
-    # Add some outliers
-    sample_data.loc[10, 'feature1'] = 500
-    sample_data.loc[20, 'feature2'] = 1000
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nSummary statistics before cleaning:")
+    for col in df.columns:
+        stats = calculate_summary_statistics(df, col)
+        print(f"{col}: {stats}")
     
-    print("Original data shape:", sample_data.shape)
-    print("Original statistics:")
-    print(sample_data.describe())
-    
-    # Clean the data
-    cleaned_data = clean_dataset(sample_data)
-    
-    print("\nCleaned data shape:", cleaned_data.shape)
-    print("Cleaned statistics:")
-    print(cleaned_data.describe())
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nSummary statistics after cleaning:")
+    for col in cleaned_df.columns:
+        stats = calculate_summary_statistics(cleaned_df, col)
+        print(f"{col}: {stats}")
