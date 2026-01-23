@@ -96,4 +96,48 @@ def clean_dataset(filepath, numerical_cols):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaned. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+    print(f"Data cleaned. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")import csv
+import re
+
+def clean_csv(input_file, output_file):
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile, \
+         open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        
+        reader = csv.reader(infile)
+        writer = csv.writer(outfile)
+        
+        header = next(reader)
+        writer.writerow(header)
+        
+        for row in reader:
+            cleaned_row = []
+            for cell in row:
+                cleaned_cell = re.sub(r'\s+', ' ', cell.strip())
+                cleaned_cell = cleaned_cell.lower()
+                cleaned_row.append(cleaned_cell)
+            writer.writerow(cleaned_row)
+
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def remove_duplicates(input_file, output_file):
+    seen = set()
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile, \
+         open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        
+        reader = csv.reader(infile)
+        writer = csv.writer(outfile)
+        
+        header = next(reader)
+        writer.writerow(header)
+        
+        for row in reader:
+            row_tuple = tuple(row)
+            if row_tuple not in seen:
+                seen.add(row_tuple)
+                writer.writerow(row)
+
+if __name__ == "__main__":
+    clean_csv("raw_data.csv", "cleaned_data.csv")
+    remove_duplicates("cleaned_data.csv", "final_data.csv")
