@@ -393,4 +393,60 @@ def validate_data(df, check_duplicates=True, check_infinite=True):
         numeric_df = df.select_dtypes(include=[np.number])
         validation_results['infinite_values'] = np.isinf(numeric_df.values).sum()
     
-    return validation_results
+    return validation_resultsimport pandas as pd
+import numpy as np
+
+def remove_missing_values(df, threshold=0.5):
+    """
+    Remove columns with missing values above threshold.
+    """
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > threshold].index
+    return df.drop(columns=columns_to_drop)
+
+def normalize_numeric_columns(df, columns=None):
+    """
+    Normalize specified numeric columns to range [0,1].
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            if col_max != col_min:
+                df[col] = (df[col] - col_min) / (col_max - col_min)
+    return df
+
+def encode_categorical(df, columns=None, method='onehot'):
+    """
+    Encode categorical columns using specified method.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=['object']).columns
+    
+    if method == 'onehot':
+        return pd.get_dummies(df, columns=columns, drop_first=True)
+    elif method == 'label':
+        encoded_df = df.copy()
+        for col in columns:
+            encoded_df[col] = pd.factorize(encoded_df[col])[0]
+        return encoded_df
+    else:
+        raise ValueError("Method must be 'onehot' or 'label'")
+
+def clean_dataset(filepath, output_path=None):
+    """
+    Main cleaning pipeline for CSV files.
+    """
+    df = pd.read_csv(filepath)
+    
+    df = remove_missing_values(df)
+    df = normalize_numeric_columns(df)
+    df = encode_categorical(df, method='onehot')
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+    
+    return df
