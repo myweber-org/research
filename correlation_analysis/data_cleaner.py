@@ -209,4 +209,68 @@ def clean_dataset(df, numeric_columns):
 
 def save_cleaned_data(df, output_path):
     df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
+    print(f"Cleaned data saved to {output_path}")import pandas as pd
+import numpy as np
+from typing import Optional, List
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: any = None) -> pd.DataFrame:
+    """Handle missing values in DataFrame."""
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            return df.fillna(df.mean(numeric_only=True))
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Normalize a column to range [0, 1]."""
+    if column not in df.columns:
+        raise KeyError(f"Column '{column}' not found in DataFrame")
+    
+    col_min = df[column].min()
+    col_max = df[column].max()
+    
+    if col_max == col_min:
+        df[column] = 0.5
+    else:
+        df[column] = (df[column] - col_min) / (col_max - col_min)
+    
+    return df
+
+def filter_outliers(df: pd.DataFrame, column: str, threshold: float = 3.0) -> pd.DataFrame:
+    """Filter outliers using z-score method."""
+    if column not in df.columns:
+        raise KeyError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+    return df[z_scores < threshold]
+
+def clean_dataset(df: pd.DataFrame, 
+                  remove_dups: bool = True,
+                  missing_strategy: str = 'drop',
+                  normalize_cols: Optional[List[str]] = None,
+                  outlier_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    """Comprehensive data cleaning pipeline."""
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            cleaned_df = normalize_column(cleaned_df, col)
+    
+    if outlier_cols:
+        for col in outlier_cols:
+            cleaned_df = filter_outliers(cleaned_df, col)
+    
+    return cleaned_df
