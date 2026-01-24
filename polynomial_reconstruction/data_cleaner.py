@@ -1,13 +1,14 @@
+
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
     """
     Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
     pd.DataFrame: Cleaned DataFrame.
@@ -32,45 +33,45 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     
     return cleaned_df
 
-def validate_data(df, required_columns=None, min_rows=1):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate the DataFrame structure and content.
+    Validate DataFrame structure and content.
     
     Parameters:
     df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present. Default is None.
-    min_rows (int): Minimum number of rows required. Default is 1.
+    required_columns (list): List of column names that must be present.
     
     Returns:
-    tuple: (bool, str) indicating validation success and message.
+    tuple: (is_valid, error_message)
     """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
     if df.empty:
         return False, "DataFrame is empty"
     
-    if len(df) < min_rows:
-        return False, f"DataFrame has fewer than {min_rows} rows"
-    
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    return True, "Data validation passed"
+    return True, "DataFrame is valid"
 
 if __name__ == "__main__":
+    # Example usage
     sample_data = {
-        'A': [1, 2, 2, None, 5],
-        'B': [10, None, 30, 40, 50],
-        'C': ['x', 'y', 'y', 'z', None]
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'x']
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
     
-    cleaned = clean_dataset(df, fill_missing='median')
+    cleaned = clean_dataframe(df, fill_missing='mean')
     print("\nCleaned DataFrame:")
     print(cleaned)
     
-    is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {is_valid}, Message: {message}")
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {message}")
