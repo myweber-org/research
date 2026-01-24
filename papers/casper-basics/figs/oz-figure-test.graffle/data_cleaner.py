@@ -91,4 +91,35 @@ def get_data_summary(df, numeric_columns):
                 'count': df[col].count(),
                 'missing': df[col].isnull().sum()
             }
-    return pd.DataFrame(summary).T
+    return pd.DataFrame(summary).Tdef remove_duplicates(data_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(data_list):
+    """
+    Convert string representations of numbers to integers where possible.
+    Non-convertible items remain unchanged.
+    """
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, "4", "4", "abc", 5, 5]
+    unique_data = remove_duplicates(sample_data)
+    final_data = clean_numeric_strings(unique_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {final_data}")
