@@ -1,69 +1,30 @@
-import pandas as pd
 
-def remove_duplicates(df, subset=None, keep='first'):
+import numpy as np
+
+def remove_outliers_iqr(data, column):
     """
-    Remove duplicate rows from a DataFrame.
+    Remove outliers from a specified column in a dataset using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for duplicates.
-        keep (str, optional): Which duplicates to keep.
+    Parameters:
+    data (numpy.ndarray): The dataset.
+    column (int): Index of the column to process.
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
+    numpy.ndarray: Dataset with outliers removed from the specified column.
     """
-    if df.empty:
-        return df
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
-
-def validate_dataframe(df):
-    """
-    Perform basic validation on DataFrame.
+    if column >= data.shape[1] or column < 0:
+        raise IndexError("Column index out of bounds")
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
     
-    Returns:
-        bool: True if DataFrame passes validation.
-    """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
     
-    if df.empty:
-        print("Warning: DataFrame is empty")
-        return True
-    
-    return True
-
-def clean_dataset(file_path, output_path=None):
-    """
-    Load, clean, and optionally save a dataset.
-    
-    Args:
-        file_path (str): Path to input CSV file.
-        output_path (str, optional): Path to save cleaned data.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
-    
-    validate_dataframe(df)
-    
-    initial_rows = len(df)
-    df_cleaned = remove_duplicates(df)
-    final_rows = len(df_cleaned)
-    
-    duplicates_removed = initial_rows - final_rows
-    print(f"Removed {duplicates_removed} duplicate rows")
-    
-    if output_path:
-        df_cleaned.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to: {output_path}")
-    
-    return df_cleaned
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
