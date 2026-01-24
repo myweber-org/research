@@ -153,3 +153,74 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0)
     print("Cleaned DataFrame:")
     print(cleaned)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame containing the data
+        column: string name of the column to clean
+    
+    Returns:
+        Cleaned DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Args:
+        data: pandas DataFrame
+        column: string name of the column
+    
+    Returns:
+        Dictionary containing mean, median, and standard deviation
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'count': len(data[column])
+    }
+    
+    return stats
+
+def clean_dataset(data, columns_to_clean):
+    """
+    Clean multiple columns in a dataset by removing outliers.
+    
+    Args:
+        data: pandas DataFrame
+        columns_to_clean: list of column names to clean
+    
+    Returns:
+        Tuple of (cleaned DataFrame, dictionary of removed outliers count)
+    """
+    cleaned_data = data.copy()
+    removed_counts = {}
+    
+    for column in columns_to_clean:
+        if column in data.columns:
+            original_count = len(cleaned_data)
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+            removed_counts[column] = original_count - len(cleaned_data)
+    
+    return cleaned_data, removed_counts
