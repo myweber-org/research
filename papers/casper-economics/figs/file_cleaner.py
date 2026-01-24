@@ -105,4 +105,96 @@ def main():
                 print(f"  {err}")
 
 if __name__ == '__main__':
-    main()
+    main()import os
+import shutil
+import tempfile
+from pathlib import Path
+
+def clean_temporary_files(directory_path, extensions=None, days_old=7):
+    """
+    Remove temporary files from a specified directory.
+    
+    Args:
+        directory_path (str or Path): Path to the directory to clean.
+        extensions (list, optional): List of file extensions to consider as temporary.
+                                     Defaults to common temporary extensions.
+        days_old (int, optional): Remove files older than this many days. Defaults to 7.
+    """
+    if extensions is None:
+        extensions = ['.tmp', '.temp', '.bak', '.swp', '.log']
+    
+    directory = Path(directory_path)
+    if not directory.exists() or not directory.is_dir():
+        raise ValueError(f"Invalid directory path: {directory_path}")
+    
+    current_time = time.time()
+    cutoff_time = current_time - (days_old * 24 * 60 * 60)
+    
+    files_removed = 0
+    total_size = 0
+    
+    for file_path in directory.rglob('*'):
+        if file_path.is_file():
+            # Check if file matches temporary extensions
+            if file_path.suffix.lower() in extensions:
+                # Check if file is older than the cutoff
+                file_mtime = file_path.stat().st_mtime
+                if file_mtime < cutoff_time:
+                    try:
+                        file_size = file_path.stat().st_size
+                        file_path.unlink()
+                        files_removed += 1
+                        total_size += file_size
+                        print(f"Removed: {file_path} ({file_size} bytes)")
+                    except OSError as e:
+                        print(f"Error removing {file_path}: {e}")
+    
+    print(f"\nCleanup completed:")
+    print(f"  Files removed: {files_removed}")
+    print(f"  Total space freed: {total_size} bytes")
+    return files_removed, total_size
+
+def create_test_environment():
+    """Create a test environment with temporary files."""
+    test_dir = Path(tempfile.mkdtemp(prefix="clean_test_"))
+    print(f"Created test directory: {test_dir}")
+    
+    # Create some test files
+    test_files = [
+        "document.tmp",
+        "backup.bak",
+        "important.txt",
+        "logfile.log",
+        "swapfile.swp",
+        "config.temp"
+    ]
+    
+    for filename in test_files:
+        file_path = test_dir / filename
+        file_path.write_text("Sample content for testing")
+        # Make some files older by modifying mtime
+        if filename.endswith('.tmp'):
+            old_time = time.time() - (10 * 24 * 60 * 60)  # 10 days old
+            os.utime(file_path, (old_time, old_time))
+    
+    return test_dir
+
+if __name__ == "__main__":
+    import time
+    
+    # Create and clean a test environment
+    test_directory = create_test_environment()
+    
+    try:
+        print("\nStarting cleanup process...")
+        removed, freed = clean_temporary_files(test_directory, days_old=5)
+        
+        # List remaining files
+        print("\nRemaining files:")
+        for item in test_directory.iterdir():
+            print(f"  {item.name}")
+            
+    finally:
+        # Clean up test directory
+        shutil.rmtree(test_directory)
+        print(f"\nTest directory removed: {test_directory}")
