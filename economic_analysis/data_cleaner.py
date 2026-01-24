@@ -198,3 +198,22 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data_sequence):
+    if not isinstance(data_sequence, list):
+        raise TypeError("Input must be a list")
+    cleaned = remove_duplicates_preserve_order(data_sequence)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [3, 1, 2, 3, 4, 2, 5, 1, 6]
+    print("Original:", sample_data)
+    print("Cleaned:", clean_data(sample_data))
