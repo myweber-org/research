@@ -605,3 +605,113 @@ if __name__ == "__main__":
     import os
     if os.path.exists('test_data.csv'):
         os.remove('test_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_method='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Parameters:
+    file_path (str): Path to input CSV file
+    output_path (str, optional): Path for cleaned output file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+    
+    Returns:
+    pandas.DataFrame: Cleaned dataframe
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df.drop_duplicates(inplace=True)
+        duplicates_removed = initial_rows - len(df)
+        print(f"Removed {duplicates_removed} duplicate rows")
+        
+        # Handle missing values
+        missing_before = df.isnull().sum().sum()
+        
+        if fill_method == 'mean':
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif fill_method == 'median':
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif fill_method == 'mode':
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        elif fill_method == 'zero':
+            df.fillna(0, inplace=True)
+        
+        missing_after = df.isnull().sum().sum()
+        print(f"Fixed {missing_before - missing_after} missing values")
+        
+        # Save cleaned data if output path provided
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): Dataframe to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    
+    if df is None or df.empty:
+        print("Validation failed: Dataframe is empty or None")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing required columns: {missing_cols}")
+            return False
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if not numeric_cols.empty:
+        inf_count = np.isinf(df[numeric_cols]).sum().sum()
+        if inf_count > 0:
+            print(f"Warning: Found {inf_count} infinite values in numeric columns")
+    
+    print("Data validation passed")
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'value': [10.5, None, 15.2, 20.1, None, 10.5],
+        'category': ['A', 'B', None, 'A', 'C', 'A'],
+        'score': [85, 92, None, 78, 88, 85]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv', fill_method='mean')
+    
+    if cleaned_df is not None:
+        validation_result = validate_dataframe(cleaned_df, ['id', 'value', 'category'])
+        print(f"Validation result: {validation_result}")
+        print("\nCleaned data summary:")
+        print(cleaned_df.describe())
