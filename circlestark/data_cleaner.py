@@ -118,3 +118,43 @@ def validate_dataframe(df, required_columns):
         raise ValueError("DataFrame is empty")
     
     return True
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(filepath, numeric_columns):
+    df = pd.read_csv(filepath)
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+    
+    cleaned_filepath = filepath.replace('.csv', '_cleaned.csv')
+    df.to_csv(cleaned_filepath, index=False)
+    return cleaned_filepath
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_path = clean_dataset('sample_data.csv', ['feature1', 'feature2'])
+    print(f"Cleaned data saved to: {cleaned_path}")
