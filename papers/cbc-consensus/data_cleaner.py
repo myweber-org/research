@@ -362,3 +362,86 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].isnull().any():
+                if cleaned_df[column].dtype in ['int64', 'float64']:
+                    if fill_strategy == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif fill_strategy == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif fill_strategy == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    elif fill_strategy == 'zero':
+                        fill_value = 0
+                    else:
+                        raise ValueError(f"Unsupported fill strategy: {fill_strategy}")
+                    cleaned_df[column].fillna(fill_value, inplace=True)
+                else:
+                    cleaned_df[column].fillna('Unknown', inplace=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame for required columns and data types.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    for column in df.columns:
+        if df[column].isnull().all():
+            print(f"Column '{column}' contains only null values.")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan],
+        'B': [10, 20, 20, 40, 50, 60],
+        'C': ['x', 'y', 'y', 'z', np.nan, 'w']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df, fill_strategy='median')
+    print(cleaned)
+    
+    print("\nValidation result:", validate_data(cleaned, required_columns=['A', 'B']))
