@@ -210,3 +210,104 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop').
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore').
+    columns (list): Specific columns to clean. If None, clean all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    else:
+        numeric_cols = [col for col in columns if col in df_clean.columns]
+    
+    for col in numeric_cols:
+        if missing_strategy == 'mean':
+            df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+        elif missing_strategy == 'median':
+            df_clean[col].fillna(df_clean[col].median(), inplace=True)
+        elif missing_strategy == 'mode':
+            df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+        elif missing_strategy == 'drop':
+            df_clean.dropna(subset=[col], inplace=True)
+        
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean[col] = np.where(
+                (df_clean[col] < lower_bound) | (df_clean[col] > upper_bound),
+                df_clean[col].median(),
+                df_clean[col]
+            )
+        elif outlier_method == 'zscore':
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            z_scores = (df_clean[col] - mean_val) / std_val
+            df_clean[col] = np.where(
+                np.abs(z_scores) > 3,
+                mean_val,
+                df_clean[col]
+            )
+    
+    return df_clean
+
+def validate_dataframe(df, check_missing=True, check_duplicates=True):
+    """
+    Validate DataFrame for common data quality issues.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    check_missing (bool): Check for missing values.
+    check_duplicates (bool): Check for duplicate rows.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        validation_results['missing_values'] = missing_counts[missing_counts > 0].to_dict()
+    
+    if check_duplicates:
+        duplicate_count = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
+    
+    validation_results['shape'] = df.shape
+    validation_results['dtypes'] = df.dtypes.to_dict()
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, missing_strategy='median', outlier_method='iqr')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_dataframe(cleaned_df)
+    print("\nValidation Results:")
+    print(validation)
