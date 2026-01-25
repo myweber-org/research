@@ -206,4 +206,73 @@ if __name__ == "__main__":
     
     cleaned_dicts = clean_data_with_key(data_dicts, key_func=lambda x: x["id"])
     print(f"\nOriginal dicts: {data_dicts}")
-    print(f"Cleaned dicts: {cleaned_dicts}")
+    print(f"Cleaned dicts: {cleaned_dicts}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def impute_missing_with_median(data, column):
+    median_value = data[column].median()
+    data[column].fillna(median_value, inplace=True)
+    return data
+
+def remove_duplicates(data, subset=None):
+    if subset:
+        data_cleaned = data.drop_duplicates(subset=subset)
+    else:
+        data_cleaned = data.drop_duplicates()
+    return data_cleaned
+
+def standardize_column(data, column):
+    mean = data[column].mean()
+    std = data[column].std()
+    data[column] = (data[column] - mean) / std
+    return data
+
+def clean_dataset(data, numeric_columns, categorical_columns=None):
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if cleaned_data[col].isnull().any():
+            cleaned_data = impute_missing_with_median(cleaned_data, col)
+        outliers = detect_outliers_iqr(cleaned_data, col)
+        if not outliers.empty:
+            median_val = cleaned_data[col].median()
+            cleaned_data.loc[outliers.index, col] = median_val
+        cleaned_data = standardize_column(cleaned_data, col)
+    
+    if categorical_columns:
+        cleaned_data = remove_duplicates(cleaned_data, subset=categorical_columns)
+    else:
+        cleaned_data = remove_duplicates(cleaned_data)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns):
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'B': [11, 12, None, 14, 15, 16, 17, 18, 19, 20],
+        'C': ['X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y']
+    })
+    
+    try:
+        validate_data(sample_data, ['A', 'B', 'C'])
+        cleaned = clean_dataset(sample_data, numeric_columns=['A', 'B'], categorical_columns=['C'])
+        print("Data cleaning completed successfully.")
+        print(cleaned.head())
+    except ValueError as e:
+        print(f"Validation error: {e}")
