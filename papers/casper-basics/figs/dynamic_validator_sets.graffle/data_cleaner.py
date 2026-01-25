@@ -145,4 +145,106 @@ if __name__ == "__main__":
     filled_data['feature_b_standardized'] = standardize_zscore(filled_data, 'feature_b')
     
     print("\nData cleaning completed successfully")
-    print("Available columns:", filled_data.columns.tolist())
+    print("Available columns:", filled_data.columns.tolist())import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: Input pandas DataFrame
+        drop_duplicates: Whether to remove duplicate rows
+        fill_missing: Strategy for filling missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed_duplicates = initial_rows - len(cleaned_df)
+        print(f"Removed {removed_duplicates} duplicate rows")
+    
+    # Handle missing values
+    missing_count = cleaned_df.isnull().sum().sum()
+    if missing_count > 0:
+        print(f"Found {missing_count} missing values")
+        
+        if fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print(f"Dropped rows with missing values")
+        elif fill_missing == 'mean':
+            numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+            print(f"Filled missing numeric values with column means")
+        elif fill_missing == 'median':
+            numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+            print(f"Filled missing numeric values with column medians")
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    mode_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown'
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_value)
+            print(f"Filled missing categorical values with column modes")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    print(f"Data cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: Input pandas DataFrame
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with duplicates and missing values
+    sample_data = {
+        'id': [1, 2, 3, 2, 5, 6, 7, 8],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'Eve', 'Frank', None, 'Grace'],
+        'age': [25, 30, None, 30, 28, 35, 40, 22],
+        'score': [85.5, 92.0, 78.5, 92.0, 88.0, None, 95.5, 76.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print(f"Shape: {df.shape}")
+    
+    # Clean the data
+    cleaned = clean_dataframe(df, drop_duplicates=True, fill_missing='mean')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    is_valid = validate_dataframe(cleaned, required_columns=['id', 'name', 'age', 'score'])
+    print(f"\nData validation result: {is_valid}")
