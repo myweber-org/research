@@ -173,4 +173,28 @@ def validate_data(df, required_columns, min_rows=1):
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
+    return Truedef remove_duplicates(data_list):
+    seen = set()
+    unique_data = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_data.append(item)
+    return unique_data
+
+def clean_numeric_strings(data_list):
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str):
+            try:
+                cleaned.append(float(item))
+            except ValueError:
+                cleaned.append(item)
+        else:
+            cleaned.append(item)
+    return cleaned
+
+def process_data(raw_data):
+    step1 = remove_duplicates(raw_data)
+    step2 = clean_numeric_strings(step1)
+    return step2
