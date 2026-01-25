@@ -1,117 +1,61 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
 
-def detect_outliers_iqr(data, column, threshold=1.5):
+def clean_dataset(df):
     """
-    Detect outliers using IQR method
-    """
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - threshold * iqr
-    upper_bound = q3 + threshold * iqr
+    Remove null values and duplicate rows from a pandas DataFrame.
     
-    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
-    return outliers
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    z_scores = np.abs(stats.zscore(data[column].dropna()))
-    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    min_val = data[column].min()
-    max_val = data[column].max()
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
     
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def normalize_zscore(data, column):
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with no nulls or duplicates.
     """
-    Normalize data using Z-score standardization
-    """
-    mean_val = data[column].mean()
-    std_val = data[column].std()
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
     
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def handle_missing_values(data, strategy='mean'):
-    """
-    Handle missing values with different strategies
-    """
-    cleaned_data = data.copy()
-    
-    for column in cleaned_data.select_dtypes(include=[np.number]).columns:
-        if cleaned_data[column].isnull().any():
-            if strategy == 'mean':
-                fill_value = cleaned_data[column].mean()
-            elif strategy == 'median':
-                fill_value = cleaned_data[column].median()
-            elif strategy == 'mode':
-                fill_value = cleaned_data[column].mode()[0]
-            else:
-                fill_value = 0
-            
-            cleaned_data[column] = cleaned_data[column].fillna(fill_value)
-    
-    return cleaned_data
-
-def validate_dataframe(data):
-    """
-    Validate dataframe structure and content
-    """
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-    
-    if data.empty:
-        raise ValueError("DataFrame is empty")
-    
-    return True
-
-def clean_dataset(data, outlier_method='zscore', normalize_method=None, missing_strategy='mean'):
-    """
-    Main function to clean dataset with multiple steps
-    """
-    # Validate input
-    validate_dataframe(data)
-    
-    # Handle missing values
-    cleaned_data = handle_missing_values(data, strategy=missing_strategy)
-    
-    # Remove outliers for numeric columns
-    numeric_cols = cleaned_data.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        if outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, col)
-        elif outlier_method == 'iqr':
-            outliers = detect_outliers_iqr(cleaned_data, col)
-            cleaned_data = cleaned_data.drop(outliers.index)
-    
-    # Normalize data if requested
-    if normalize_method:
-        for col in numeric_cols:
-            if normalize_method == 'minmax':
-                cleaned_data[col] = normalize_minmax(cleaned_data, col)
-            elif normalize_method == 'zscore':
-                cleaned_data[col] = normalize_zscore(cleaned_data, col)
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
     
     # Reset index after cleaning
-    cleaned_data = cleaned_data.reset_index(drop=True)
+    df_cleaned = df_cleaned.reset_index(drop=True)
     
-    return cleaned_data
+    return df_cleaned
+
+def validate_dataset(df):
+    """
+    Validate if DataFrame has null values or duplicates.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'has_nulls': df.isnull().any().any(),
+        'null_count': df.isnull().sum().sum(),
+        'has_duplicates': df.duplicated().any(),
+        'duplicate_count': df.duplicated().sum(),
+        'original_shape': df.shape,
+        'cleaned_shape': clean_dataset(df).shape
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 1],
+        'B': [5, 6, 7, None, 5],
+        'C': [9, 10, 11, 12, 9]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataset(df))
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
