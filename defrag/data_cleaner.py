@@ -353,4 +353,90 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
     if len(df) < min_rows:
         return False, f"DataFrame has fewer than {min_rows} rows"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fillna_method='drop'):
+    """
+    Clean a pandas DataFrame by handling null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fillna_method (str): Method to handle null values. 
+                             Options: 'drop', 'fill_mean', 'fill_median', 'fill_mode'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle null values
+    if fillna_method == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fillna_method == 'fill_mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif fillna_method == 'fill_median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif fillna_method == 'fill_mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+    
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataset is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with nulls and duplicates
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, None],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', 'David', None],
+        'age': [25, 30, None, 35, 40, 45],
+        'score': [85.5, 90.0, 78.5, 78.5, 92.0, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fillna_method='fill_mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nShape after cleaning:", cleaned_df.shape)
+    
+    # Validate the cleaned dataset
+    is_valid, message = validate_dataset(cleaned_df, required_columns=['id', 'name', 'age'], min_rows=1)
+    print(f"\nValidation: {message}")
