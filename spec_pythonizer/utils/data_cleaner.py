@@ -77,3 +77,58 @@ def clean_dataset(input_file, output_file):
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
     print("Data cleaning completed successfully.")
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(filepath: str, 
+                   missing_strategy: str = 'drop',
+                   fill_value: Optional[float] = None) -> pd.DataFrame:
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        filepath: Path to CSV file
+        missing_strategy: 'drop', 'fill', or 'interpolate'
+        fill_value: Value to use when missing_strategy is 'fill'
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    df = pd.read_csv(filepath)
+    
+    if missing_strategy == 'drop':
+        df = df.dropna()
+    elif missing_strategy == 'fill':
+        if fill_value is not None:
+            df = df.fillna(fill_value)
+        else:
+            df = df.fillna(df.mean(numeric_only=True))
+    elif missing_strategy == 'interpolate':
+        df = df.interpolate(method='linear', limit_direction='forward')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].apply(lambda x: (x - x.mean()) / x.std())
+    
+    return df.reset_index(drop=True)
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """Validate DataFrame has no infinite values and all numeric columns are finite."""
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if not numeric_cols.empty:
+        return not np.any(np.isinf(df[numeric_cols].values))
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, 4, 5],
+        'C': [1, 2, 3, 4, 5]
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned = clean_csv_data('sample_data.csv', missing_strategy='fill')
+    print(f"Data cleaned successfully: {validate_dataframe(cleaned)}")
+    print(f"Shape: {cleaned.shape}")
+    print(cleaned.head())
