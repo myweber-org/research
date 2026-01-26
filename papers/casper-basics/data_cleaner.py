@@ -92,3 +92,45 @@ def validate_dataframe(df, required_columns=None):
 #     print("\nCleaned DataFrame:")
 #     cleaned = clean_dataset(df, fill_method='mean')
 #     print(cleaned)
+def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_strings(string_list):
+    """
+    Clean a list of numeric strings by converting to integers,
+    removing non-numeric entries, and returning sorted unique values.
+    """
+    cleaned = []
+    for item in string_list:
+        try:
+            num = int(item.strip())
+            cleaned.append(num)
+        except (ValueError, AttributeError):
+            continue
+    
+    unique_nums = remove_duplicates(cleaned)
+    return sorted(unique_nums)
+
+def validate_email_list(email_list):
+    """
+    Basic email validation and cleaning.
+    Returns a list of valid email addresses (simple validation).
+    """
+    valid_emails = []
+    for email in email_list:
+        if not isinstance(email, str):
+            continue
+        email = email.strip().lower()
+        if '@' in email and '.' in email.split('@')[-1]:
+            valid_emails.append(email)
+    return remove_duplicates(valid_emails)
