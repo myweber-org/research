@@ -96,4 +96,45 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nCleaned statistics for 'temperature':")
-    print(calculate_basic_stats(cleaned_df, 'temperature'))
+    print(calculate_basic_stats(cleaned_df, 'temperature'))import csv
+import sys
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values
+    and standardizing column names to lowercase.
+    """
+    try:
+        with open(input_file, 'r', newline='') as infile:
+            reader = csv.DictReader(infile)
+            fieldnames = [field.strip().lower() for field in reader.fieldnames]
+            
+            cleaned_rows = []
+            for row in reader:
+                if all(value.strip() != '' for value in row.values()):
+                    cleaned_row = {fieldnames[i]: row[field].strip() 
+                                  for i, field in enumerate(reader.fieldnames)}
+                    cleaned_rows.append(cleaned_row)
+        
+        with open(output_file, 'w', newline='') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(cleaned_rows)
+            
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Original rows: {len(cleaned_rows) + (len(cleaned_rows) != reader.line_num - 1)}")
+        print(f"Cleaned rows: {len(cleaned_rows)}")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    clean_csv(sys.argv[1], sys.argv[2])
