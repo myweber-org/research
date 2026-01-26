@@ -1,127 +1,100 @@
+
 import pandas as pd
 import numpy as np
 
-def remove_missing_rows(df, columns=None):
+def remove_outliers_iqr(df, column):
     """
-    Remove rows with missing values from specified columns or entire DataFrame.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of columns to check. Defaults to all columns.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-        pd.DataFrame: DataFrame with rows containing missing values removed
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_stats(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column])
+    }
+    
+    return stats
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric columns by removing outliers from specified columns or all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list, optional): List of column names to clean. If None, cleans all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
     """
     if columns is None:
-        columns = df.columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
     
-    return df.dropna(subset=columns)
-
-def fill_missing_with_mean(df, columns=None):
-    """
-    Fill missing values with column mean for specified columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of columns to fill. Defaults to all numeric columns.
-    
-    Returns:
-        pd.DataFrame: DataFrame with missing values filled
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_filled = df.copy()
-    for col in columns:
-        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
-            df_filled[col] = df[col].fillna(df[col].mean())
-    
-    return df_filled
-
-def remove_outliers_iqr(df, columns=None, multiplier=1.5):
-    """
-    Remove outliers using the Interquartile Range (IQR) method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of columns to check for outliers.
-        multiplier (float, optional): IQR multiplier for outlier detection.
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_clean = df.copy()
-    
-    for col in columns:
-        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            
-            lower_bound = Q1 - multiplier * IQR
-            upper_bound = Q3 + multiplier * IQR
-            
-            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            df_clean = df_clean[mask]
-    
-    return df_clean.reset_index(drop=True)
-
-def standardize_columns(df, columns=None):
-    """
-    Standardize specified columns to have zero mean and unit variance.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of columns to standardize.
-    
-    Returns:
-        pd.DataFrame: DataFrame with standardized columns
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_standardized = df.copy()
-    
-    for col in columns:
-        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
-            mean = df[col].mean()
-            std = df[col].std()
-            
-            if std > 0:
-                df_standardized[col] = (df[col] - mean) / std
-    
-    return df_standardized
-
-def clean_dataset(df, missing_strategy='remove', outlier_removal=True, standardization=True):
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        missing_strategy (str): Strategy for handling missing values ('remove' or 'mean')
-        outlier_removal (bool): Whether to remove outliers
-        standardization (bool): Whether to standardize numeric columns
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
     cleaned_df = df.copy()
     
-    # Handle missing values
-    if missing_strategy == 'remove':
-        cleaned_df = remove_missing_rows(cleaned_df)
-    elif missing_strategy == 'mean':
-        cleaned_df = fill_missing_with_mean(cleaned_df)
-    
-    # Remove outliers
-    if outlier_removal:
-        cleaned_df = remove_outliers_iqr(cleaned_df)
-    
-    # Standardize columns
-    if standardization:
-        cleaned_df = standardize_columns(cleaned_df)
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
     
     return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[::100, 'A'] = 500  # Add some outliers
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary for column A:")
+    print(calculate_summary_stats(df, 'A'))
+    
+    cleaned_df = clean_numeric_data(df, ['A'])
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary for column A:")
+    print(calculate_summary_stats(cleaned_df, 'A'))
