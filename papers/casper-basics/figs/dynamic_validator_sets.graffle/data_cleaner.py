@@ -1,98 +1,51 @@
-
-import numpy as np
 import pandas as pd
+import re
 
-def remove_outliers_iqr(df, column):
+def clean_text_column(df, column_name):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Standardize text by converting to lowercase and removing extra whitespace.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x).strip())
+    return df
 
-def calculate_summary_statistics(df, column):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing summary statistics
+    Remove duplicate rows from DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def validate_email_column(df, column_name):
+    """
+    Validate email format in specified column.
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column])
+    df['is_valid_email'] = df[column_name].str.match(email_pattern)
+    return df
+
+def main():
+    # Example usage
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
+        'email': ['john@example.com', 'jane@example.com', 'invalid-email', 'bob@example.com']
     }
     
-    return stats
-
-def process_dataset(file_path, column_name):
-    """
-    Load a dataset from file and clean it by removing outliers.
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
     
-    Parameters:
-    file_path (str): Path to the data file
-    column_name (str): Column to clean
+    df = clean_text_column(df, 'name')
+    df = remove_duplicates(df, subset=['name'])
+    df = validate_email_column(df, 'email')
     
-    Returns:
-    tuple: (cleaned DataFrame, original stats, cleaned stats)
-    """
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
-    
-    original_stats = calculate_summary_statistics(df, column_name)
-    cleaned_df = remove_outliers_iqr(df, column_name)
-    cleaned_stats = calculate_summary_statistics(cleaned_df, column_name)
-    
-    return cleaned_df, original_stats, cleaned_stats
+    print("\nCleaned DataFrame:")
+    print(df)
 
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'values': np.concatenate([
-            np.random.normal(100, 10, 90),
-            np.random.normal(200, 10, 10)
-        ])
-    })
-    
-    print("Original data shape:", sample_data.shape)
-    print("Original statistics:", calculate_summary_statistics(sample_data, 'values'))
-    
-    cleaned_data = remove_outliers_iqr(sample_data, 'values')
-    print("\nCleaned data shape:", cleaned_data.shape)
-    print("Cleaned statistics:", calculate_summary_statistics(cleaned_data, 'values'))
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    main()
