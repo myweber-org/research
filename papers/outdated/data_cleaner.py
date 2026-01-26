@@ -399,3 +399,11 @@ if __name__ == "__main__":
     validation = validate_dataset(cleaned, required_columns=['name', 'age', 'score'])
     print("Validation Result:")
     print(validation)
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
