@@ -496,3 +496,34 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
     return filtered_df.reset_index(drop=True)
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Remove duplicate rows and normalize text in specified column.
+    """
+    # Remove duplicates
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase, remove extra whitespace
+    if text_column in df_clean.columns:
+        df_clean[text_column] = df_clean[text_column].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+        )
+    
+    return df_clean
+
+def validate_email(email):
+    """
+    Simple email validation using regex.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def save_clean_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Data saved to {output_path}")
