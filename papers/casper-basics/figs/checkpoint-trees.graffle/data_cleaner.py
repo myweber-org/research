@@ -276,3 +276,82 @@ if __name__ == "__main__":
         # Display cleaned data
         print("\nCleaned data preview:")
         print(cleaned_df.head())
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def normalize_data(df, columns=None, method='zscore'):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    
+    if method == 'zscore':
+        for col in columns:
+            if col in df.columns:
+                df_normalized[col] = stats.zscore(df[col])
+    elif method == 'minmax':
+        for col in columns:
+            if col in df.columns:
+                col_min = df[col].min()
+                col_max = df[col].max()
+                if col_max != col_min:
+                    df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
+                else:
+                    df_normalized[col] = 0
+    else:
+        raise ValueError("Method must be 'zscore' or 'minmax'")
+    
+    return df_normalized
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif strategy == 'drop':
+                df_filled = df_filled.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+            
+            df_filled[col] = df_filled[col].fillna(fill_value)
+    
+    return df_filled
+
+def clean_dataset(df, normalize_cols=None, outlier_threshold=1.5, missing_strategy='mean'):
+    df_clean = df.copy()
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    df_clean = remove_outliers_iqr(df_clean, threshold=outlier_threshold)
+    df_clean = normalize_data(df_clean, columns=normalize_cols)
+    
+    return df_clean
