@@ -1,87 +1,120 @@
 
 import pandas as pd
 import numpy as np
+from typing import List, Union
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove duplicate rows from DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for duplicates
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        DataFrame with duplicates removed
     """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def calculate_summary_statistics(df, column):
+def convert_column_types(df: pd.DataFrame, 
+                         column_types: dict) -> pd.DataFrame:
     """
-    Calculate summary statistics for a DataFrame column.
+    Convert columns to specified data types.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    Args:
+        df: Input DataFrame
+        column_types: Dictionary mapping column names to target types
     
     Returns:
-    dict: Dictionary containing summary statistics
+        DataFrame with converted column types
     """
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    df_copy = df.copy()
     
-    return stats
+    for column, dtype in column_types.items():
+        if column in df_copy.columns:
+            try:
+                if dtype == 'datetime':
+                    df_copy[column] = pd.to_datetime(df_copy[column])
+                elif dtype == 'numeric':
+                    df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+                elif dtype == 'category':
+                    df_copy[column] = df_copy[column].astype('category')
+                else:
+                    df_copy[column] = df_copy[column].astype(dtype)
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not convert column '{column}' to {dtype}: {e}")
+    
+    return df_copy
 
-def clean_dataset(df, numeric_columns):
+def handle_missing_values(df: pd.DataFrame, 
+                         strategy: str = 'drop',
+                         fill_value: Union[int, float, str] = None) -> pd.DataFrame:
     """
-    Clean a dataset by removing outliers from multiple numeric columns.
+    Handle missing values in DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of column names to clean
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to use when filling missing values
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill' and fill_value is not None:
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Invalid strategy or missing fill_value")
+
+def clean_dataframe(df: pd.DataFrame,
+                   deduplicate: bool = True,
+                   type_conversions: dict = None,
+                   missing_strategy: str = 'drop',
+                   fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Main function to clean DataFrame with multiple operations.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary for column type conversions
+        missing_strategy: Strategy for handling missing values
+        fill_value: Value to fill missing values with
+    
+    Returns:
+        Cleaned DataFrame
     """
     cleaned_df = df.copy()
     
-    for column in numeric_columns:
-        if column in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
     
     return cleaned_df
 
-if __name__ == "__main__":
-    sample_data = {
-        'temperature': [22, 23, 24, 25, 26, 100, 27, 28, 29, 30, -10],
-        'humidity': [45, 46, 47, 48, 49, 200, 50, 51, 52, 53, -5],
-        'pressure': [1013, 1014, 1015, 1016, 1017, 2000, 1018, 1019, 1020, 1021, 500]
+def validate_dataframe(df: pd.DataFrame) -> dict:
+    """
+    Validate DataFrame and return summary statistics.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'missing_values': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object', 'category']).columns.tolist()
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original dataset:")
-    print(df)
-    print("\nOriginal statistics:")
-    for col in df.columns:
-        print(f"{col}: {calculate_summary_statistics(df, col)}")
-    
-    cleaned_df = clean_dataset(df, ['temperature', 'humidity', 'pressure'])
-    print("\nCleaned dataset:")
-    print(cleaned_df)
-    print("\nCleaned statistics:")
-    for col in cleaned_df.columns:
-        print(f"{col}: {calculate_summary_statistics(cleaned_df, col)}")
+    return validation_results
