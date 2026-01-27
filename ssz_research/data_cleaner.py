@@ -1,81 +1,22 @@
-import pandas as pd
+
 import numpy as np
 
-def clean_missing_data(file_path, strategy='mean', columns=None):
+def remove_outliers_iqr(data, column):
     """
-    Clean missing data in a CSV file using specified strategy.
+    Remove outliers from a specified column using the IQR method.
     
-    Args:
-        file_path (str): Path to the CSV file
-        strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
-        columns (list): List of columns to apply cleaning to, None for all columns
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    try:
-        df = pd.read_csv(file_path)
-        
-        if columns is None:
-            columns = df.columns
-        
-        for col in columns:
-            if col in df.columns:
-                if df[col].isnull().any():
-                    if strategy == 'mean':
-                        df[col].fillna(df[col].mean(), inplace=True)
-                    elif strategy == 'median':
-                        df[col].fillna(df[col].median(), inplace=True)
-                    elif strategy == 'mode':
-                        df[col].fillna(df[col].mode()[0], inplace=True)
-                    elif strategy == 'drop':
-                        df.dropna(subset=[col], inplace=True)
-        
-        return df
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        return None
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return None
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        bool: True if validation passes, False otherwise
-    """
-    if df is None or df.empty:
-        return False
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
-    
-    return True
-
-def save_cleaned_data(df, output_path):
-    """
-    Save cleaned DataFrame to CSV file.
-    
-    Args:
-        df (pd.DataFrame): Cleaned DataFrame
-        output_path (str): Path to save the cleaned data
-    
-    Returns:
-        bool: True if save successful, False otherwise
-    """
-    try:
-        df.to_csv(output_path, index=False)
-        return True
-    except Exception as e:
-        print(f"Error saving cleaned data: {str(e)}")
-        return False
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
