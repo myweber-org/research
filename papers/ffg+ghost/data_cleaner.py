@@ -315,3 +315,86 @@ if __name__ == "__main__":
         print(f"Cleaned data shape: {cleaned_data.shape}")
         print("\nSummary statistics:")
         print(cleaned_data.describe())
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Args:
+        df: Input pandas DataFrame
+        missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop')
+        outlier_threshold: Z-score threshold for outlier detection
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median())
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    
+    # Remove outliers using Z-score method
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / cleaned_df[col].std())
+        cleaned_df = cleaned_df[z_scores < outlier_threshold]
+    
+    return cleaned_df.reset_index(drop=True)
+
+def normalize_data(df, method='minmax'):
+    """
+    Normalize numeric columns in the DataFrame.
+    
+    Args:
+        df: Input pandas DataFrame
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        Normalized pandas DataFrame
+    """
+    normalized_df = df.copy()
+    numeric_cols = normalized_df.select_dtypes(include=[np.number]).columns
+    
+    if method == 'minmax':
+        for col in numeric_cols:
+            col_min = normalized_df[col].min()
+            col_max = normalized_df[col].max()
+            if col_max != col_min:
+                normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+    
+    elif method == 'zscore':
+        for col in numeric_cols:
+            col_mean = normalized_df[col].mean()
+            col_std = normalized_df[col].std()
+            if col_std != 0:
+                normalized_df[col] = (normalized_df[col] - col_mean) / col_std
+    
+    return normalized_df
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: Input pandas DataFrame
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
