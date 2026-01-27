@@ -1,286 +1,82 @@
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers using IQR method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    z_scores = np.abs(stats.zscore(data[column]))
-    filtered_data = data[z_scores < threshold]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def normalize_zscore(data, column):
-    """
-    Normalize data using Z-score standardization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def handle_missing_values(data, strategy='mean'):
-    """
-    Handle missing values in numeric columns
-    """
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    
-    if strategy == 'mean':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].mean())
-    elif strategy == 'median':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].median())
-    elif strategy == 'mode':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].mode()[0])
-    elif strategy == 'drop':
-        data = data.dropna(subset=numeric_cols)
-    else:
-        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
-    
-    return data
-
-def clean_dataset(data, outlier_method='iqr', normalization_method='minmax', missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    cleaned_data = data.copy()
-    
-    numeric_cols = cleaned_data.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        if outlier_method == 'iqr':
-            cleaned_data = remove_outliers_iqr(cleaned_data, col)
-        elif outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, col)
-    
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
-    
-    for col in numeric_cols:
-        if col in cleaned_data.columns:
-            if normalization_method == 'minmax':
-                cleaned_data[col] = normalize_minmax(cleaned_data, col)
-            elif normalization_method == 'zscore':
-                cleaned_data[col] = normalize_zscore(cleaned_data, col)
-    
-    return cleaned_data
-
-def validate_data(data, check_duplicates=True, check_infinite=True):
-    """
-    Validate data quality
-    """
-    validation_report = {}
-    
-    validation_report['rows'] = len(data)
-    validation_report['columns'] = len(data.columns)
-    validation_report['missing_values'] = data.isnull().sum().sum()
-    
-    if check_duplicates:
-        validation_report['duplicates'] = data.duplicated().sum()
-    
-    if check_infinite:
-        numeric_cols = data.select_dtypes(include=[np.number]).columns
-        infinite_count = 0
-        for col in numeric_cols:
-            infinite_count += np.isinf(data[col]).sum()
-        validation_report['infinite_values'] = infinite_count
-    
-    return validation_report
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-
-if __name__ == "__main__":
-    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
-    cleaned = remove_duplicates_preserve_order(sample_data)
-    print(f"Original: {sample_data}")
-    print(f"Cleaned: {cleaned}")
-def remove_duplicates(data_list):
-    """
-    Remove duplicate entries from a list while preserving order.
-    
-    Args:
-        data_list: List of elements (must be hashable)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        List with duplicates removed
+    pd.DataFrame: DataFrame with outliers removed
     """
-    seen = set()
-    result = []
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    
-    return result
-
-def clean_data_with_key(data_list, key_func=None):
-    """
-    Remove duplicates based on a key function.
-    
-    Args:
-        data_list: List of elements
-        key_func: Function to extract comparison key (default: identity)
-    
-    Returns:
-        List with duplicates removed based on key
-    """
-    if key_func is None:
-        return remove_duplicates(data_list)
-    
-    seen = set()
-    result = []
-    
-    for item in data_list:
-        key = key_func(item)
-        if key not in seen:
-            seen.add(key)
-            result.append(item)
-    
-    return result
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = [1, 2, 2, 3, 4, 4, 5, 1]
-    cleaned = remove_duplicates(sample_data)
-    print(f"Original: {sample_data}")
-    print(f"Cleaned: {cleaned}")
-    
-    # Example with custom key
-    data_dicts = [
-        {"id": 1, "name": "Alice"},
-        {"id": 2, "name": "Bob"},
-        {"id": 1, "name": "Alice"},
-        {"id": 3, "name": "Charlie"}
-    ]
-    
-    cleaned_dicts = clean_data_with_key(data_dicts, key_func=lambda x: x["id"])
-    print(f"\nOriginal dicts: {data_dicts}")
-    print(f"Cleaned dicts: {cleaned_dicts}")import pandas as pd
-import numpy as np
-from scipy import stats
-
-def detect_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
+    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
-    return outliers
-
-def impute_missing_with_median(data, column):
-    median_value = data[column].median()
-    data[column].fillna(median_value, inplace=True)
-    return data
-
-def remove_duplicates(data, subset=None):
-    if subset:
-        data_cleaned = data.drop_duplicates(subset=subset)
-    else:
-        data_cleaned = data.drop_duplicates()
-    return data_cleaned
-
-def standardize_column(data, column):
-    mean = data[column].mean()
-    std = data[column].std()
-    data[column] = (data[column] - mean) / std
-    return data
-
-def clean_dataset(data, numeric_columns, categorical_columns=None):
-    cleaned_data = data.copy()
     
-    for col in numeric_columns:
-        if cleaned_data[col].isnull().any():
-            cleaned_data = impute_missing_with_median(cleaned_data, col)
-        outliers = detect_outliers_iqr(cleaned_data, col)
-        if not outliers.empty:
-            median_val = cleaned_data[col].median()
-            cleaned_data.loc[outliers.index, col] = median_val
-        cleaned_data = standardize_column(cleaned_data, col)
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    if categorical_columns:
-        cleaned_data = remove_duplicates(cleaned_data, subset=categorical_columns)
-    else:
-        cleaned_data = remove_duplicates(cleaned_data)
-    
-    return cleaned_data
+    return filtered_df.reset_index(drop=True)
 
-def validate_data(data, required_columns):
-    missing_columns = [col for col in required_columns if col not in data.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-    return True
+def calculate_summary_stats(df, column):
+    """
+    Calculate summary statistics for a column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column]),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary statistics:")
+    print(calculate_summary_stats(df, 'value'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary statistics:")
+    print(calculate_summary_stats(cleaned_df, 'value'))
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'A': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
-        'B': [11, 12, None, 14, 15, 16, 17, 18, 19, 20],
-        'C': ['X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y']
-    })
-    
-    try:
-        validate_data(sample_data, ['A', 'B', 'C'])
-        cleaned = clean_dataset(sample_data, numeric_columns=['A', 'B'], categorical_columns=['C'])
-        print("Data cleaning completed successfully.")
-        print(cleaned.head())
-    except ValueError as e:
-        print(f"Validation error: {e}")
-def remove_duplicates_preserve_order(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    cleaned_data = example_usage()
