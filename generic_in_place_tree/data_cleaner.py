@@ -253,3 +253,121 @@ def clean_dataset(df, numeric_columns):
         cleaned_df = normalize_minmax(cleaned_df, col)
     cleaned_df = handle_missing_values(cleaned_df, strategy='mean')
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, duplicate_cols=None, missing_strategy='drop'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        duplicate_cols (list, optional): Columns to check for duplicates. 
+                                         If None, checks all columns.
+        missing_strategy (str): Strategy for handling missing values.
+                                Options: 'drop', 'fill_mean', 'fill_median', 'fill_zero'
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    if duplicate_cols is None:
+        duplicate_cols = cleaned_df.columns.tolist()
+    
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates(subset=duplicate_cols)
+    duplicates_removed = initial_rows - len(cleaned_df)
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'fill_mean':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+    elif missing_strategy == 'fill_median':
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif missing_strategy == 'fill_zero':
+        cleaned_df = cleaned_df.fillna(0)
+    
+    # Log cleaning results
+    final_rows = len(cleaned_df)
+    print(f"Initial rows: {initial_rows}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    print(f"Final rows: {final_rows}")
+    print(f"Rows removed: {initial_rows - final_rows}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of columns that must be present
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if DataFrame is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty')
+        return validation_results
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for completely empty columns
+    empty_columns = df.columns[df.isnull().all()].tolist()
+    if empty_columns:
+        validation_results['warnings'].append(f'Completely empty columns: {empty_columns}')
+    
+    # Check data types
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            unique_count = df[col].nunique()
+            if unique_count == 1:
+                validation_results['warnings'].append(f'Column "{col}" has only one unique value')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, duplicate_cols=['id', 'name'], missing_strategy='fill_mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    print("\nValidation Results:")
+    validation = validate_dataframe(cleaned, required_columns=['id', 'name', 'age', 'score'])
+    for key, value in validation.items():
+        print(f"{key}: {value}")
