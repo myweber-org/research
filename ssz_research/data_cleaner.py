@@ -117,4 +117,36 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'value')
     print("\nSummary statistics after cleaning:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, clean missing values, and save to a new file.
+    Missing numeric values are filled with the column median.
+    Missing categorical values are filled with the most frequent value.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        for column in df.columns:
+            if df[column].dtype in [np.float64, np.int64]:
+                median_value = df[column].median()
+                df[column].fillna(median_value, inplace=True)
+            else:
+                most_frequent = df[column].mode()[0] if not df[column].mode().empty else 'Unknown'
+                df[column].fillna(most_frequent, inplace=True)
+        
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned and saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    clean_csv_data('raw_data.csv', 'cleaned_data.csv')
