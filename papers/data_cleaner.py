@@ -1,168 +1,95 @@
-
-import re
-
-def filter_valid_emails(email_list):
-    """
-    Filters a list of email strings, returning only those that match a basic
-    email pattern.
-    """
-    if not isinstance(email_list, list):
-        raise TypeError("Input must be a list")
-    
-    valid_emails = []
-    # Basic email regex pattern
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    
-    for email in email_list:
-        if isinstance(email, str) and re.match(pattern, email):
-            valid_emails.append(email)
-    
-    return valid_emails
-
-def example_usage():
-    """Example of how to use the filter_valid_emails function."""
-    sample_emails = [
-        "user@example.com",
-        "invalid-email",
-        "another.user@domain.org",
-        "not.an.email@",
-        "test@sub.domain.co.uk"
-    ]
-    
-    result = filter_valid_emails(sample_emails)
-    print("Original list:", sample_emails)
-    print("Valid emails:", result)
-    return result
-
-if __name__ == "__main__":
-    example_usage()import pandas as pd
+import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(df, columns=None):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from specified columns using the Interquartile Range method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def clean_numeric_data(df, columns=None):
-    """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of column names to clean
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with outliers removed
     """
     if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    cleaned_df = df.copy()
+    df_clean = df.copy()
+    
     for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+            df_clean = df_clean[mask]
     
-    return cleaned_df
+    return df_clean.reset_index(drop=True)
 
-def get_statistics(df, column):
+def normalize_data(df, columns=None, method='minmax'):
     """
-    Calculate basic statistics for a column.
+    Normalize specified columns in the DataFrame.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
     
     Returns:
-        dict: Dictionary containing statistics
+    pd.DataFrame: DataFrame with normalized columns
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
+    df_norm = df.copy()
     
-    return stats
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            if method == 'minmax':
+                min_val = df[col].min()
+                max_val = df[col].max()
+                if max_val != min_val:
+                    df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            
+            elif method == 'zscore':
+                mean_val = df[col].mean()
+                std_val = df[col].std()
+                if std_val != 0:
+                    df_norm[col] = (df[col] - mean_val) / std_val
     
-    df = pd.DataFrame(sample_data)
-    print("Original shape:", df.shape)
+    return df_norm
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in the DataFrame.
     
-    cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    print("Cleaned shape:", cleaned_df.shape)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process
     
-    stats = get_statistics(cleaned_df, 'A')
-    print("Column A statistics:", stats)import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    if max_val == min_val:
-        return df[column].apply(lambda x: 0.5)
-    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
-
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
-
-def validate_data(df, required_columns):
-    missing_cols = [col for col in required_columns if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
-def deduplicate_list(original_list):
-    seen = set()
-    deduplicated = []
-    for item in original_list:
-        if item not in seen:
-            seen.add(item)
-            deduplicated.append(item)
-    return deduplicated
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns.tolist()
+    
+    df_processed = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_processed[col].fillna(df[col].mode()[0] if not df[col].mode().empty else None, inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+    
+    return df_processed.reset_index(drop=True)
