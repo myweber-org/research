@@ -187,3 +187,11 @@ if __name__ == "__main__":
     filled_df = cleaner.fill_missing_mean()
     missing_count = filled_df.isnull().sum().sum()
     print(f"\nAfter filling missing values: {missing_count} missing values remaining")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
