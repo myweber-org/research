@@ -245,3 +245,107 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned_df, required_columns=['Name', 'Email', 'Age'])
     print("Validation Results:")
     print(validation)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None, drop_threshold=0.5):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names containing text data
+    drop_threshold (float): Threshold for dropping columns with too many nulls
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    # Drop columns with excessive null values
+    null_ratio = df_clean.isnull().sum() / len(df_clean)
+    cols_to_drop = null_ratio[null_ratio > drop_threshold].index
+    df_clean = df_clean.drop(columns=cols_to_drop)
+    
+    # Fill numeric columns with median
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # Fill categorical/text columns with mode
+    if text_columns is None:
+        text_columns = df_clean.select_dtypes(include=['object']).columns
+    
+    for col in text_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 'Unknown')
+            df_clean[col] = df_clean[col].str.strip().str.lower()
+    
+    # Remove duplicate rows
+    df_clean = df_clean.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    if df.empty:
+        validation_results['warnings'].append('DataFrame is empty')
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_cols}')
+    
+    # Check for completely null columns
+    null_cols = df.columns[df.isnull().all()].tolist()
+    if null_cols:
+        validation_results['warnings'].append(f'Columns with all null values: {null_cols}')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', None, 'Charlie', 'Alice'],
+        'age': [25, None, 30, 35, 25],
+        'score': [85.5, 92.0, None, None, 85.5],
+        'department': ['IT', 'HR', 'IT', None, 'IT']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    cleaned_df = clean_dataset(df, text_columns=['name', 'department'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['name', 'age'])
+    print("\nValidation results:")
+    print(validation)
