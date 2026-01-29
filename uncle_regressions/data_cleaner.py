@@ -1,60 +1,128 @@
-
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def remove_missing_rows(df, columns=None):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove rows with missing values from specified columns or entire DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Method to fill missing values. 
-                        Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of columns to check for missing values.
+                                 If None, checks all columns.
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: DataFrame with rows containing missing values removed
     """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-            elif fill_missing == 'median':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
-    
-    return cleaned_df
+    if columns is None:
+        return df.dropna()
+    else:
+        return df.dropna(subset=columns)
 
-def validate_data(df, required_columns=None, min_rows=1):
+def fill_missing_with_mean(df, columns):
     """
-    Validate the structure and content of a DataFrame.
+    Fill missing values in specified columns with column mean.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    min_rows (int): Minimum number of rows required.
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to fill missing values
     
     Returns:
-    tuple: (bool, str) indicating validation result and message.
+        pd.DataFrame: DataFrame with missing values filled
     """
-    if df.empty:
-        return False, "DataFrame is empty"
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using Interquartile Range method.
     
-    if len(df) < min_rows:
-        return False, f"DataFrame has fewer than {min_rows} rows"
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
+    Returns:
+        pd.DataFrame: DataFrame containing only outlier rows
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    return True, "Data validation passed"
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers using Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to remove outliers from
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def standardize_column(df, column):
+    """
+    Standardize a column using z-score normalization.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_standardized = df.copy()
+    mean = df_standardized[column].mean()
+    std = df_standardized[column].std()
+    
+    if std != 0:
+        df_standardized[column] = (df_standardized[column] - mean) / std
+    
+    return df_standardized
+
+def get_data_summary(df):
+    """
+    Generate a summary of data quality including missing values and basic statistics.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Dictionary containing data summary
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.astype(str).to_dict(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    if summary['numeric_columns']:
+        summary['numeric_stats'] = df[summary['numeric_columns']].describe().to_dict()
+    
+    return summary
