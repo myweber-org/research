@@ -1,76 +1,81 @@
 
 import requests
 import json
-import os
+import logging
 from datetime import datetime
+from typing import Optional, Dict, Any
 
-def get_weather(city_name, api_key):
-    base_url = "http://api.openweathermap.org/data/2.5/weather"
-    params = {
-        'q': city_name,
-        'appid': api_key,
-        'units': 'metric'
-    }
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class WeatherFetcher:
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
     
-    try:
-        response = requests.get(base_url, params=params)
-        response.raise_for_status()
-        data = response.json()
+    def __init__(self, api_key: str):
+        self.api_key = api_key
         
-        if data['cod'] != 200:
-            return f"Error: {data.get('message', 'Unknown error')}"
-        
-        weather_info = {
-            'city': data['name'],
-            'country': data['sys']['country'],
-            'temperature': data['main']['temp'],
-            'feels_like': data['main']['feels_like'],
-            'humidity': data['main']['humidity'],
-            'pressure': data['main']['pressure'],
-            'weather': data['weather'][0]['description'],
-            'wind_speed': data['wind']['speed'],
-            'timestamp': datetime.fromtimestamp(data['dt']).strftime('%Y-%m-%d %H:%M:%S')
+    def get_weather(self, city: str, country_code: Optional[str] = None) -> Dict[str, Any]:
+        query = city
+        if country_code:
+            query = f"{city},{country_code}"
+            
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
         }
         
-        return weather_info
-        
-    except requests.exceptions.RequestException as e:
-        return f"Network error: {str(e)}"
-    except (KeyError, json.JSONDecodeError) as e:
-        return f"Data parsing error: {str(e)}"
-
-def display_weather(weather_data):
-    if isinstance(weather_data, dict):
-        print("\n" + "="*40)
-        print(f"Weather in {weather_data['city']}, {weather_data['country']}")
-        print("="*40)
-        print(f"Temperature: {weather_data['temperature']}°C")
-        print(f"Feels like: {weather_data['feels_like']}°C")
-        print(f"Weather: {weather_data['weather'].title()}")
-        print(f"Humidity: {weather_data['humidity']}%")
-        print(f"Pressure: {weather_data['pressure']} hPa")
-        print(f"Wind Speed: {weather_data['wind_speed']} m/s")
-        print(f"Last Updated: {weather_data['timestamp']}")
-        print("="*40)
-    else:
-        print(f"Error: {weather_data}")
+        try:
+            response = requests.get(self.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            processed_data = self._process_weather_data(data)
+            logger.info(f"Weather data fetched for {query}")
+            return processed_data
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error fetching weather: {e}")
+            return {'error': str(e)}
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON response: {e}")
+            return {'error': 'Invalid response from server'}
+        except KeyError as e:
+            logger.error(f"Missing expected data in response: {e}")
+            return {'error': 'Unexpected response format'}
+            
+    def _process_weather_data(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            'city': raw_data.get('name', 'Unknown'),
+            'temperature': raw_data.get('main', {}).get('temp'),
+            'feels_like': raw_data.get('main', {}).get('feels_like'),
+            'humidity': raw_data.get('main', {}).get('humidity'),
+            'pressure': raw_data.get('main', {}).get('pressure'),
+            'weather': raw_data.get('weather', [{}])[0].get('description'),
+            'wind_speed': raw_data.get('wind', {}).get('speed'),
+            'timestamp': datetime.now().isoformat()
+        }
 
 def main():
-    api_key = os.environ.get('OPENWEATHER_API_KEY')
+    api_key = "your_api_key_here"
+    fetcher = WeatherFetcher(api_key)
     
-    if not api_key:
-        print("Please set OPENWEATHER_API_KEY environment variable")
-        return
+    cities = [
+        ("London", "UK"),
+        ("New York", "US"),
+        ("Tokyo", "JP")
+    ]
     
-    city = input("Enter city name: ").strip()
-    
-    if not city:
-        print("City name cannot be empty")
-        return
-    
-    print(f"\nFetching weather for {city}...")
-    weather = get_weather(city, api_key)
-    display_weather(weather)
+    for city, country in cities:
+        print(f"\nFetching weather for {city}, {country}:")
+        weather = fetcher.get_weather(city, country)
+        
+        if 'error' not in weather:
+            print(f"Temperature: {weather['temperature']}°C")
+            print(f"Weather: {weather['weather']}")
+            print(f"Humidity: {weather['humidity']}%")
+        else:
+            print(f"Error: {weather['error']}")
 
 if __name__ == "__main__":
     main()
