@@ -1,21 +1,45 @@
 
-def clean_data(data):
-    """
-    Remove duplicate entries from a list and sort the remaining items.
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_column(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = normalize_column(cleaned_df, col)
+    cleaned_df = cleaned_df.dropna()
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'category': np.random.choice(['A', 'B', 'C'], 200)
+    }
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'feature1'] = 500
+    df.loc[20, 'feature2'] = 1000
     
-    Args:
-        data (list): A list of items that may contain duplicates.
+    numeric_cols = ['feature1', 'feature2']
+    cleaned = clean_dataset(df, numeric_cols)
     
-    Returns:
-        list: A new list with duplicates removed and sorted.
-    """
-    if not isinstance(data, list):
-        raise TypeError("Input must be a list")
-    
-    # Remove duplicates by converting to set, then back to list
-    unique_data = list(set(data))
-    
-    # Sort the list
-    sorted_data = sorted(unique_data)
-    
-    return sorted_data
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Outliers removed: {len(df) - len(cleaned)}")
+    print("\nCleaned data summary:")
+    print(cleaned[['feature1_normalized', 'feature2_normalized']].describe())
