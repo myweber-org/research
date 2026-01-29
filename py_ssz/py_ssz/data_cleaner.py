@@ -58,3 +58,11 @@ if __name__ == "__main__":
     print(cleaned_data)
     print("\nCleaned statistics:")
     print(calculate_summary_statistics(cleaned_data, 'values'))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
