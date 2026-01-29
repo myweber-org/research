@@ -171,3 +171,152 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset("raw_data.csv")
     cleaned_data.to_csv("cleaned_data.csv", index=False)
     print("Data cleaning completed. Cleaned data saved to cleaned_data.csv")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from specified column using IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
+            col_min = normalized_df[col].min()
+            col_max = normalized_df[col].max()
+            
+            if col_max != col_min:
+                normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with skewed distributions.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: absolute skewness threshold (default 0.5)
+    
+    Returns:
+        Dictionary with skewness values for columns exceeding threshold
+    """
+    skewed_cols = {}
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
+    
+    return skewed_cols
+
+def clean_dataset(dataframe, outlier_columns=None, normalize=True, skew_threshold=0.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        outlier_columns: list of columns for outlier removal (default: all numeric)
+        normalize: whether to normalize numeric columns
+        skew_threshold: threshold for detecting skewed columns
+    
+    Returns:
+        Tuple of (cleaned DataFrame, cleaning report)
+    """
+    df_clean = dataframe.copy()
+    report = {
+        'original_shape': dataframe.shape,
+        'outliers_removed': {},
+        'skewed_columns': {},
+        'normalized_columns': []
+    }
+    
+    if outlier_columns is None:
+        outlier_columns = df_clean.select_dtypes(include=[np.number]).columns
+    
+    for col in outlier_columns:
+        if col in df_clean.columns:
+            original_count = len(df_clean)
+            df_clean = remove_outliers_iqr(df_clean, col)
+            removed = original_count - len(df_clean)
+            if removed > 0:
+                report['outliers_removed'][col] = removed
+    
+    if normalize:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        df_clean = normalize_minmax(df_clean, numeric_cols)
+        report['normalized_columns'] = list(numeric_cols)
+    
+    skewed = detect_skewed_columns(df_clean, skew_threshold)
+    report['skewed_columns'] = skewed
+    report['final_shape'] = df_clean.shape
+    
+    return df_clean, report
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if dataframe.isnull().all().any():
+        return False, "Some columns contain only null values"
+    
+    return True, "DataFrame validation passed"
