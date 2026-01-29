@@ -62,3 +62,11 @@ if __name__ == "__main__":
         print(f"Error: File '{input_file}' not found.")
     except Exception as e:
         print(f"Error during data cleaning: {e}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
