@@ -1,24 +1,21 @@
-import pandas as pd
 
-def clean_dataset(df):
+def clean_data(data):
     """
-    Clean a pandas DataFrame by removing null values and duplicate rows.
+    Remove duplicate entries from a list and sort the remaining items.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to be cleaned.
+        data (list): A list of items that may contain duplicates.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        list: A new list with duplicates removed and sorted.
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
     
-    df_cleaned = df.copy()
+    # Remove duplicates by converting to set, then back to list
+    unique_data = list(set(data))
     
-    df_cleaned = df_cleaned.dropna()
+    # Sort the list
+    sorted_data = sorted(unique_data)
     
-    df_cleaned = df_cleaned.drop_duplicates()
-    
-    df_cleaned = df_cleaned.reset_index(drop=True)
-    
-    return df_cleaned
+    return sorted_data
