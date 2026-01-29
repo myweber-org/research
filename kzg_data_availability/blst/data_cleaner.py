@@ -210,4 +210,136 @@ def validate_dataframe(df, required_columns=None):
 #     print("Original DataFrame:")
 #     print(df)
 #     print("\nCleaned DataFrame:")
-#     print(cleaned)
+#     print(cleaned)import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing values in a DataFrame using specified strategy.
+    
+    Args:
+        df: pandas DataFrame containing data with missing values
+        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns: List of columns to apply cleaning to (None for all columns)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().sum() == 0:
+            continue
+        
+        if strategy == 'mean':
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+        
+        elif strategy == 'median':
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+        
+        elif strategy == 'mode':
+            if not df_clean[col].empty:
+                mode_value = df_clean[col].mode()
+                if not mode_value.empty:
+                    df_clean[col].fillna(mode_value[0], inplace=True)
+        
+        elif strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+    
+    return df_clean
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to check for outliers
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        Boolean mask indicating outliers
+    """
+    if column not in df.columns or not pd.api.types.is_numeric_dtype(df[column]):
+        return pd.Series([False] * len(df), index=df.index)
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in df.columns or not pd.api.types.is_numeric_dtype(df[column]):
+        return df[column]
+    
+    if method == 'minmax':
+        col_min = df[column].min()
+        col_max = df[column].max()
+        
+        if col_max == col_min:
+            return pd.Series([0.5] * len(df), index=df.index)
+        
+        return (df[column] - col_min) / (col_max - col_min)
+    
+    elif method == 'zscore':
+        col_mean = df[column].mean()
+        col_std = df[column].std()
+        
+        if col_std == 0:
+            return pd.Series([0] * len(df), index=df.index)
+        
+        return (df[column] - col_mean) / col_std
+    
+    return df[column]
+
+if __name__ == "__main__":
+    sample_data = {
+        'age': [25, 30, np.nan, 35, 40, 150, 28],
+        'salary': [50000, 60000, 70000, np.nan, 90000, 100000, 55000],
+        'department': ['IT', 'HR', 'IT', 'Finance', 'IT', 'HR', 'Finance']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_missing_data(df, strategy='mean')
+    print("DataFrame after cleaning missing values:")
+    print(cleaned_df)
+    print("\n")
+    
+    outliers = detect_outliers_iqr(cleaned_df, 'age')
+    print("Outliers in 'age' column:")
+    print(cleaned_df[outliers])
+    print("\n")
+    
+    cleaned_df['age_normalized'] = normalize_column(cleaned_df, 'age', method='minmax')
+    print("DataFrame with normalized age column:")
+    print(cleaned_df)
