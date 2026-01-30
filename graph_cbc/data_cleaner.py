@@ -451,4 +451,47 @@ def deduplicate_list(original_list):
         if item not in seen:
             seen.add(item)
             deduplicated.append(item)
-    return deduplicated
+    return deduplicatedimport csv
+import sys
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values
+    and trimming whitespace from all fields.
+    """
+    try:
+        with open(input_file, 'r', newline='') as infile, \
+             open(output_file, 'w', newline='') as outfile:
+            
+            reader = csv.reader(infile)
+            writer = csv.writer(outfile)
+            
+            header = next(reader)
+            writer.writerow(header)
+            
+            cleaned_count = 0
+            for row in reader:
+                # Trim whitespace from each field
+                trimmed_row = [field.strip() for field in row]
+                
+                # Skip rows with empty fields
+                if all(trimmed_row):
+                    writer.writerow(trimmed_row)
+                    cleaned_count += 1
+            
+            print(f"Cleaned {cleaned_count} rows")
+            print(f"Output saved to {output_file}")
+            
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    clean_csv(sys.argv[1], sys.argv[2])
