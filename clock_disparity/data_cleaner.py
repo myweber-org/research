@@ -175,4 +175,101 @@ def normalize_column(data, column):
     else:
         data[column + '_normalized'] = 0
     
-    return data
+    return dataimport pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_missing='mean', remove_duplicates=True):
+    """
+    Clean a pandas DataFrame by handling missing values and removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    columns_to_check (list): List of columns to check for missing values. If None, checks all columns.
+    fill_missing (str): Method to fill missing values - 'mean', 'median', 'mode', or 'drop'
+    remove_duplicates (bool): Whether to remove duplicate rows
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    if columns_to_check is None:
+        columns_to_check = df_clean.columns.tolist()
+    
+    if fill_missing != 'drop':
+        for col in columns_to_check:
+            if df_clean[col].isnull().any():
+                if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(df_clean[col]):
+                    df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+                elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(df_clean[col]):
+                    df_clean[col].fillna(df_clean[col].median(), inplace=True)
+                elif fill_missing == 'mode':
+                    df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0, inplace=True)
+                else:
+                    df_clean[col].fillna(0, inplace=True)
+    else:
+        df_clean.dropna(subset=columns_to_check, inplace=True)
+    
+    if remove_duplicates:
+        df_clean.drop_duplicates(inplace=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of columns that must be present
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame including missing values and data types.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary DataFrame
+    """
+    
+    summary_data = []
+    
+    for col in df.columns:
+        col_info = {
+            'column': col,
+            'dtype': str(df[col].dtype),
+            'non_null_count': df[col].count(),
+            'null_count': df[col].isnull().sum(),
+            'null_percentage': (df[col].isnull().sum() / len(df)) * 100,
+            'unique_values': df[col].nunique()
+        }
+        
+        if pd.api.types.is_numeric_dtype(df[col]):
+            col_info['mean'] = df[col].mean()
+            col_info['std'] = df[col].std()
+            col_info['min'] = df[col].min()
+            col_info['max'] = df[col].max()
+        
+        summary_data.append(col_info)
+    
+    return pd.DataFrame(summary_data)
