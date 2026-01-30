@@ -342,4 +342,91 @@ if __name__ == "__main__":
     
     cleaned_df['age_normalized'] = normalize_column(cleaned_df, 'age', method='minmax')
     print("DataFrame with normalized age column:")
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(filepath: str, 
+                   missing_strategy: str = 'drop', 
+                   fill_value: Optional[float] = None) -> pd.DataFrame:
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        filepath: Path to the CSV file
+        missing_strategy: Strategy for handling missing values ('drop', 'fill', 'interpolate')
+        fill_value: Value to fill missing entries when strategy is 'fill'
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    try:
+        df = pd.read_csv(filepath)
+        
+        if missing_strategy == 'drop':
+            df_clean = df.dropna()
+        elif missing_strategy == 'fill':
+            if fill_value is not None:
+                df_clean = df.fillna(fill_value)
+            else:
+                df_clean = df.fillna(df.mean(numeric_only=True))
+        elif missing_strategy == 'interpolate':
+            df_clean = df.interpolate(method='linear', limit_direction='forward')
+        else:
+            raise ValueError(f"Unsupported strategy: {missing_strategy}")
+        
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        if not numeric_cols.empty:
+            df_clean[numeric_cols] = df_clean[numeric_cols].round(2)
+        
+        return df_clean
+    
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return pd.DataFrame()
+    except pd.errors.EmptyDataError:
+        print("Error: CSV file is empty")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return pd.DataFrame()
+
+def validate_dataframe(df: pd.DataFrame, required_columns: list) -> bool:
+    """
+    Validate if DataFrame contains required columns and has valid data.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if df.empty:
+        return False
+    
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        print(f"Missing required columns: {missing_cols}")
+        return False
+    
+    return True
+
+def export_cleaned_data(df: pd.DataFrame, output_path: str) -> bool:
+    """
+    Export cleaned DataFrame to CSV file.
+    
+    Args:
+        df: DataFrame to export
+        output_path: Path for output CSV file
+    
+    Returns:
+        Boolean indicating if export was successful
+    """
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data exported to: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error exporting data: {str(e)}")
+        return False
