@@ -291,4 +291,101 @@ def clean_dataset(df, numeric_columns):
             df = remove_outliers_iqr(df, col)
     print(f"Original shape: {original_shape}, Cleaned shape: {df.shape}")
     print(f"Removed {original_shape[0] - df.shape[0]} rows")
-    return df
+    return dfimport pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            print(f"Loaded data with shape: {self.df.shape}")
+            return True
+        except FileNotFoundError:
+            print(f"Error: File not found at {self.file_path}")
+            return False
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            return False
+    
+    def remove_duplicates(self):
+        if self.df is not None:
+            initial_rows = len(self.df)
+            self.df.drop_duplicates(inplace=True)
+            removed = initial_rows - len(self.df)
+            print(f"Removed {removed} duplicate rows")
+            return removed
+        return 0
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            print("No data loaded")
+            return
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df.dropna(subset=[col], inplace=True)
+        
+        print(f"Handled missing values using {strategy} strategy")
+    
+    def normalize_numeric(self, columns=None):
+        if self.df is None:
+            print("No data loaded")
+            return
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        print(f"Normalized {len(columns)} numeric columns")
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            print("No data to save")
+            return False
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        try:
+            self.df.to_csv(output_path, index=False)
+            print(f"Saved cleaned data to {output_path}")
+            return True
+        except Exception as e:
+            print(f"Error saving data: {e}")
+            return False
+
+def clean_csv_file(input_file, output_file=None):
+    cleaner = DataCleaner(input_file)
+    
+    if not cleaner.load_data():
+        return False
+    
+    cleaner.remove_duplicates()
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.normalize_numeric()
+    
+    if output_file:
+        return cleaner.save_cleaned_data(output_file)
+    else:
+        return cleaner.save_cleaned_data()
