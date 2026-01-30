@@ -185,4 +185,120 @@ if __name__ == "__main__":
     print("\nCleaned data:")
     print(cleaned_df)
     print("\nCleaned statistics:")
-    print(calculate_summary_statistics(cleaned_df, 'values'))
+    print(calculate_summary_statistics(cleaned_df, 'values'))import numpy as np
+import pandas as pd
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from dataset.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize column using min-max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize column using z-score normalization.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(data, numeric_columns, outlier_threshold=1.5, normalization_method='minmax'):
+    """
+    Main cleaning function for numeric columns.
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        # Remove outliers
+        cleaned_data = remove_outliers(cleaned_data, col, outlier_threshold)
+        
+        # Apply normalization
+        if normalization_method == 'minmax':
+            cleaned_data[f'{col}_normalized'] = normalize_minmax(cleaned_data, col)
+        elif normalization_method == 'zscore':
+            cleaned_data[f'{col}_standardized'] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+def summary_statistics(data, numeric_columns):
+    """
+    Generate summary statistics for numeric columns.
+    """
+    stats = {}
+    for col in numeric_columns:
+        if col in data.columns:
+            stats[col] = {
+                'mean': data[col].mean(),
+                'median': data[col].median(),
+                'std': data[col].std(),
+                'min': data[col].min(),
+                'max': data[col].max(),
+                'count': data[col].count(),
+                'missing': data[col].isnull().sum()
+            }
+    return pd.DataFrame(stats).T
+
+# Example usage demonstration
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    })
+    
+    # Add some outliers
+    sample_data.loc[0, 'feature_a'] = 500
+    sample_data.loc[1, 'feature_b'] = 1000
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nOriginal summary:")
+    print(summary_statistics(sample_data, ['feature_a', 'feature_b']))
+    
+    # Clean the data
+    cleaned = clean_dataset(
+        sample_data, 
+        numeric_columns=['feature_a', 'feature_b'],
+        outlier_threshold=1.5,
+        normalization_method='minmax'
+    )
+    
+    print("\nCleaned data shape:", cleaned.shape)
+    print("\nCleaned summary:")
+    print(summary_statistics(cleaned, ['feature_a', 'feature_b']))
