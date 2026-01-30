@@ -398,3 +398,64 @@ def validate_dataframe(df):
     }
     
     return validation_results
+import pandas as pd
+import re
+
+def clean_string_column(series, case='lower', strip=True, remove_extra_spaces=True):
+    """
+    Standardize string values in a pandas Series.
+    """
+    if not pd.api.types.is_string_dtype(series):
+        series = series.astype(str)
+    
+    if case == 'lower':
+        series = series.str.lower()
+    elif case == 'upper':
+        series = series.str.upper()
+    elif case == 'title':
+        series = series.str.title()
+    
+    if strip:
+        series = series.str.strip()
+    
+    if remove_extra_spaces:
+        series = series.apply(lambda x: re.sub(r'\s+', ' ', x) if isinstance(x, str) else x)
+    
+    return series
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame with optional subset.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def standardize_missing_values(df, missing_values=['null', 'none', 'na', 'nan', ''], replacement=pd.NA):
+    """
+    Replace common missing value representations with pandas NA.
+    """
+    df = df.copy()
+    for col in df.columns:
+        if pd.api.types.is_string_dtype(df[col]):
+            df[col] = df[col].replace(missing_values, replacement)
+    return df
+
+def clean_dataframe(df, string_columns=None, case='lower', remove_dups=True, standardize_missing=True):
+    """
+    Apply multiple cleaning operations to a DataFrame.
+    """
+    df = df.copy()
+    
+    if standardize_missing:
+        df = standardize_missing_values(df)
+    
+    if string_columns is None:
+        string_columns = df.select_dtypes(include=['object']).columns
+    
+    for col in string_columns:
+        if col in df.columns:
+            df[col] = clean_string_column(df[col], case=case)
+    
+    if remove_dups:
+        df = remove_duplicates(df)
+    
+    return df
