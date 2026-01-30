@@ -1,62 +1,97 @@
+
 import pandas as pd
+import numpy as np
+from typing import List, Optional
 
-def clean_dataset(df):
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
     """
-    Clean a pandas DataFrame by removing null values and duplicates.
+    Remove duplicate rows from DataFrame.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to be cleaned.
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        DataFrame with duplicates removed
     """
-    # Remove rows with any null values
-    df_cleaned = df.dropna()
-    
-    # Remove duplicate rows
-    df_cleaned = df_cleaned.drop_duplicates()
-    
-    # Reset index after cleaning
-    df_cleaned = df_cleaned.reset_index(drop=True)
-    
-    return df_cleaned
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def filter_by_threshold(df, column, threshold):
+def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
     """
-    Filter DataFrame rows where column value is greater than threshold.
+    Normalize specified column using selected method.
     
     Args:
-        df (pd.DataFrame): Input DataFrame.
-        column (str): Column name to apply threshold.
-        threshold (float): Threshold value.
+        df: Input DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
     
     Returns:
-        pd.DataFrame: Filtered DataFrame.
+        DataFrame with normalized column
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    df = df.copy()
     
-    filtered_df = df[df[column] > threshold]
-    return filtered_df
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df[column] = (df[column] - mean_val) / std_val
+    
+    return df
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': [1, 2, None, 4, 2],
-        'B': [5, 6, 7, None, 6],
-        'C': [10, 20, 30, 40, 20]
-    }
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Handle missing values in numeric columns.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
+    Args:
+        df: Input DataFrame
+        strategy: Imputation strategy ('mean', 'median', or 'drop')
     
-    cleaned_df = clean_dataset(df)
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    print("\n")
+    Returns:
+        DataFrame with handled missing values
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    filtered_df = filter_by_threshold(cleaned_df, 'C', 15)
-    print("Filtered DataFrame (C > 15):")
-    print(filtered_df)
+    if strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    
+    return df
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_cols: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        normalize_cols: Columns to normalize
+        missing_strategy: Strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
