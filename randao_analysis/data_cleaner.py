@@ -408,4 +408,130 @@ if __name__ == "__main__":
     cleaned_df = cleaner.get_cleaned_data()
     print(f"\nCleaned data shape: {cleaned_df.shape}")
     print("First 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    print(cleaned_df.head())import pandas as pd
+import numpy as np
+from typing import Optional, List
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df: pd.DataFrame, strategy: str = 'mean', columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Fill missing values using specified strategy.
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+            elif strategy == 'zero':
+                df_filled[col] = df[col].fillna(0)
+        else:
+            if strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+            else:
+                df_filled[col] = df[col].fillna('')
+    
+    return df_filled
+
+def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize specified column using given method.
+    """
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            df_normalized[column] = (df[column] - mean_val) / std_val
+    
+    return df_normalized
+
+def remove_outliers(df: pd.DataFrame, column: str, method: str = 'iqr', threshold: float = 1.5) -> pd.DataFrame:
+    """
+    Remove outliers from specified column.
+    """
+    df_clean = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df_clean = df_clean[(df_clean[column] >= lower_bound) & (df_clean[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        z_scores = np.abs((df[column] - mean_val) / std_val)
+        df_clean = df_clean[z_scores <= threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def convert_data_types(df: pd.DataFrame, type_mapping: dict) -> pd.DataFrame:
+    """
+    Convert columns to specified data types.
+    """
+    df_converted = df.copy()
+    
+    for column, dtype in type_mapping.items():
+        if column in df.columns:
+            try:
+                if dtype == 'datetime':
+                    df_converted[column] = pd.to_datetime(df[column])
+                elif dtype == 'category':
+                    df_converted[column] = df[column].astype('category')
+                else:
+                    df_converted[column] = df[column].astype(dtype)
+            except Exception as e:
+                print(f"Error converting column {column}: {e}")
+    
+    return df_converted
+
+def clean_dataframe(df: pd.DataFrame, 
+                   remove_dups: bool = True,
+                   fill_na: bool = True,
+                   fill_strategy: str = 'mean',
+                   normalize_cols: Optional[List[str]] = None,
+                   outlier_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if fill_na:
+        cleaned_df = fill_missing_values(cleaned_df, strategy=fill_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    if outlier_cols:
+        for col in outlier_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers(cleaned_df, col)
+    
+    return cleaned_df
