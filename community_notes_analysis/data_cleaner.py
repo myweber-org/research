@@ -666,4 +666,168 @@ def handle_missing_values(df, strategy='mean', columns=None):
                 
             df_processed[col] = df[col].fillna(fill_value)
     
-    return df_processed.reset_index(drop=True)
+    return df_processed.reset_index(drop=True)import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns a cleaned Series and the indices of outliers removed.
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outlier_mask = (data < lower_bound) | (data > upper_bound)
+    cleaned_data = data[~outlier_mask].copy()
+    outlier_indices = data[outlier_mask].index.tolist()
+    
+    return cleaned_data, outlier_indices
+
+def normalize_minmax(data):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    Handles both pandas Series and numpy arrays.
+    """
+    if isinstance(data, pd.Series):
+        data_values = data.values
+    else:
+        data_values = np.array(data)
+    
+    if len(data_values) == 0:
+        return data_values
+    
+    data_min = np.min(data_values)
+    data_max = np.max(data_values)
+    
+    if data_max == data_min:
+        return np.zeros_like(data_values)
+    
+    normalized = (data_values - data_min) / (data_max - data_min)
+    
+    if isinstance(data, pd.Series):
+        return pd.Series(normalized, index=data.index)
+    return normalized
+
+def winsorize_data(data, limits=(0.05, 0.05)):
+    """
+    Apply winsorization to limit extreme values.
+    Uses scipy.stats.mstats.winsorize.
+    """
+    try:
+        winsorized = stats.mstats.winsorize(data, limits=limits)
+        return winsorized
+    except Exception as e:
+        print(f"Winsorization failed: {e}")
+        return data
+
+def clean_dataframe(df, numeric_columns=None, remove_outliers=True, normalize=False):
+    """
+    Clean a DataFrame by handling outliers and normalization for numeric columns.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    outlier_report = {}
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        original_data = cleaned_df[col].dropna()
+        
+        if remove_outliers and len(original_data) > 0:
+            cleaned_series, outliers = remove_outliers_iqr(original_data, col)
+            outlier_report[col] = {
+                'outlier_count': len(outliers),
+                'outlier_indices': outliers,
+                'removed_percentage': len(outliers) / len(original_data) * 100
+            }
+            cleaned_df.loc[original_data.index, col] = cleaned_series
+        
+        if normalize and len(original_data) > 0:
+            normalized_values = normalize_minmax(cleaned_df[col].dropna())
+            cleaned_df.loc[cleaned_df[col].notna(), col] = normalized_values
+    
+    return cleaned_df, outlier_report
+
+def validate_cleaning(original_df, cleaned_df, numeric_columns=None):
+    """
+    Validate the cleaning process by comparing statistics.
+    """
+    if numeric_columns is None:
+        numeric_columns = original_df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    validation_report = {}
+    
+    for col in numeric_columns:
+        if col not in original_df.columns or col not in cleaned_df.columns:
+            continue
+            
+        orig_stats = {
+            'mean': original_df[col].mean(),
+            'std': original_df[col].std(),
+            'min': original_df[col].min(),
+            'max': original_df[col].max(),
+            'count': original_df[col].count()
+        }
+        
+        clean_stats = {
+            'mean': cleaned_df[col].mean(),
+            'std': cleaned_df[col].std(),
+            'min': cleaned_df[col].min(),
+            'max': cleaned_df[col].max(),
+            'count': cleaned_df[col].count()
+        }
+        
+        validation_report[col] = {
+            'original': orig_stats,
+            'cleaned': clean_stats,
+            'rows_removed': orig_stats['count'] - clean_stats['count']
+        }
+    
+    return validation_report
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    # Add some outliers
+    sample_data.loc[10:15, 'feature1'] = 500
+    sample_data.loc[20:25, 'feature2'] = 1000
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nOriginal statistics:")
+    print(sample_data[['feature1', 'feature2']].describe())
+    
+    cleaned_data, report = clean_dataframe(
+        sample_data, 
+        numeric_columns=['feature1', 'feature2'],
+        remove_outliers=True,
+        normalize=True
+    )
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("\nCleaned statistics:")
+    print(cleaned_data[['feature1', 'feature2']].describe())
+    
+    print("\nOutlier report:")
+    for col, info in report.items():
+        print(f"{col}: {info['outlier_count']} outliers removed ({info['removed_percentage']:.2f}%)")
+    
+    validation = validate_cleaning(sample_data, cleaned_data)
+    print("\nValidation summary:")
+    for col, stats in validation.items():
+        print(f"{col}: {stats['rows_removed']} rows removed")
