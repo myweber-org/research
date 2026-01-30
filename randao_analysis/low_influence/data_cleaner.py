@@ -1,91 +1,82 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+def remove_outliers_iqr(data, column):
     """
-    Load and clean CSV data by handling missing values.
-    
-    Parameters:
-    filepath (str): Path to the CSV file.
-    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero').
-    drop_threshold (float): Drop columns with missing values above this ratio (0.0 to 1.0).
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Remove outliers using the Interquartile Range method.
     """
-    try:
-        df = pd.read_csv(filepath)
-    except FileNotFoundError:
-        print(f"Error: File '{filepath}' not found.")
-        return None
-    
-    original_shape = df.shape
-    print(f"Original data shape: {original_shape}")
-    
-    # Calculate missing ratio per column
-    missing_ratio = df.isnull().sum() / len(df)
-    
-    # Drop columns with missing ratio above threshold
-    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
-    df = df.drop(columns=columns_to_drop)
-    
-    if len(columns_to_drop) > 0:
-        print(f"Dropped columns with >{drop_threshold*100}% missing values: {list(columns_to_drop)}")
-    
-    # Fill remaining missing values based on strategy
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    if fill_strategy == 'mean':
-        fill_values = df[numeric_cols].mean()
-    elif fill_strategy == 'median':
-        fill_values = df[numeric_cols].median()
-    elif fill_strategy == 'mode':
-        fill_values = df[numeric_cols].mode().iloc[0]
-    elif fill_strategy == 'zero':
-        fill_values = 0
-    else:
-        print(f"Warning: Unknown fill strategy '{fill_strategy}'. Using 'mean'.")
-        fill_values = df[numeric_cols].mean()
-    
-    # Apply filling to numeric columns
-    df[numeric_cols] = df[numeric_cols].fillna(fill_values)
-    
-    # For non-numeric columns, fill with most frequent value
-    non_numeric_cols = df.select_dtypes(exclude=[np.number]).columns
-    for col in non_numeric_cols:
-        if df[col].isnull().any():
-            most_frequent = df[col].mode()[0] if not df[col].mode().empty else 'Unknown'
-            df[col] = df[col].fillna(most_frequent)
-    
-    # Remove any remaining rows with missing values (should be none after filling)
-    df = df.dropna()
-    
-    final_shape = df.shape
-    print(f"Cleaned data shape: {final_shape}")
-    print(f"Removed {original_shape[0] - final_shape[0]} rows and {original_shape[1] - final_shape[1]} columns")
-    
-    return df
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def export_cleaned_data(df, output_path):
+def remove_outliers_zscore(data, column, threshold=3):
     """
-    Export cleaned DataFrame to CSV.
-    
-    Parameters:
-    df (pd.DataFrame): Cleaned DataFrame.
-    output_path (str): Path for output CSV file.
+    Remove outliers using Z-score method.
     """
-    if df is not None:
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data exported to: {output_path}")
-        return True
-    return False
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
 
-if __name__ == "__main__":
-    # Example usage
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+def normalize_minmax(data, column):
+    """
+    Normalize data to [0, 1] range using Min-Max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score normalization (mean=0, std=1).
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Main cleaning function to process multiple numeric columns.
+    """
+    cleaned_df = df.copy()
     
-    cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalize_method == 'minmax':
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+        elif normalize_method == 'zscore':
+            cleaned_df[col] = normalize_zscore(cleaned_df, col)
     
-    if cleaned_df is not None:
-        export_cleaned_data(cleaned_df, output_file)
+    return cleaned_df
+
+def validate_data(df, required_columns, allow_nan=False):
+    """
+    Validate dataset structure and content.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if not allow_nan:
+        nan_counts = df.isnull().sum()
+        if nan_counts.any():
+            raise ValueError(f"Dataset contains NaN values in columns: {nan_counts[nan_counts > 0].index.tolist()}")
+    
+    return True
