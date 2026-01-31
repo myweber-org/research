@@ -1,113 +1,156 @@
+import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(data, column, multiplier=1.5):
+def clean_missing_data(df, strategy='mean', columns=None):
     """
-    Remove outliers from a dataset using the Interquartile Range method.
+    Clean missing values in a DataFrame using specified strategy.
     
     Args:
-        data: numpy array or list of numerical values
-        column: index or key to access the data column
-        multiplier: IQR multiplier for outlier detection (default: 1.5)
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for handling missing values. 
+                       Options: 'mean', 'median', 'mode', 'drop', 'fill_zero'
+        columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
     
     Returns:
-        Cleaned data without outliers
+        pd.DataFrame: Cleaned DataFrame
     """
-    if isinstance(data, list):
-        data = np.array(data)
+    df_clean = df.copy()
     
-    q1 = np.percentile(data[:, column], 25)
-    q3 = np.percentile(data[:, column], 75)
-    iqr = q3 - q1
+    if columns is None:
+        columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
     
-    lower_bound = q1 - multiplier * iqr
-    upper_bound = q3 + multiplier * iqr
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=columns)
+    elif strategy == 'mean':
+        for col in columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+    elif strategy == 'median':
+        for col in columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    elif strategy == 'mode':
+        for col in columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0)
+    elif strategy == 'fill_zero':
+        df_clean[columns] = df_clean[columns].fillna(0)
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
     
-    mask = (data[:, column] >= lower_bound) & (data[:, column] <= upper_bound)
-    cleaned_data = data[mask]
-    
-    return cleaned_data
+    return df_clean
 
-def calculate_statistics(data, column):
+def detect_outliers_iqr(df, columns=None, threshold=1.5):
     """
-    Calculate basic statistics for a data column.
+    Detect outliers using Interquartile Range method.
     
     Args:
-        data: numpy array
-        column: index of the column to analyze
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to check for outliers
+        threshold (float): IQR multiplier threshold
     
     Returns:
-        Dictionary containing mean, median, std, min, max
+        dict: Dictionary with outlier counts per column
     """
-    column_data = data[:, column]
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    stats = {
-        'mean': np.mean(column_data),
-        'median': np.median(column_data),
-        'std': np.std(column_data),
-        'min': np.min(column_data),
-        'max': np.max(column_data),
-        'count': len(column_data)
-    }
+    outliers = {}
     
-    return stats
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            outlier_mask = (df[col] < lower_bound) | (df[col] > upper_bound)
+            outliers[col] = outlier_mask.sum()
+    
+    return outliers
 
-def normalize_data(data, column, method='minmax'):
+def normalize_data(df, columns=None, method='minmax'):
     """
-    Normalize data in a column using specified method.
+    Normalize data in specified columns.
     
     Args:
-        data: numpy array
-        column: index of the column to normalize
-        method: normalization method ('minmax' or 'zscore')
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to normalize
+        method (str): Normalization method ('minmax' or 'zscore')
     
     Returns:
-        Data with normalized column
+        pd.DataFrame: DataFrame with normalized columns
     """
-    column_data = data[:, column].astype(float)
+    df_norm = df.copy()
+    
+    if columns is None:
+        columns = df_norm.select_dtypes(include=[np.number]).columns.tolist()
     
     if method == 'minmax':
-        min_val = np.min(column_data)
-        max_val = np.max(column_data)
-        if max_val - min_val != 0:
-            normalized = (column_data - min_val) / (max_val - min_val)
-        else:
-            normalized = np.zeros_like(column_data)
+        for col in columns:
+            if col in df_norm.columns:
+                min_val = df_norm[col].min()
+                max_val = df_norm[col].max()
+                if max_val > min_val:
+                    df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
     
     elif method == 'zscore':
-        mean = np.mean(column_data)
-        std = np.std(column_data)
-        if std != 0:
-            normalized = (column_data - mean) / std
-        else:
-            normalized = np.zeros_like(column_data)
+        for col in columns:
+            if col in df_norm.columns:
+                mean_val = df_norm[col].mean()
+                std_val = df_norm[col].std()
+                if std_val > 0:
+                    df_norm[col] = (df_norm[col] - mean_val) / std_val
     
-    else:
-        raise ValueError("Method must be 'minmax' or 'zscore'")
-    
-    data[:, column] = normalized
-    return data
+    return df_norm
 
-def validate_data(data, column, value_range=None):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
-    Validate data in a column against specified criteria.
+    Validate DataFrame structure and content.
     
     Args:
-        data: numpy array
-        column: index of the column to validate
-        value_range: tuple of (min, max) allowed values
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
     
     Returns:
-        Boolean mask indicating valid rows
+        tuple: (is_valid, error_message)
     """
-    column_data = data[:, column]
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
     
-    mask = np.ones(len(data), dtype=bool)
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
     
-    if value_range is not None:
-        min_val, max_val = value_range
-        mask = mask & (column_data >= min_val) & (column_data <= max_val)
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    mask = mask & ~np.isnan(column_data)
-    mask = mask & ~np.isinf(column_data)
+    return True, "DataFrame is valid"
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': [100, 200, 300, 400, 500],
+        'category': ['X', 'Y', 'X', 'Y', 'Z']
+    }
     
-    return mask
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (mean imputation):")
+    df_clean = clean_missing_data(df, strategy='mean')
+    print(df_clean)
+    
+    outliers = detect_outliers_iqr(df_clean)
+    print(f"\nOutlier counts: {outliers}")
+    
+    df_norm = normalize_data(df_clean, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(df_norm)
+    
+    is_valid, message = validate_dataframe(df_norm, min_rows=3)
+    print(f"\nValidation: {is_valid} - {message}")
