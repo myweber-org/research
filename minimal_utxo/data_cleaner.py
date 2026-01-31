@@ -74,4 +74,55 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_dataframe(cleaned)
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for identifying duplicates.
+        keep (str, optional): Determines which duplicates to keep.
+            'first' : Keep the first occurrence.
+            'last'  : Keep the last occurrence.
+            False   : Drop all duplicates.
+
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_column(df, column_name, fill_method='mean'):
+    """
+    Clean a numeric column by filling missing values.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of the column to clean.
+        fill_method (str): Method to fill missing values ('mean', 'median', 'zero').
+
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+    if df[column_name].dtype not in ['int64', 'float64']:
+        raise TypeError(f"Column '{column_name}' is not numeric")
+
+    if fill_method == 'mean':
+        fill_value = df[column_name].mean()
+    elif fill_method == 'median':
+        fill_value = df[column_name].median()
+    elif fill_method == 'zero':
+        fill_value = 0
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
+
+    df[column_name] = df[column_name].fillna(fill_value)
+    return df
