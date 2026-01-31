@@ -188,4 +188,104 @@ if __name__ == "__main__":
     for col, col_stats in stats.items():
         print(f"{col}:")
         for stat_name, stat_value in col_stats.items():
-            print(f"  {stat_name}: {stat_value:.2f}" if isinstance(stat_value, float) else f"  {stat_name}: {stat_value}")
+            print(f"  {stat_name}: {stat_value:.2f}" if isinstance(stat_value, float) else f"  {stat_name}: {stat_value}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    If subset is provided, only consider specified columns for duplicates.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in DataFrame.
+    Strategies: 'mean', 'median', 'mode', or 'constant'
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+            elif strategy == 'constant':
+                df_filled[col] = df[col].fillna(0)
+        else:
+            df_filled[col] = df[col].fillna(df[col].mode()[0])
+    
+    return df_filled
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    Methods: 'minmax', 'zscore'
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df[column] = (df[column] - mean_val) / std_val
+    
+    return df
+
+def detect_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Detect outliers in a column.
+    Returns boolean mask where True indicates outlier.
+    """
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        return (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    elif method == 'zscore':
+        z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+        return z_scores > threshold
+    
+    return pd.Series(False, index=df.index)
+
+def clean_dataframe(df, 
+                   remove_dups=True, 
+                   fill_na=True, 
+                   fill_strategy='mean',
+                   normalize_cols=None,
+                   outlier_cols=None):
+    """
+    Comprehensive dataframe cleaning function.
+    """
+    df_clean = df.copy()
+    
+    if remove_dups:
+        df_clean = remove_duplicates(df_clean)
+    
+    if fill_na:
+        df_clean = fill_missing_values(df_clean, strategy=fill_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in df_clean.columns:
+                df_clean = normalize_column(df_clean, col)
+    
+    if outlier_cols:
+        for col in outlier_cols:
+            if col in df_clean.columns:
+                outliers = detect_outliers(df_clean, col)
+                df_clean = df_clean[~outliers]
+    
+    return df_clean.reset_index(drop=True)
