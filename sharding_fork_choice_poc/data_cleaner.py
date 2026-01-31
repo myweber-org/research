@@ -657,3 +657,77 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, ['A', 'B'])
     print("\nCleaned DataFrame:")
     print(cleaned)
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean', remove_columns=None):
+    """
+    Clean CSV data by handling missing values and removing specified columns.
+    
+    Parameters:
+    file_path (str): Path to the CSV file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+    remove_columns (list): List of column names to remove
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    original_shape = df.shape
+    
+    if remove_columns:
+        df = df.drop(columns=[col for col in remove_columns if col in df.columns])
+    
+    for column in df.select_dtypes(include=[np.number]).columns:
+        if df[column].isnull().any():
+            if fill_method == 'mean':
+                fill_value = df[column].mean()
+            elif fill_method == 'median':
+                fill_value = df[column].median()
+            elif fill_method == 'mode':
+                fill_value = df[column].mode()[0] if not df[column].mode().empty else 0
+            elif fill_method == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Invalid fill method: {fill_method}")
+            
+            df[column] = df[column].fillna(fill_value)
+    
+    for column in df.select_dtypes(exclude=[np.number]).columns:
+        df[column] = df[column].fillna('Unknown')
+    
+    print(f"Data cleaning completed:")
+    print(f"  Original shape: {original_shape}")
+    print(f"  Final shape: {df.shape}")
+    print(f"  Missing values filled using: {fill_method}")
+    
+    return df
+
+def export_cleaned_data(df, output_path):
+    """
+    Export cleaned DataFrame to CSV.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to export
+    output_path (str): Path for output CSV file
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data exported to: {output_path}")
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, 4, 5],
+        'C': ['a', 'b', np.nan, 'd', 'e'],
+        'D': [10, 20, 30, 40, 50]
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_method='median', remove_columns=['D'])
+    export_cleaned_data(cleaned_df, 'cleaned_sample_data.csv')
