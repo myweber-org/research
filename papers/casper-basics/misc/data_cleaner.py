@@ -154,3 +154,68 @@ def process_data(file_path, output_path=None, **clean_kwargs):
     except Exception as e:
         print(f"Error processing data: {e}")
         return None
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {original_shape[0] - cleaned_df.shape[0]} duplicate rows.")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        for column in cleaned_df.columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(cleaned_df[column]):
+                    fill_value = cleaned_df[column].mean()
+                elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(cleaned_df[column]):
+                    fill_value = cleaned_df[column].median()
+                elif fill_missing == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                else:
+                    fill_value = 0 if pd.api.types.is_numeric_dtype(cleaned_df[column]) else 'Unknown'
+                cleaned_df[column].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in '{column}' with {fill_value}.")
+
+    print(f"Data cleaning complete. Original shape: {original_shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate the DataFrame for required columns and data types.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+
+    for column in df.columns:
+        if df[column].dtype == 'object':
+            unique_count = df[column].nunique()
+            if unique_count / len(df) > 0.5:
+                print(f"Warning: Column '{column}' has high cardinality ({unique_count} unique values).")
+
+    print("Data validation passed.")
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, np.nan, 15.0, 20.0, np.nan, 30.0],
+        'category': ['A', 'B', 'B', 'A', 'C', 'A']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validate_dataframe(cleaned_df, required_columns=['id', 'value', 'category'])
