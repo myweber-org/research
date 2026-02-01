@@ -1,140 +1,111 @@
-
 import pandas as pd
 import numpy as np
+from typing import List, Optional
 
-def remove_missing_rows(df, columns=None):
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
     """
-    Remove rows with missing values from DataFrame.
-    If columns specified, only check those columns.
-    """
-    if columns:
-        return df.dropna(subset=columns)
-    return df.dropna()
-
-def fill_missing_with_mean(df, columns):
-    """
-    Fill missing values in specified columns with column mean.
-    """
-    df_filled = df.copy()
-    for col in columns:
-        if col in df.columns:
-            mean_val = df[col].mean()
-            df_filled[col].fillna(mean_val, inplace=True)
-    return df_filled
-
-def detect_outliers_iqr(df, column):
-    """
-    Detect outliers using IQR method for a specific column.
-    Returns boolean Series indicating outliers.
-    """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    return (df[column] < lower_bound) | (df[column] > upper_bound)
-
-def remove_outliers(df, column):
-    """
-    Remove rows where specified column contains outliers.
-    """
-    outliers = detect_outliers_iqr(df, column)
-    return df[~outliers]
-
-def standardize_column(df, column):
-    """
-    Standardize a column to have mean=0 and std=1.
-    """
-    df_standardized = df.copy()
-    if column in df.columns:
-        mean = df[column].mean()
-        std = df[column].std()
-        if std > 0:
-            df_standardized[column] = (df[column] - mean) / std
-    return df_standardized
-
-def clean_dataset(df, missing_strategy='remove', outlier_columns=None):
-    """
-    Comprehensive data cleaning function.
-    """
-    cleaned_df = df.copy()
-    
-    # Handle missing values
-    if missing_strategy == 'remove':
-        cleaned_df = remove_missing_rows(cleaned_df)
-    elif missing_strategy == 'mean':
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        cleaned_df = fill_missing_with_mean(cleaned_df, numeric_cols)
-    
-    # Handle outliers
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in cleaned_df.columns:
-                cleaned_df = remove_outliers(cleaned_df, col)
-    
-    return cleaned_df
-import pandas as pd
-
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
+    Remove duplicate rows from DataFrame.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        subset (list, optional): Columns to consider for duplicates
-        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed
+        DataFrame with duplicates removed
     """
-    if df.empty:
-        return df
-    
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    
-    removed_count = len(df) - len(cleaned_df)
-    if removed_count > 0:
-        print(f"Removed {removed_count} duplicate rows")
-    
-    return cleaned_df
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def clean_numeric_columns(df, columns):
+def normalize_text_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
     """
-    Clean numeric columns by converting to appropriate types.
+    Normalize text column by converting to lowercase and stripping whitespace.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): List of column names to clean
+        df: Input DataFrame
+        column: Name of column to normalize
     
     Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns
+        DataFrame with normalized column
     """
-    cleaned_df = df.copy()
+    df = df.copy()
+    df[column] = df[column].astype(str).str.lower().str.strip()
+    return df
+
+def fill_missing_values(df: pd.DataFrame, strategy: str = 'mean', columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Fill missing values in DataFrame columns.
+    
+    Args:
+        df: Input DataFrame
+        strategy: Method for filling missing values ('mean', 'median', 'mode', 'constant')
+        columns: Specific columns to fill, fills all numeric columns if None
+    
+    Returns:
+        DataFrame with missing values filled
+    """
+    df = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
     for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+        if col not in df.columns:
+            continue
+            
+        if strategy == 'mean':
+            df[col] = df[col].fillna(df[col].mean())
+        elif strategy == 'median':
+            df[col] = df[col].fillna(df[col].median())
+        elif strategy == 'mode':
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+        elif strategy == 'constant':
+            df[col] = df[col].fillna(0)
     
-    return cleaned_df
+    return df
 
-def validate_dataframe(df, required_columns=None):
+def clean_dataset(df: pd.DataFrame, 
+                  text_columns: Optional[List[str]] = None,
+                  numeric_strategy: str = 'mean') -> pd.DataFrame:
     """
-    Validate DataFrame structure and content.
+    Comprehensive data cleaning pipeline.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list, optional): Required columns
+        df: Input DataFrame
+        text_columns: List of text columns to normalize
+        numeric_strategy: Strategy for filling numeric missing values
     
     Returns:
-        tuple: (is_valid, error_message)
+        Cleaned DataFrame
     """
+    df_clean = df.copy()
+    
+    df_clean = remove_duplicates(df_clean)
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean = normalize_text_column(df_clean, col)
+    
+    df_clean = fill_missing_values(df_clean, strategy=numeric_strategy)
+    
+    return df_clean
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Basic validation of DataFrame structure.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        True if DataFrame passes validation checks
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
     if df.empty:
-        return False, "DataFrame is empty"
+        return False
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    if df.columns.duplicated().any():
+        return False
     
-    return True, "DataFrame is valid"
+    return True
