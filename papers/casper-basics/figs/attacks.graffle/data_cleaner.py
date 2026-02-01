@@ -60,4 +60,14 @@ if __name__ == "__main__":
     
     print(f"Original data: {sample_data}")
     print(f"Cleaned data: {cleaned_data}")
-    print(f"Statistics: {stats}")
+    print(f"Statistics: {stats}")def clean_data(data):
+    """
+    Remove duplicate entries from a list and sort the remaining items.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
+    # Remove duplicates by converting to a set, then back to a list
+    unique_data = list(set(data))
+    # Sort the list
+    unique_data.sort()
+    return unique_data
