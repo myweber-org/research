@@ -301,4 +301,78 @@ if __name__ == "__main__":
     
     print("\nCleaned data shape:", cleaned.shape)
     print("\nCleaned summary:")
-    print(summary_statistics(cleaned, ['feature_a', 'feature_b']))
+    print(summary_statistics(cleaned, ['feature_a', 'feature_b']))import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Args:
+        dataframe: Input DataFrame
+        subset: Column label or sequence of labels to consider for duplicates
+        keep: {'first', 'last', False} - Which duplicates to keep
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if dataframe.empty:
+        return dataframe
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def clean_numeric_column(dataframe, column_name):
+    """
+    Clean a numeric column by converting to appropriate type and handling errors.
+    
+    Args:
+        dataframe: Input DataFrame
+        column_name: Name of the column to clean
+    
+    Returns:
+        DataFrame with cleaned column
+    """
+    if column_name not in dataframe.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    original_dtype = dataframe[column_name].dtype
+    
+    try:
+        dataframe[column_name] = pd.to_numeric(dataframe[column_name], errors='coerce')
+        print(f"Converted column '{column_name}' from {original_dtype} to numeric")
+    except Exception as e:
+        print(f"Error cleaning column '{column_name}': {e}")
+    
+    return dataframe
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: DataFrame to validate
+        required_columns: List of columns that must be present
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if dataframe.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
