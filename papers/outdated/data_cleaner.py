@@ -681,3 +681,54 @@ if __name__ == "__main__":
     no_outliers = remove_outliers_iqr(cleaned, 'age')
     print("Data without outliers:")
     print(no_outliers)
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase, removing extra spaces,
+    and stripping special characters.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str)
+    df[column_name] = df[column_name].str.lower()
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^\w\s]', '', x))
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def validate_email_column(df, column_name):
+    """
+    Validate email addresses in a column and return a boolean series.
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[column_name].astype(str).str.match(email_pattern)
+
+def clean_dataset(df, text_columns=None, deduplicate=True, email_columns=None):
+    """
+    Comprehensive data cleaning function.
+    """
+    cleaned_df = df.copy()
+    
+    if text_columns:
+        for col in text_columns:
+            cleaned_df = clean_text_column(cleaned_df, col)
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if email_columns:
+        for col in email_columns:
+            mask = validate_email_column(cleaned_df, col)
+            cleaned_df = cleaned_df[mask]
+    
+    return cleaned_df
