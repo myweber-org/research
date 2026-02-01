@@ -150,4 +150,63 @@ def validate_dataframe(df, required_columns):
     if columns_with_nulls:
         print(f"Warning: Null values found in columns: {columns_with_nulls}")
     
-    return len(columns_with_nulls) == 0
+    return len(columns_with_nulls) == 0import re
+import json
+from typing import Dict, Any, List, Optional
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value)
+    return ' '.join(value.strip().split())
+
+def validate_email(email: str) -> bool:
+    """Validate email format using regex."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(data_list: List[Any]) -> List[Any]:
+    """Remove duplicates while preserving order."""
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def sanitize_json(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Sanitize dictionary by cleaning string values."""
+    sanitized = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            sanitized[key] = clean_string(value)
+        elif isinstance(value, dict):
+            sanitized[key] = sanitize_json(value)
+        elif isinstance(value, list):
+            sanitized[key] = [sanitize_json(item) if isinstance(item, dict) else 
+                             (clean_string(item) if isinstance(item, str) else item) 
+                             for item in value]
+        else:
+            sanitized[key] = value
+    return sanitized
+
+def load_and_validate_config(filepath: str) -> Optional[Dict[str, Any]]:
+    """Load and validate JSON configuration file."""
+    try:
+        with open(filepath, 'r') as f:
+            config = json.load(f)
+        
+        if not isinstance(config, dict):
+            raise ValueError("Config must be a JSON object")
+        
+        return sanitize_json(config)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        print(f"Error loading config: {e}")
+        return None
+
+def filter_by_keyword(data_list: List[str], keyword: str) -> List[str]:
+    """Filter list of strings containing specific keyword."""
+    if not keyword:
+        return data_list
+    return [item for item in data_list if keyword.lower() in item.lower()]
