@@ -139,3 +139,62 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "Data validation passed"
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing string columns.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # If specific columns are provided, clean only those; otherwise clean all object columns
+    if columns_to_clean is None:
+        columns_to_clean = df_cleaned.select_dtypes(include=['object']).columns
+    
+    for col in columns_to_clean:
+        if col in df_cleaned.columns:
+            df_cleaned[col] = df_cleaned[col].apply(_normalize_string)
+    
+    return df_cleaned
+
+def _normalize_string(value):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if isinstance(value, str):
+        # Convert to lowercase
+        value = value.lower()
+        # Remove extra whitespace
+        value = re.sub(r'\s+', ' ', value).strip()
+        # Remove special characters except alphanumeric and spaces
+        value = re.sub(r'[^a-z0-9\s]', '', value)
+    return value
+
+def validate_email(email):
+    """
+    Validate an email address format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email)) if isinstance(email, str) else False
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Alice   Johnson  '],
+        'email': ['john@example.com', 'jane@example.com', 'invalid-email', 'alice@test.org'],
+        'age': [25, 30, 25, 28]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataframe(df, columns_to_clean=['name'])
+    print(cleaned_df)
+    
+    print("\nEmail Validation:")
+    for email in cleaned_df['email']:
+        print(f"{email}: {validate_email(email)}")
