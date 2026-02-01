@@ -260,3 +260,56 @@ def process_dataset(file_path, column_name):
         raise FileNotFoundError(f"File not found: {file_path}")
     except Exception as e:
         raise RuntimeError(f"Error processing dataset: {str(e)}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Remove duplicate rows and standardize column names.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    
+    return df
+
+def main():
+    # Example usage
+    data = {
+        'ID': [1, 2, 2, 3, 4],
+        'Name': ['Alice', 'Bob', 'Bob', 'Charlie', None],
+        'Age': [25, 30, 30, None, 35],
+        'Score': [85.5, 92.0, 92.0, 78.5, 88.0]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    df_cleaned = clean_dataset(df)
+    print("\nAfter cleaning duplicates and standardizing columns:")
+    print(df_cleaned)
+    
+    df_filled = handle_missing_values(df_cleaned, strategy='mean')
+    print("\nAfter handling missing values:")
+    print(df_filled)
+
+if __name__ == "__main__":
+    main()
