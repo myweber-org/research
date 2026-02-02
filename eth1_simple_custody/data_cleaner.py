@@ -124,4 +124,62 @@ def validate_data_types(data, expected_types):
                 'valid': expected_type in actual_type
             }
     
-    return validation_results
+    return validation_resultsimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data to range [0, 1] using min-max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization (mean=0, std=1).
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns):
+    """
+    Apply outlier removal and normalization to specified numeric columns.
+    Returns a cleaned copy of the DataFrame.
+    """
+    df_clean = df.copy()
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, col)
+            df_clean[col + '_normalized'] = normalize_minmax(df_clean, col)
+            df_clean[col + '_standardized'] = standardize_zscore(df_clean, col)
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 15, 10, 9]}
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    cleaned_df = clean_dataset(df, ['values'])
+    print("\nCleaned DataFrame with normalized and standardized columns:")
+    print(cleaned_df)
