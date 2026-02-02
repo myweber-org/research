@@ -166,4 +166,122 @@ def clean_dataset(df, outlier_removal=True, normalization='standardize', fill_mi
     cleaned_df = cleaner.get_cleaned_data()
     stats = cleaner.get_cleaning_stats()
     
-    return cleaned_df, stats
+    return cleaned_df, statsimport pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, z_threshold=3, fill_method='median'):
+    """
+    Clean a dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    z_threshold (float): Z-score threshold for outlier detection
+    fill_method (str): Method for filling missing values ('median' or 'mean')
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if df.empty:
+        return df
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in numeric_columns:
+        if col not in df_clean.columns:
+            continue
+            
+        series = df_clean[col]
+        
+        if fill_method == 'median':
+            fill_value = series.median()
+        else:
+            fill_value = series.mean()
+        
+        df_clean[col] = series.fillna(fill_value)
+        
+        if len(series) > 10:
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            df_clean = df_clean[z_scores < z_threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_columns(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in a dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col not in df_norm.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val > 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    subset (list): List of column names to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: Dataframe without duplicates
+    """
+    return df.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"Dataframe has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataframe is valid"
