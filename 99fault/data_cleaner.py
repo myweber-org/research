@@ -126,3 +126,99 @@ def validate_data(data, required_columns=None, min_rows=1):
             raise ValueError(f"Missing required columns: {missing_columns}")
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        
+        self.df = df_clean
+        removed_count = self.original_shape[0] - self.df.shape[0]
+        return removed_count
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        return self.df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'current_rows': self.df.shape[0],
+            'original_columns': self.original_shape[1],
+            'current_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+        return summary
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.uniform(0, 1, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature_a'] = np.nan
+    df.loc[95, 'feature_b'] = 1000
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Initial data shape:", cleaner.original_shape)
+    print("Missing values before:", sample_df.isnull().sum().sum())
+    
+    cleaner.fill_missing_median()
+    removed = cleaner.remove_outliers_iqr(threshold=1.5)
+    cleaner.normalize_minmax()
+    
+    summary = cleaner.get_summary()
+    print(f"Rows removed: {removed}")
+    print(f"Final shape: {cleaner.df.shape}")
+    print(f"Missing values after: {summary['missing_values']}")
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_df.head())
