@@ -429,3 +429,202 @@ if __name__ == "__main__":
     print("\nStatistics for feature1:")
     for key, value in stats['feature1'].items():
         print(f"{key}: {value:.2f}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: Z-score threshold (default 3)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        data[column + '_normalized'] = 0.5
+    else:
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    return data
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        data[column + '_standardized'] = 0
+    else:
+        data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names to process
+        outlier_method: 'iqr' or 'zscore' (default 'iqr')
+        normalize_method: 'minmax' or 'zscore' (default 'minmax')
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column not in cleaned_data.columns:
+            print(f"Warning: Column '{column}' not found, skipping")
+            continue
+        
+        if outlier_method == 'iqr':
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+        elif outlier_method == 'zscore':
+            cleaned_data = remove_outliers_zscore(cleaned_data, column)
+        else:
+            raise ValueError("outlier_method must be 'iqr' or 'zscore'")
+        
+        if normalize_method == 'minmax':
+            cleaned_data = normalize_minmax(cleaned_data, column)
+        elif normalize_method == 'zscore':
+            cleaned_data = normalize_zscore(cleaned_data, column)
+        else:
+            raise ValueError("normalize_method must be 'minmax' or 'zscore'")
+    
+    return cleaned_data
+
+def get_summary_statistics(data, numeric_columns):
+    """
+    Generate summary statistics for numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names
+    
+    Returns:
+        Dictionary with summary statistics
+    """
+    summary = {}
+    
+    for column in numeric_columns:
+        if column in data.columns:
+            col_data = data[column]
+            summary[column] = {
+                'count': len(col_data),
+                'mean': col_data.mean(),
+                'std': col_data.std(),
+                'min': col_data.min(),
+                '25%': col_data.quantile(0.25),
+                'median': col_data.median(),
+                '75%': col_data.quantile(0.75),
+                'max': col_data.max(),
+                'missing': col_data.isnull().sum()
+            }
+    
+    return summary
+
+def example_usage():
+    """
+    Example usage of the data cleaning utilities.
+    """
+    np.random.seed(42)
+    
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nOriginal summary statistics:")
+    stats_original = get_summary_statistics(sample_data, ['feature_a', 'feature_b', 'feature_c'])
+    for col, stat in stats_original.items():
+        print(f"\n{col}:")
+        for key, value in stat.items():
+            print(f"  {key}: {value:.4f}")
+    
+    cleaned_data = clean_dataset(
+        sample_data,
+        numeric_columns=['feature_a', 'feature_b', 'feature_c'],
+        outlier_method='iqr',
+        normalize_method='minmax'
+    )
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("\nCleaned summary statistics:")
+    stats_cleaned = get_summary_statistics(cleaned_data, ['feature_a_normalized', 'feature_b_normalized', 'feature_c_normalized'])
+    for col, stat in stats_cleaned.items():
+        print(f"\n{col}:")
+        for key, value in stat.items():
+            print(f"  {key}: {value:.4f}")
+
+if __name__ == "__main__":
+    example_usage()
