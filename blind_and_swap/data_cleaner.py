@@ -136,4 +136,101 @@ def validate_data(df, required_columns=None, min_rows=1):
     if df.isnull().all().any():
         raise ValueError("Dataset contains columns with all null values")
     
-    return True
+    return Trueimport pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_clean (list, optional): List of column names to apply string normalization.
+            If None, all object dtype columns are cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Determine columns to normalize
+    if columns_to_clean is None:
+        columns_to_clean = cleaned_df.select_dtypes(include=['object']).columns.tolist()
+    
+    # Normalize string columns
+    for col in columns_to_clean:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+    
+    return cleaned_df
+
+def _normalize_string(s):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters from the edges.
+    
+    Args:
+        s (str): Input string.
+    
+    Returns:
+        str: Normalized string.
+    """
+    if not isinstance(s, str):
+        return s
+    
+    # Convert to lowercase
+    s = s.lower()
+    
+    # Remove leading/trailing whitespace
+    s = s.strip()
+    
+    # Replace multiple spaces with single space
+    s = re.sub(r'\s+', ' ', s)
+    
+    return s
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        email_column (str): Name of the column containing email addresses.
+    
+    Returns:
+        pd.DataFrame: DataFrame with an additional 'email_valid' boolean column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    validated_df = df.copy()
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validated_df['email_valid'] = validated_df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    return validated_df
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = {
+#         'name': ['John Doe', 'Jane Smith', 'John Doe', '  Bob Johnson  '],
+#         'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.co.uk'],
+#         'age': [25, 30, 25, 35]
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     
+#     cleaned = clean_dataframe(df)
+#     print("\nCleaned DataFrame:")
+#     print(cleaned)
+#     
+#     validated = validate_email_column(cleaned, 'email')
+#     print("\nDataFrame with email validation:")
+#     print(validated)
