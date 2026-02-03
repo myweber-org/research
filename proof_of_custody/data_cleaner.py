@@ -583,4 +583,104 @@ if __name__ == "__main__":
     if validation_passed:
         print("\nData is ready for analysis!")
     else:
-        print("\nData requires further cleaning")
+        print("\nData requires further cleaning")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
+    
+    summary.loc['variance'] = df[numeric_cols].var()
+    summary.loc['skewness'] = df[numeric_cols].skew()
+    summary.loc['kurtosis'] = df[numeric_cols].kurtosis()
+    
+    return summary
+
+def normalize_data(df, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col in df.columns and np.issubdtype(df[col].dtype, np.number):
+            min_val = df[col].min()
+            max_val = df[col].max()
+            
+            if max_val != min_val:
+                normalized_df[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_processed = df.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                df_processed[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_processed[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_processed[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+    
+    return df_processed
