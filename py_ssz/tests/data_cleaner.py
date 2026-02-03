@@ -253,3 +253,116 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_data, ['feature1', 'feature2'])
     print("\nCleaned data shape:", cleaned.shape)
     print("\nAvailable columns:", cleaned.columns.tolist())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return dataframe[(dataframe[column] >= lower_bound) & 
+                     (dataframe[column] <= upper_bound)]
+
+def zscore_normalize(dataframe, column):
+    """
+    Normalize column using z-score normalization
+    """
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val > 0:
+        dataframe[column + '_normalized'] = (dataframe[column] - mean_val) / std_val
+    else:
+        dataframe[column + '_normalized'] = 0
+    
+    return dataframe
+
+def minmax_normalize(dataframe, column, feature_range=(0, 1)):
+    """
+    Normalize column using min-max normalization
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val > min_val:
+        dataframe[column + '_scaled'] = (
+            (dataframe[column] - min_val) / (max_val - min_val) * 
+            (feature_range[1] - feature_range[0]) + feature_range[0]
+        )
+    else:
+        dataframe[column + '_scaled'] = feature_range[0]
+    
+    return dataframe
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    if columns is None:
+        columns = dataframe.columns
+    
+    df_copy = dataframe.copy()
+    
+    for col in columns:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_copy[col].mean()
+            elif strategy == 'median':
+                fill_value = df_copy[col].median()
+            elif strategy == 'mode':
+                fill_value = df_copy[col].mode()[0]
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', 'constant'")
+            
+            df_copy[col].fillna(fill_value, inplace=True)
+    
+    return df_copy
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_multiplier=1.5, 
+                  normalize_method='zscore', missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = dataframe.copy()
+    
+    # Handle missing values
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy, columns=numeric_columns)
+    
+    # Remove outliers for each numeric column
+    for col in numeric_columns:
+        df_clean = remove_outliers_iqr(df_clean, col, multiplier=outlier_multiplier)
+    
+    # Normalize numeric columns
+    for col in numeric_columns:
+        if normalize_method == 'zscore':
+            df_clean = zscore_normalize(df_clean, col)
+        elif normalize_method == 'minmax':
+            df_clean = minmax_normalize(df_clean, col)
+    
+    return df_clean
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content
+    """
+    if len(dataframe) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
