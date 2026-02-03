@@ -349,3 +349,55 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     clean_dataset("raw_data.csv", "cleaned_data.csv")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values in numeric columns with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df_cleaned[col].isnull().any():
+            median_value = df_cleaned[col].median()
+            df_cleaned[col] = df_cleaned[col].fillna(median_value)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def process_csv_file(input_path, output_path):
+    """
+    Read CSV file, clean data, and save cleaned version.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        validate_dataframe(df)
+        cleaned_df = clean_dataframe(df)
+        cleaned_df.to_csv(output_path, index=False)
+        print(f"Data cleaned successfully. Saved to {output_path}")
+        return cleaned_df
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    process_csv_file(input_file, output_file)
