@@ -192,4 +192,91 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned.shape)
     print("\nCleaned data summary:")
     cleaned_summary = get_data_summary(cleaned)
-    print(f"Shape: {cleaned_summary['shape']}")
+    print(f"Shape: {cleaned_summary['shape']}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return data[(data >= lower_bound) & (data <= upper_bound)]
+
+def normalize_minmax(data):
+    """
+    Normalize data using min-max scaling to range [0, 1].
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    min_val = data.min()
+    max_val = data.max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean a DataFrame by removing outliers and normalizing numeric columns.
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            # Remove outliers
+            mask = remove_outliers_iqr(cleaned_df[col], col).index
+            cleaned_df = cleaned_df.loc[mask]
+            
+            # Normalize the column
+            cleaned_df[col] = normalize_minmax(cleaned_df[col])
+    
+    return cleaned_df.reset_index(drop=True)
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    stats = {}
+    
+    for col in numeric_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'median': df[col].median()
+        }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 1000, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset shape:", df.shape)
+    
+    cleaned = clean_dataset(df, ['A', 'B', 'C'])
+    print("Cleaned dataset shape:", cleaned.shape)
+    
+    stats = calculate_statistics(cleaned)
+    for col, values in stats.items():
+        print(f"\nStatistics for {col}:")
+        for stat_name, stat_value in values.items():
+            print(f"  {stat_name}: {stat_value:.4f}")
