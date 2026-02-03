@@ -195,3 +195,37 @@ def validate_data(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import csv
+import sys
+
+def remove_duplicates(input_file, output_file, key_column):
+    seen = set()
+    unique_rows = []
+
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+
+        for row in reader:
+            identifier = row[key_column]
+            if identifier not in seen:
+                seen.add(identifier)
+                unique_rows.append(row)
+
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_rows)
+
+    print(f"Removed duplicates. Original rows: {len(seen) + (len(unique_rows) - len(seen))}, Unique rows: {len(unique_rows)}")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python data_cleaner.py <input_file> <output_file> <key_column>")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    key_column = sys.argv[3]
+
+    remove_duplicates(input_file, output_file, key_column)
