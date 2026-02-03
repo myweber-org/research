@@ -361,4 +361,54 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: A list of elements that may contain duplicates.
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(data_list):
+    """
+    Convert string representations of numbers to actual numeric types.
+    
+    Args:
+        data_list: A list containing string or numeric elements.
+    
+    Returns:
+        A new list with numeric strings converted to integers or floats.
+    """
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str):
+            if item.isdigit():
+                cleaned.append(int(item))
+            else:
+                try:
+                    cleaned.append(float(item))
+                except ValueError:
+                    cleaned.append(item)
+        else:
+            cleaned.append(item)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, "4", "5.5", 3, "test"]
+    print("Original:", sample_data)
+    
+    unique_data = remove_duplicates(sample_data)
+    print("After removing duplicates:", unique_data)
+    
+    cleaned_data = clean_numeric_strings(unique_data)
+    print("After cleaning numeric strings:", cleaned_data)
