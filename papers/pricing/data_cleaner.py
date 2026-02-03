@@ -180,4 +180,60 @@ def clean_dataframe(df: pd.DataFrame,
     
     cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     
-    return cleaned_df
+    return cleaned_dfimport csv
+import re
+from typing import List, Dict, Optional
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value) if value is not None else ""
+    return re.sub(r'\s+', ' ', value.strip())
+
+def validate_email(email: str) -> bool:
+    """Validate email format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def clean_csv_row(row: Dict[str, str]) -> Dict[str, str]:
+    """Clean all string values in a CSV row."""
+    cleaned = {}
+    for key, value in row.items():
+        cleaned[key] = clean_string(value)
+    return cleaned
+
+def read_and_clean_csv(filepath: str) -> List[Dict[str, str]]:
+    """Read CSV file and clean all rows."""
+    cleaned_data = []
+    try:
+        with open(filepath, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                cleaned_row = clean_csv_row(row)
+                cleaned_data.append(cleaned_row)
+    except FileNotFoundError:
+        print(f"Error: File {filepath} not found.")
+    except Exception as e:
+        print(f"Error processing file: {e}")
+    
+    return cleaned_data
+
+def write_cleaned_csv(data: List[Dict[str, str]], output_path: str) -> None:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        print("No data to write.")
+        return
+    
+    fieldnames = data[0].keys()
+    try:
+        with open(output_path, 'w', encoding='utf-8', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Cleaned data written to {output_path}")
+    except Exception as e:
+        print(f"Error writing file: {e}")
+
+def filter_valid_emails(data: List[Dict[str, str]], email_field: str = 'email') -> List[Dict[str, str]]:
+    """Filter rows with valid email addresses."""
+    return [row for row in data if validate_email(row.get(email_field, ''))]
