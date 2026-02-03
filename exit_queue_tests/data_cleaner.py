@@ -86,4 +86,85 @@ def get_data_summary(df: pd.DataFrame) -> dict:
         'duplicate_rows': df.duplicated().sum(),
         'data_types': df.dtypes.to_dict()
     }
-    return summary
+    return summaryimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using z-score method
+    """
+    mean = data[column].mean()
+    std = data[column].std()
+    normalized = (data[column] - mean) / std
+    return normalized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with specified strategy
+    """
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError(f"Unsupported strategy: {strategy}")
+
+def clean_dataset(data, numeric_columns, outlier_threshold=1.5, normalize_method='minmax', missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_threshold)
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            if normalize_method == 'minmax':
+                cleaned_data[col] = normalize_minmax(cleaned_data, col)
+            elif normalize_method == 'zscore':
+                cleaned_data[col] = z_score_normalize(cleaned_data, col)
+    
+    cleaned_data = handle_missing_values(cleaned_data, missing_strategy)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns):
+    """
+    Validate data structure and required columns
+    """
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if data.empty:
+        raise ValueError("Data is empty")
+    
+    return True
