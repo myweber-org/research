@@ -108,4 +108,36 @@ def create_data_summary(dataframe):
         'column_types': dataframe.dtypes.to_dict()
     }
     
-    return summary
+    return summarydef remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_data(values, default=0):
+    """
+    Convert all items in a list to integers, replacing non-convertible items with a default value.
+    """
+    cleaned = []
+    for value in values:
+        try:
+            cleaned.append(int(value))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    print("Original:", sample_data)
+    print("Cleaned:", remove_duplicates(sample_data))
+    
+    numeric_mix = [10, "20", "abc", 30.5, None]
+    print("Numeric original:", numeric_mix)
+    print("Numeric cleaned:", clean_numeric_data(numeric_mix))
