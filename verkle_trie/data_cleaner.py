@@ -151,3 +151,11 @@ if __name__ == "__main__":
     
     filled_df = cleaner.fill_missing_mean()
     print(f"\nMissing values after mean imputation: {filled_df.isnull().sum().sum()}")
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
