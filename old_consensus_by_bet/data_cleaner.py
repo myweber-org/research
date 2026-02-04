@@ -788,3 +788,11 @@ if __name__ == "__main__":
     cleaned_df = clean_numeric_data(df, ['value'])
     print("\nCleaned data shape:", cleaned_df.shape)
     print("Cleaned summary stats:", calculate_summary_stats(cleaned_df, 'value'))
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
