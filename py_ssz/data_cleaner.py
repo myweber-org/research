@@ -383,4 +383,86 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
     print(f"Original: {len(sample_data)} rows, Cleaned: {len(cleaned)} rows")
-    print(cleaned.head())
+    print(cleaned.head())import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (bool): Whether to fill missing values. Default is True.
+    fill_value: Value to use for filling missing values. Default is 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+def process_data_file(file_path, output_path=None, **clean_kwargs):
+    """
+    Load, clean, and optionally save a data file.
+    
+    Parameters:
+    file_path (str): Path to the input data file.
+    output_path (str): Path to save the cleaned data. If None, data is not saved.
+    **clean_kwargs: Additional arguments to pass to clean_dataset.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        if file_path.endswith('.csv'):
+            df = pd.read_csv(file_path)
+        elif file_path.endswith('.xlsx'):
+            df = pd.read_excel(file_path)
+        else:
+            raise ValueError("Unsupported file format. Use .csv or .xlsx")
+        
+        is_valid, message = validate_data(df)
+        if not is_valid:
+            raise ValueError(f"Data validation failed: {message}")
+        
+        cleaned_df = clean_dataset(df, **clean_kwargs)
+        
+        if output_path:
+            if output_path.endswith('.csv'):
+                cleaned_df.to_csv(output_path, index=False)
+            elif output_path.endswith('.xlsx'):
+                cleaned_df.to_excel(output_path, index=False)
+        
+        return cleaned_df
+        
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        raise
