@@ -189,4 +189,54 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_statistics(cleaned_df, 'A'))
+    print(calculate_statistics(cleaned_df, 'A'))import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_column_minmax(dataframe, column):
+    """
+    Normalize a column to range [0, 1] using min-max scaling.
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column].apply(lambda x: 0.0)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataset(dataframe, numeric_columns):
+    """
+    Clean dataset by removing outliers from all numeric columns and normalizing them.
+    """
+    cleaned_df = dataframe.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_column_minmax(cleaned_df, col)
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.randn(100) * 10 + 50,
+        'B': np.random.randn(100) * 5 + 20,
+        'C': np.random.randn(100) * 2 + 10,
+        'label': np.random.choice(['X', 'Y', 'Z'], 100)
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original shape:", df.shape)
+    numeric_cols = ['A', 'B', 'C']
+    cleaned = clean_dataset(df, numeric_cols)
+    print("Cleaned shape:", cleaned.shape)
+    print("Cleaned data head:")
+    print(cleaned.head())
