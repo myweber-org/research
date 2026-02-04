@@ -164,4 +164,40 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+
+        df = df.dropna(subset=['critical_column'])
+        print(f"After dropping rows with missing critical_column: {df.shape}")
+
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return True
+
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except KeyError as e:
+        print(f"Error: Required column not found - {e}")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    clean_data('raw_data.csv', 'cleaned_data.csv')
