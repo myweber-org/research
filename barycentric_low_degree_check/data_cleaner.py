@@ -190,3 +190,62 @@ def remove_duplicates(seq):
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
+import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame after cleaning.
+    """
+    if df.isnull().sum().sum() > 0:
+        raise ValueError("DataFrame contains missing values after cleaning")
+    
+    duplicate_count = df.duplicated().sum()
+    if duplicate_count > 0:
+        raise ValueError(f"DataFrame contains {duplicate_count} duplicate rows after cleaning")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve'],
+        'age': [25, 30, 30, None, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nMissing values:", df.isnull().sum().sum())
+    print("Duplicates:", df.duplicated().sum())
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df)
+        print("\nData validation passed successfully")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
