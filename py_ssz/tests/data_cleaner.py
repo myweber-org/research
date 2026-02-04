@@ -366,3 +366,56 @@ def validate_dataframe(dataframe, required_columns=None, min_rows=1):
             raise ValueError(f"Missing required columns: {missing_cols}")
     
     return True
+import re
+import pandas as pd
+from typing import List, Optional, Union
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def standardize_strings(df: pd.DataFrame, columns: Union[str, List[str]]) -> pd.DataFrame:
+    """
+    Standardize strings in specified columns: strip whitespace and convert to lowercase.
+    """
+    df_copy = df.copy()
+    if isinstance(columns, str):
+        columns = [columns]
+    for col in columns:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col].astype(str).str.strip().str.lower()
+    return df_copy
+
+def validate_email_column(df: pd.DataFrame, email_column: str) -> pd.Series:
+    """
+    Validate email addresses in a specified column using a regex pattern.
+    Returns a boolean Series indicating valid emails.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    return df[email_column].astype(str).str.match(pattern)
+
+def fill_missing_with_mean(df: pd.DataFrame, numeric_columns: List[str]) -> pd.DataFrame:
+    """
+    Fill missing values in numeric columns with the column mean.
+    """
+    df_copy = df.copy()
+    for col in numeric_columns:
+        if col in df_copy.columns and pd.api.types.is_numeric_dtype(df_copy[col]):
+            mean_val = df_copy[col].mean()
+            df_copy[col].fillna(mean_val, inplace=True)
+    return df_copy
+
+def filter_by_threshold(df: pd.DataFrame, column: str, threshold: float, keep_above: bool = True) -> pd.DataFrame:
+    """
+    Filter rows based on a threshold value in a numeric column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if keep_above:
+        return df[df[column] >= threshold].copy()
+    else:
+        return df[df[column] <= threshold].copy()
