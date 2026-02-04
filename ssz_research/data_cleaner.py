@@ -1,3 +1,4 @@
+
 import numpy as np
 import pandas as pd
 
@@ -6,11 +7,11 @@ def remove_outliers_iqr(df, column):
     Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to process.
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    pd.DataFrame: DataFrame with outliers removed
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -24,18 +25,18 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_df.reset_index(drop=True)
 
-def calculate_basic_stats(df, column):
+def calculate_summary_statistics(df, column):
     """
-    Calculate basic statistics for a DataFrame column.
+    Calculate summary statistics for a column after outlier removal.
     
     Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to analyze.
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
     
     Returns:
-    dict: Dictionary containing statistical measures.
+    dict: Dictionary containing summary statistics
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -46,24 +47,62 @@ def calculate_basic_stats(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count()
+        'count': len(df[column])
     }
     
     return stats
 
+def clean_dataset(df, columns_to_clean):
+    """
+    Clean multiple columns in a DataFrame by removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of summary statistics for each cleaned column
+    """
+    cleaned_df = df.copy()
+    all_stats = {}
+    
+    for column in columns_to_clean:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_summary_statistics(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            
+            all_stats[column] = stats
+    
+    return cleaned_df, all_stats
+
 if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
     sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 14, 13, 12, 11]
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.normal(60, 15, 100),
+        'pressure': np.random.normal(1013, 20, 100)
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nOriginal Statistics:")
-    print(calculate_basic_stats(df, 'values'))
+    # Add some outliers
+    sample_data['temperature'][0] = 100
+    sample_data['humidity'][1] = 150
+    sample_data['pressure'][2] = 2000
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    df = pd.DataFrame(sample_data)
+    
+    columns_to_clean = ['temperature', 'humidity', 'pressure']
+    cleaned_df, stats = clean_dataset(df, columns_to_clean)
+    
+    print(f"Original dataset shape: {df.shape}")
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    
+    for column, column_stats in stats.items():
+        print(f"\nStatistics for {column}:")
+        for stat_name, stat_value in column_stats.items():
+            print(f"  {stat_name}: {stat_value:.2f}")
