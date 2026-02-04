@@ -290,4 +290,134 @@ def main():
     )
 
 if __name__ == '__main__':
-    main()
+    main()import pandas as pd
+import numpy as np
+from typing import Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[list] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df: pd.DataFrame, strategy: str = 'mean', columns: Optional[list] = None) -> pd.DataFrame:
+    """
+    Fill missing values in DataFrame columns.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'mean', 'median', 'mode', or 'constant'
+        columns: Specific columns to fill, None for all numeric columns
+    
+    Returns:
+        DataFrame with missing values filled
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+            elif strategy == 'constant':
+                df_filled[col] = df[col].fillna(0)
+    
+    return df_filled
+
+def normalize_columns(df: pd.DataFrame, columns: Optional[list] = None) -> pd.DataFrame:
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        df: Input DataFrame
+        columns: Columns to normalize, None for all numeric columns
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            if col_max != col_min:
+                df_normalized[col] = (df[col] - col_min) / (col_max - col_min)
+    
+    return df_normalized
+
+def detect_outliers_iqr(df: pd.DataFrame, columns: Optional[list] = None) -> dict:
+    """
+    Detect outliers using IQR method.
+    
+    Args:
+        df: Input DataFrame
+        columns: Columns to check for outliers
+    
+    Returns:
+        Dictionary with outlier counts per column
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    outliers = {}
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            outlier_mask = (df[col] < lower_bound) | (df[col] > upper_bound)
+            outliers[col] = outlier_mask.sum()
+    
+    return outliers
+
+def clean_dataframe(df: pd.DataFrame, 
+                   remove_dups: bool = True,
+                   fill_na: bool = True,
+                   fill_strategy: str = 'mean',
+                   normalize: bool = False) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        remove_dups: Whether to remove duplicates
+        fill_na: Whether to fill missing values
+        fill_strategy: Strategy for filling missing values
+        normalize: Whether to normalize numeric columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if fill_na:
+        cleaned_df = fill_missing_values(cleaned_df, strategy=fill_strategy)
+    
+    if normalize:
+        cleaned_df = normalize_columns(cleaned_df)
+    
+    return cleaned_df
