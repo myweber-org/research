@@ -106,3 +106,129 @@ if __name__ == "__main__":
         print(f"\nStatistics for {column}:")
         for stat_name, stat_value in column_stats.items():
             print(f"  {stat_name}: {stat_value:.2f}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    column_mapping (dict): Optional dictionary to rename columns
+    drop_duplicates (bool): Whether to remove duplicate rows
+    normalize_text (bool): Whether to normalize text columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Normalize text columns
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def calculate_statistics(df, numeric_columns=None):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    stats = {}
+    for col in numeric_columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            stats[col] = {
+                'mean': df[col].mean(),
+                'median': df[col].median(),
+                'std': df[col].std(),
+                'min': df[col].min(),
+                'max': df[col].max(),
+                'count': df[col].count(),
+                'missing': df[col].isna().sum()
+            }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', ''],
+        'Age': [25, 30, 25, 35, None],
+        'Email': ['john@example.com', 'jane@example.com', 'JOHN@example.com', 'bob@example.com', None],
+        'Score': [85.5, 92.0, 85.5, 78.5, 0.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the data
+    is_valid, message = validate_dataframe(cleaned, required_columns=['Name', 'Age', 'Email'])
+    print(f"Validation: {is_valid} - {message}")
+    print("\n" + "="*50 + "\n")
+    
+    # Calculate statistics
+    stats = calculate_statistics(cleaned)
+    print("Statistics:")
+    for col, col_stats in stats.items():
+        print(f"\n{col}:")
+        for stat_name, stat_value in col_stats.items():
+            print(f"  {stat_name}: {stat_value}")
