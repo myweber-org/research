@@ -466,3 +466,32 @@ def process_data_file(file_path, output_path=None, **clean_kwargs):
     except Exception as e:
         print(f"Error processing file: {e}")
         raise
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column in a dataset using the IQR method.
+    
+    Parameters:
+    data (numpy.ndarray): The dataset.
+    column (int): Index of the column to process.
+    
+    Returns:
+    numpy.ndarray: Dataset with outliers removed from the specified column.
+    """
+    if not isinstance(data, np.ndarray):
+        raise ValueError("Input data must be a numpy array")
+    
+    if column >= data.shape[1] or column < 0:
+        raise ValueError("Column index out of bounds")
+    
+    col_data = data[:, column]
+    Q1 = np.percentile(col_data, 25)
+    Q3 = np.percentile(col_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
