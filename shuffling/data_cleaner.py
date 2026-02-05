@@ -113,3 +113,103 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(file_path):
+    return pd.read_csv(file_path)
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_data_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def standardize_data_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def handle_missing_values(data, strategy='mean'):
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def clean_dataset(data, numeric_columns, outlier_handling='remove', normalization='minmax', missing_strategy='mean'):
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = handle_missing_values(cleaned_data[[column]], strategy=missing_strategy)
+            
+            if outlier_handling == 'remove':
+                cleaned_data = remove_outliers(cleaned_data, column)
+            elif outlier_handling == 'cap':
+                Q1 = cleaned_data[column].quantile(0.25)
+                Q3 = cleaned_data[column].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                cleaned_data[column] = cleaned_data[column].clip(lower=lower_bound, upper=upper_bound)
+            
+            if normalization == 'minmax':
+                cleaned_data = normalize_data_minmax(cleaned_data, column)
+            elif normalization == 'zscore':
+                cleaned_data = standardize_data_zscore(cleaned_data, column)
+    
+    return cleaned_data
+
+def main():
+    sample_data = pd.DataFrame({
+        'feature1': [1, 2, 3, 4, 5, 100, 6, 7, 8, 9],
+        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'feature3': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    })
+    
+    print("Original Data:")
+    print(sample_data)
+    
+    cleaned = clean_dataset(
+        sample_data, 
+        numeric_columns=['feature1', 'feature2', 'feature3'],
+        outlier_handling='cap',
+        normalization='zscore',
+        missing_strategy='mean'
+    )
+    
+    print("\nCleaned Data:")
+    print(cleaned)
+    
+    outliers = detect_outliers_iqr(sample_data, 'feature1')
+    print("\nOutliers in feature1:")
+    print(outliers)
+
+if __name__ == "__main__":
+    main()
