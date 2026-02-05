@@ -1,64 +1,68 @@
-
 import pandas as pd
+import numpy as np
+from typing import List, Optional
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-        fill_missing (bool): Whether to fill missing values. Default is True.
-        fill_value: Value to use for filling missing values. Default is 0.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    Remove duplicate rows from DataFrame.
     """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing:
-        cleaned_df = cleaned_df.fillna(fill_value)
-    
-    return cleaned_df
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def validate_data(df, required_columns=None):
+def normalize_column(df: pd.DataFrame, column_name: str) -> pd.DataFrame:
     """
-    Validate that the DataFrame meets basic requirements.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-    
-    Returns:
-        tuple: (is_valid, error_message)
+    Normalize specified column to range [0, 1].
     """
-    if df.empty:
-        return False, "DataFrame is empty"
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+    col_min = df[column_name].min()
+    col_max = df[column_name].max()
     
-    return True, "Data validation passed"
+    if col_max == col_min:
+        df[column_name] = 0.5
+    else:
+        df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    
+    return df
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': [1, 2, 2, None, 5],
-        'B': [10, None, 30, 40, 50],
-        'C': ['x', 'y', 'y', 'z', 'x']
-    }
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Handle missing values using specified strategy.
+    """
+    df_clean = df.copy()
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned = clean_dataset(df)
-    print(cleaned)
+    for column in df_clean.columns:
+        if df_clean[column].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df_clean[column]):
+                df_clean[column].fillna(df_clean[column].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df_clean[column]):
+                df_clean[column].fillna(df_clean[column].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[column].fillna(df_clean[column].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[column])
+            else:
+                df_clean[column].fillna(0, inplace=True)
     
-    is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {is_valid} - {message}")
+    return df_clean
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_cols: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    df_clean = df.copy()
+    
+    if deduplicate:
+        df_clean = remove_duplicates(df_clean)
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in df_clean.columns and pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean = normalize_column(df_clean, col)
+    
+    return df_clean.reset_index(drop=True)
