@@ -114,4 +114,93 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     removed = original_len - len(filtered_df)
     print(f"Removed {removed} outliers from column '{column}'")
     
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import numpy as np
+from typing import Optional, List
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df: pd.DataFrame, column: str, fill_value) -> pd.DataFrame:
+    """
+    Fill missing values in specified column.
+    """
+    df_copy = df.copy()
+    df_copy[column] = df_copy[column].fillna(fill_value)
+    return df_copy
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize column values to range [0, 1].
+    """
+    df_copy = df.copy()
+    col_min = df_copy[column].min()
+    col_max = df_copy[column].max()
+    
+    if col_max - col_min > 0:
+        df_copy[column] = (df_copy[column] - col_min) / (col_max - col_min)
+    
+    return df_copy
+
+def filter_outliers(df: pd.DataFrame, column: str, threshold: float = 3.0) -> pd.DataFrame:
+    """
+    Remove outliers using z-score method.
+    """
+    df_copy = df.copy()
+    z_scores = np.abs((df_copy[column] - df_copy[column].mean()) / df_copy[column].std())
+    return df_copy[z_scores < threshold]
+
+def clean_dataframe(df: pd.DataFrame, 
+                    duplicate_subset: Optional[List[str]] = None,
+                    fill_columns: Optional[dict] = None,
+                    normalize_columns: Optional[List[str]] = None,
+                    outlier_columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    cleaned_df = remove_duplicates(cleaned_df, duplicate_subset)
+    
+    # Fill missing values
+    if fill_columns:
+        for column, fill_value in fill_columns.items():
+            cleaned_df = fill_missing_values(cleaned_df, column, fill_value)
+    
+    # Normalize columns
+    if normalize_columns:
+        for column in normalize_columns:
+            cleaned_df = normalize_column(cleaned_df, column)
+    
+    # Remove outliers
+    if outlier_columns:
+        for column in outlier_columns:
+            cleaned_df = filter_outliers(cleaned_df, column)
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Basic DataFrame validation.
+    """
+    if df.empty:
+        return False
+    
+    if df.isnull().all().any():
+        return False
+    
+    return True
+
+def save_cleaned_data(df: pd.DataFrame, filename: str) -> None:
+    """
+    Save cleaned DataFrame to CSV.
+    """
+    if validate_dataframe(df):
+        df.to_csv(filename, index=False)
+        print(f"Data saved to {filename}")
+    else:
+        print("Data validation failed. Not saving.")
