@@ -316,3 +316,56 @@ def save_cleaned_data(df, output_path, format='csv'):
         df.to_json(output_path, orient='records')
     else:
         raise ValueError(f"Unsupported format: {format}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    """Remove outliers using IQR method."""
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns):
+    """Normalize data using min-max scaling."""
+    df_normalized = df.copy()
+    for col in columns:
+        min_val = df_normalized[col].min()
+        max_val = df_normalized[col].max()
+        df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values with specified strategy."""
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.dropna()
+
+def clean_dataset(input_path, output_path, numeric_columns):
+    """Main cleaning pipeline."""
+    df = load_dataset(input_path)
+    df = handle_missing_values(df, strategy='mean')
+    df = remove_outliers_iqr(df, numeric_columns)
+    df = normalize_data(df, numeric_columns)
+    df.to_csv(output_path, index=False)
+    return df
+
+if __name__ == "__main__":
+    numeric_cols = ['age', 'income', 'score']
+    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv', numeric_cols)
+    print(f"Dataset cleaned. Shape: {cleaned_df.shape}")
