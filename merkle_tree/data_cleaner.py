@@ -1,87 +1,45 @@
 
-import pandas as pd
 import numpy as np
-from typing import Optional
+import pandas as pd
 
-def clean_csv_data(
-    filepath: str,
-    missing_strategy: str = 'drop',
-    fill_value: Optional[float] = None
-) -> pd.DataFrame:
-    """
-    Load and clean CSV data by handling missing values.
-    
-    Args:
-        filepath: Path to CSV file
-        missing_strategy: Strategy for handling missing values
-                         ('drop', 'fill', or 'interpolate')
-        fill_value: Value to fill missing entries with when strategy is 'fill'
-    
-    Returns:
-        Cleaned DataFrame
-    """
-    try:
-        df = pd.read_csv(filepath)
-        
-        if missing_strategy == 'drop':
-            df_clean = df.dropna()
-        elif missing_strategy == 'fill':
-            if fill_value is not None:
-                df_clean = df.fillna(fill_value)
-            else:
-                df_clean = df.fillna(df.mean(numeric_only=True))
-        elif missing_strategy == 'interpolate':
-            df_clean = df.interpolate(method='linear')
-        else:
-            raise ValueError(f"Unknown strategy: {missing_strategy}")
-        
-        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
-        if not numeric_cols.empty:
-            df_clean[numeric_cols] = df_clean[numeric_cols].round(4)
-        
-        return df_clean
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return pd.DataFrame()
-    except pd.errors.EmptyDataError:
-        print("Error: CSV file is empty")
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        return pd.DataFrame()
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
 
-def validate_dataframe(df: pd.DataFrame) -> bool:
-    """
-    Validate DataFrame for common data quality issues.
-    """
-    if df.empty:
-        return False
-    
-    if df.isnull().sum().sum() > 0:
-        print("Warning: DataFrame contains missing values")
-        return False
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if (df[col] == 0).all():
-            print(f"Warning: Column '{col}' contains only zeros")
-            return False
-    
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column]
+    return (data[column] - min_val) / (max_val - min_val)
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+def validate_data(df, required_columns):
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
     return True
 
 if __name__ == "__main__":
     sample_data = pd.DataFrame({
-        'A': [1, 2, np.nan, 4, 5],
-        'B': [5.5, np.nan, 7.7, 8.8, 9.9],
-        'C': ['x', 'y', 'z', 'x', 'y']
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
     })
     
-    sample_data.to_csv('sample_data.csv', index=False)
-    
-    cleaned = clean_csv_data('sample_data.csv', missing_strategy='fill')
-    print("Cleaned DataFrame:")
-    print(cleaned)
-    
-    is_valid = validate_dataframe(cleaned)
-    print(f"Data validation result: {is_valid}")
+    numeric_cols = ['feature_a', 'feature_b']
+    cleaned = clean_dataset(sample_data, numeric_cols)
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Removed outliers: {len(sample_data) - len(cleaned)}")
