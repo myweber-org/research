@@ -95,3 +95,131 @@ def clean_dataset(df, columns=None):
             cleaned_df = remove_outliers_iqr(cleaned_df, col)
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def z_score_normalize(dataframe, columns):
+    """
+    Normalize specified columns using z-score normalization
+    """
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in dataframe")
+        
+        mean_val = normalized_df[col].mean()
+        std_val = normalized_df[col].std()
+        
+        if std_val > 0:
+            normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def min_max_normalize(dataframe, columns, feature_range=(0, 1)):
+    """
+    Normalize specified columns using min-max normalization
+    """
+    normalized_df = dataframe.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in dataframe")
+        
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        col_range = col_max - col_min
+        
+        if col_range > 0:
+            normalized_df[col] = ((normalized_df[col] - col_min) / col_range) * (max_val - min_val) + min_val
+        else:
+            normalized_df[col] = min_val
+    
+    return normalized_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy
+    """
+    cleaned_df = dataframe.copy()
+    
+    if columns is None:
+        columns = cleaned_df.columns
+    
+    for col in columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if cleaned_df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = cleaned_df[col].mean()
+            elif strategy == 'median':
+                fill_value = cleaned_df[col].median()
+            elif strategy == 'mode':
+                fill_value = cleaned_df[col].mode()[0]
+            elif strategy == 'drop':
+                cleaned_df = cleaned_df.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(dataframe) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def create_sample_data():
+    """
+    Create sample data for testing
+    """
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.uniform(0, 1, 100),
+        'feature_c': np.random.exponential(2, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[np.random.choice(100, 5), 'feature_a'] = np.nan
+    df.loc[np.random.choice(100, 3), 'feature_b'] = np.nan
+    
+    return df
