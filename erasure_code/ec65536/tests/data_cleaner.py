@@ -1,64 +1,79 @@
+import pandas as pd
 
-def remove_duplicates(input_list):
+def clean_dataset(df, remove_duplicates=True, fill_method=None):
     """
-    Remove duplicate elements from a list while preserving order.
+    Clean a pandas DataFrame by handling missing values and optionally removing duplicates.
     
-    Args:
-        input_list: A list of elements (must be hashable)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    remove_duplicates (bool): If True, remove duplicate rows.
+    fill_method (str or None): Method to fill missing values. 
+                               Options: 'mean', 'median', 'mode', or None to drop rows.
     
     Returns:
-        A new list with duplicates removed
+    pd.DataFrame: Cleaned DataFrame.
     """
-    seen = set()
-    result = []
+    cleaned_df = df.copy()
     
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
+    # Handle missing values
+    if fill_method is None:
+        cleaned_df = cleaned_df.dropna()
+    else:
+        if fill_method == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_method == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_method == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+                else:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
     
-    return result
+    # Remove duplicates if requested
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
 
-def clean_data_with_key(data, key_func=None):
+def validate_data(df, required_columns=None):
     """
-    Remove duplicates based on a key function.
+    Validate DataFrame structure and content.
     
-    Args:
-        data: List of items to deduplicate
-        key_func: Function to extract comparison key (default: identity)
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
     
     Returns:
-        Deduplicated list preserving order
+    tuple: (is_valid, message)
     """
-    if key_func is None:
-        return remove_duplicates(data)
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    seen = set()
-    result = []
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
-    for item in data:
-        key = key_func(item)
-        if key not in seen:
-            seen.add(key)
-            result.append(item)
-    
-    return result
+    return True, "Data validation passed"
 
-if __name__ == "__main__":
-    # Example usage
-    sample_data = [1, 2, 2, 3, 4, 4, 5, 1]
-    cleaned = remove_duplicates(sample_data)
-    print(f"Original: {sample_data}")
-    print(f"Cleaned: {cleaned}")
-    
-    # Example with custom key
-    data_dicts = [
-        {"id": 1, "name": "Alice"},
-        {"id": 2, "name": "Bob"},
-        {"id": 1, "name": "Alice"},
-        {"id": 3, "name": "Charlie"}
-    ]
-    
-    cleaned_dicts = clean_data_with_key(data_dicts, key_func=lambda x: x["id"])
-    print(f"\nOriginal dicts: {data_dicts}")
-    print(f"Cleaned dicts: {cleaned_dicts}")
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = pd.DataFrame({
+#         'A': [1, 2, None, 4, 4],
+#         'B': [5, None, 7, 8, 8],
+#         'C': ['x', 'y', 'z', None, 'x']
+#     })
+#     
+#     print("Original data:")
+#     print(sample_data)
+#     
+#     cleaned = clean_dataset(sample_data, remove_duplicates=True, fill_method='mean')
+#     print("\nCleaned data:")
+#     print(cleaned)
+#     
+#     is_valid, msg = validate_data(cleaned, required_columns=['A', 'B'])
+#     print(f"\nValidation: {msg}")
