@@ -368,4 +368,54 @@ def clean_dataset(input_path, output_path, numeric_columns):
 if __name__ == "__main__":
     numeric_cols = ['age', 'income', 'score']
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv', numeric_cols)
-    print(f"Dataset cleaned. Shape: {cleaned_df.shape}")
+    print(f"Dataset cleaned. Shape: {cleaned_df.shape}")import csv
+import re
+
+def clean_csv(input_file, output_file):
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile, \
+         open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        
+        reader = csv.reader(infile)
+        writer = csv.writer(outfile)
+        
+        for row in reader:
+            cleaned_row = []
+            for cell in row:
+                cleaned_cell = re.sub(r'\s+', ' ', cell.strip())
+                cleaned_cell = cleaned_cell.lower()
+                cleaned_row.append(cleaned_cell)
+            writer.writerow(cleaned_row)
+
+def remove_duplicates(input_file, output_file):
+    seen = set()
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile, \
+         open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        
+        reader = csv.reader(infile)
+        writer = csv.writer(outfile)
+        
+        for row in reader:
+            row_tuple = tuple(row)
+            if row_tuple not in seen:
+                seen.add(row_tuple)
+                writer.writerow(row)
+
+def validate_email_column(input_file, column_index):
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    invalid_emails = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        for i, row in enumerate(reader):
+            if column_index < len(row):
+                email = row[column_index]
+                if not re.match(email_pattern, email):
+                    invalid_emails.append((i, email))
+    
+    return invalid_emails
+
+if __name__ == "__main__":
+    clean_csv('raw_data.csv', 'cleaned_data.csv')
+    remove_duplicates('cleaned_data.csv', 'unique_data.csv')
+    invalid = validate_email_column('unique_data.csv', 2)
+    print(f"Found {len(invalid)} invalid email addresses")
