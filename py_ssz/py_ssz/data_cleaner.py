@@ -428,4 +428,151 @@ def remove_duplicates_preserve_order(sequence):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | (df_clean[col].isna())]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    """
+    Normalize data using Min-Max scaling.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df_norm[col] = 0
+    return df_norm
+
+def normalize_zscore(df, columns):
+    """
+    Normalize data using Z-score standardization.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val != 0:
+                df_norm[col] = (df[col] - mean_val) / std_val
+            else:
+                df_norm[col] = 0
+    return df_norm
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col in df.columns and df[col].isna().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'ffill':
+                df_filled[col] = df[col].fillna(method='ffill')
+                continue
+            elif strategy == 'bfill':
+                df_filled[col] = df[col].fillna(method='bfill')
+                continue
+            else:
+                fill_value = 0
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy, columns=numeric_columns)
+    
+    # Remove outliers
+    if outlier_method == 'iqr':
+        df_clean = remove_outliers_iqr(df_clean, numeric_columns)
+    elif outlier_method == 'zscore':
+        df_clean = remove_outliers_zscore(df_clean, numeric_columns)
+    
+    # Normalize data
+    if normalize_method == 'minmax':
+        df_clean = normalize_minmax(df_clean, numeric_columns)
+    elif normalize_method == 'zscore':
+        df_clean = normalize_zscore(df_clean, numeric_columns)
+    
+    return df_clean
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 1, 100)
+    }
+    
+    # Add some outliers and missing values
+    data['feature1'][10] = 500
+    data['feature2'][20] = 1000
+    data['feature3'][30] = np.nan
+    
+    df = pd.DataFrame(data)
+    
+    print("Original dataset shape:", df.shape)
+    print("Missing values:\n", df.isna().sum())
+    
+    # Clean the dataset
+    df_clean = clean_dataset(
+        df, 
+        numeric_columns=['feature1', 'feature2', 'feature3'],
+        outlier_method='iqr',
+        normalize_method='zscore',
+        missing_strategy='mean'
+    )
+    
+    print("\nCleaned dataset shape:", df_clean.shape)
+    print("Missing values after cleaning:\n", df_clean.isna().sum())
+    print("\nSummary statistics:")
+    print(df_clean.describe())
