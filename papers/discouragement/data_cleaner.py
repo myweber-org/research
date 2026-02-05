@@ -112,4 +112,53 @@ def example_usage():
     print(f"\nRemoved {removed_count} outliers")
 
 if __name__ == "__main__":
-    example_usage()
+    example_usage()import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+
+    Args:
+        dataframe: Input pandas DataFrame.
+        subset: Column label or sequence of labels to consider for identifying duplicates.
+                If None, all columns are used.
+        keep: Determines which duplicates to mark.
+              'first' : Mark duplicates as False except for the first occurrence.
+              'last' : Mark duplicates as False except for the last occurrence.
+              False : Mark all duplicates as True.
+
+    Returns:
+        DataFrame with duplicates removed.
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_column(dataframe, column_name, fill_method='mean'):
+    """
+    Clean a numeric column by filling missing values.
+
+    Args:
+        dataframe: Input pandas DataFrame.
+        column_name: Name of the column to clean.
+        fill_method: Method to fill missing values ('mean', 'median', or 'zero').
+
+    Returns:
+        DataFrame with cleaned column.
+    """
+    if column_name not in dataframe.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+    if fill_method == 'mean':
+        fill_value = dataframe[column_name].mean()
+    elif fill_method == 'median':
+        fill_value = dataframe[column_name].median()
+    elif fill_method == 'zero':
+        fill_value = 0
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
+
+    dataframe[column_name] = dataframe[column_name].fillna(fill_value)
+    return dataframe
