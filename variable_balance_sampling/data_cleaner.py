@@ -469,3 +469,192 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
             raise ValueError(f"Missing required columns: {missing_cols}")
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    factor (float): Multiplier for IQR
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Z-score normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    z_scores = (data[column] - mean_val) / std_val
+    return z_scores
+
+def detect_skewness(data, column, threshold=0.5):
+    """
+    Detect skewness in data column.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to check
+    threshold (float): Absolute skewness threshold
+    
+    Returns:
+    tuple: (skewness_value, is_skewed)
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    skewness = data[column].skew()
+    is_skewed = abs(skewness) > threshold
+    
+    return skewness, is_skewed
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5):
+    """
+    Comprehensive dataset cleaning function.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric columns to clean
+    outlier_factor (float): IQR factor for outlier removal
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            # Remove outliers
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_factor)
+            
+            # Normalize using z-score
+            cleaned_data[f"{column}_normalized"] = z_score_normalize(cleaned_data, column)
+    
+    return cleaned_data
+
+def validate_dataframe(data, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required columns
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in data.columns]
+        if missing:
+            validation_results['is_valid'] = False
+            validation_results['missing_columns'] = missing
+    
+    for column in data.columns:
+        null_count = data[column].isnull().sum()
+        validation_results['null_counts'][column] = null_count
+        validation_results['data_types'][column] = str(data[column].dtype)
+        
+        if null_count > 0:
+            validation_results['is_valid'] = False
+    
+    return validation_results
+
+# Example usage demonstration
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    # Add some outliers
+    sample_data.loc[10, 'feature_a'] = 500
+    sample_data.loc[20, 'feature_b'] = 1000
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nData validation:")
+    validation = validate_dataframe(sample_data)
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+    
+    print("\nSkewness detection:")
+    for col in ['feature_a', 'feature_b']:
+        skew_val, is_skewed = detect_skewness(sample_data, col)
+        print(f"{col}: skewness={skew_val:.3f}, is_skewed={is_skewed}")
+    
+    print("\nCleaning data...")
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print("Cleaned data shape:", cleaned.shape)
+    
+    print("\nNormalized columns added:")
+    norm_cols = [col for col in cleaned.columns if 'normalized' in col]
+    for col in norm_cols:
+        print(f"{col}: mean={cleaned[col].mean():.3f}, std={cleaned[col].std():.3f}")
