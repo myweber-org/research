@@ -405,4 +405,77 @@ def remove_outliers_iqr(data, column):
     
     mask = (col_data >= lower_bound) & (col_data <= upper_bound)
     
-    return data[mask]
+    return data[mask]import pandas as pd
+import numpy as np
+
+def clean_missing_data(file_path, strategy='mean', columns=None):
+    """
+    Load a CSV file and handle missing values using specified strategy.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        strategy (str): Method for handling missing values. 
+                       Options: 'mean', 'median', 'mode', 'drop'.
+        columns (list): Specific columns to clean. If None, clean all columns.
+    
+    Returns:
+        pandas.DataFrame: Cleaned dataframe.
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    if columns is None:
+        columns = df.columns
+    
+    for column in columns:
+        if column not in df.columns:
+            print(f"Warning: Column '{column}' not found in dataframe")
+            continue
+            
+        if df[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[column].mean()
+            elif strategy == 'median':
+                fill_value = df[column].median()
+            elif strategy == 'mode':
+                fill_value = df[column].mode()[0] if not df[column].mode().empty else np.nan
+            elif strategy == 'drop':
+                df = df.dropna(subset=[column])
+                continue
+            else:
+                print(f"Warning: Unknown strategy '{strategy}'. Using 'mean' instead.")
+                fill_value = df[column].mean()
+            
+            df[column].fillna(fill_value, inplace=True)
+            print(f"Filled missing values in '{column}' using {strategy} strategy")
+    
+    print(f"Data cleaning completed. Remaining missing values: {df.isnull().sum().sum()}")
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV file.
+    
+    Args:
+        df (pandas.DataFrame): Cleaned dataframe.
+        output_path (str): Path to save the cleaned CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    else:
+        print("Error: No data to save")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_missing_data(input_file, strategy='median')
+    save_cleaned_data(cleaned_df, output_file)
