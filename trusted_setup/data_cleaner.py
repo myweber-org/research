@@ -193,3 +193,11 @@ def validate_email_column(df, email_column):
     print(f"Email validation results: {valid_count}/{total_count} valid emails")
     
     return validation_results
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
