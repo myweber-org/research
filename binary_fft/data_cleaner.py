@@ -213,3 +213,11 @@ def process_dataset(file_path, cleaning_steps):
     summary = cleaner.get_summary()
     
     return cleaned_df, summary
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
