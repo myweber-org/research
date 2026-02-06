@@ -138,3 +138,66 @@ def summary_statistics(df, column):
         'skewness': series.skew(),
         'kurtosis': series.kurtosis()
     }
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_outliers_zscore(self, threshold=3):
+        df_clean = self.df.copy()
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
+        return df_clean
+    
+    def normalize_minmax(self):
+        df_normalized = self.df.copy()
+        for col in self.numeric_columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+        return df_normalized
+    
+    def fill_missing_median(self):
+        df_filled = self.df.copy()
+        for col in self.numeric_columns:
+            median_val = df_filled[col].median()
+            df_filled[col] = df_filled[col].fillna(median_val)
+        return df_filled
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'original_columns': len(self.df.columns),
+            'numeric_columns': self.numeric_columns,
+            'missing_values': self.df.isnull().sum().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def process_dataset(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        cleaner = DataCleaner(df)
+        
+        summary = cleaner.get_summary()
+        print(f"Dataset loaded: {summary['original_rows']} rows, {summary['original_columns']} columns")
+        
+        df_cleaned = cleaner.remove_outliers_zscore()
+        df_filled = cleaner.fill_missing_median()
+        df_normalized = cleaner.normalize_minmax()
+        
+        return {
+            'cleaned': df_cleaned,
+            'filled': df_filled,
+            'normalized': df_normalized,
+            'summary': summary
+        }
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
