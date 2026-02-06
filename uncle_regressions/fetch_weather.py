@@ -145,3 +145,39 @@ def main():
 
 if __name__ == "__main__":
     main()
+import sys
+import requests
+
+API_KEY = "YOUR_API_KEY_HERE"
+BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
+
+def get_weather(city_name):
+    params = {
+        'q': city_name,
+        'appid': API_KEY,
+        'units': 'metric'
+    }
+    try:
+        response = requests.get(BASE_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('cod') != 200:
+            print(f"Error: {data.get('message', 'Unknown error')}")
+            return
+        main = data['main']
+        weather = data['weather'][0]
+        print(f"Weather in {city_name}:")
+        print(f"  Temperature: {main['temp']}°C")
+        print(f"  Humidity: {main['humidity']}%")
+        print(f"  Conditions: {weather['description']}")
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to fetch weather data: {e}")
+    except KeyError:
+        print("Unexpected response format from API.")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python fetch_weather.py <city_name>")
+        sys.exit(1)
+    city = sys.argv[1]
+    get_weather(city)
