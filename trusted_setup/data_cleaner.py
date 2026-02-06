@@ -110,3 +110,86 @@ def validate_data(data, required_columns, numeric_columns):
                 raise ValueError(f"Column '{col}' must be numeric")
     
     return True
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_normalize=None, remove_duplicates=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing specified columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    columns_to_normalize (list): List of column names to normalize strings
+    remove_duplicates (bool): Whether to remove duplicate rows
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if columns_to_normalize:
+        for col in columns_to_normalize:
+            if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].apply(normalize_string)
+                print(f"Normalized column: {col}")
+    
+    return cleaned_df
+
+def normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    
+    Parameters:
+    text (str): Input string to normalize
+    
+    Returns:
+    str: Normalized string
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # Convert to lowercase
+    normalized = text.lower()
+    
+    # Remove extra whitespace
+    normalized = ' '.join(normalized.split())
+    
+    # Remove special characters except alphanumeric and spaces
+    normalized = re.sub(r'[^\w\s]', '', normalized)
+    
+    return normalized
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    email_column (str): Name of the column containing email addresses
+    
+    Returns:
+    pd.DataFrame: DataFrame with validation results
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validation_results = df.copy()
+    validation_results['email_valid'] = validation_results[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    valid_count = validation_results['email_valid'].sum()
+    total_count = len(validation_results)
+    
+    print(f"Email validation results: {valid_count}/{total_count} valid emails")
+    
+    return validation_results
