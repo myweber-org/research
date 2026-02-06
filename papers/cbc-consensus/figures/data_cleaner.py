@@ -101,4 +101,76 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True):
+    """
+    Clean a pandas DataFrame by removing null values and optionally duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    cleaned_df = df.dropna()
+    
+    # Remove duplicate rows if specified
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def filter_by_threshold(df, column, threshold, keep='above'):
+    """
+    Filter DataFrame rows based on a threshold value in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to apply threshold.
+        threshold (float): Threshold value.
+        keep (str): 'above' to keep values >= threshold, 'below' to keep values <= threshold.
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if keep == 'above':
+        filtered_df = df[df[column] >= threshold]
+    elif keep == 'below':
+        filtered_df = df[df[column] <= threshold]
+    else:
+        raise ValueError("keep parameter must be 'above' or 'below'")
+    
+    return filtered_df.reset_index(drop=True)
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 4],
+        'B': [5, None, 7, 8, 8],
+        'C': [9, 10, 11, 12, 12]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Create sample data for filtering
+    filter_data = {
+        'values': [10, 20, 30, 40, 50],
+        'labels': ['A', 'B', 'C', 'D', 'E']
+    }
+    
+    filter_df = pd.DataFrame(filter_data)
+    filtered = filter_by_threshold(filter_df, 'values', 30, keep='above')
+    print("\nFiltered DataFrame (values >= 30):")
+    print(filtered)
