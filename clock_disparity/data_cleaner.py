@@ -258,3 +258,149 @@ if __name__ == "__main__":
     print("\nCleaned dataset statistics:")
     print(calculate_statistics(cleaned_df, 'value'))
     print(f"\nOriginal rows: {len(df)}, Cleaned rows: {len(cleaned_df)}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize column values to range [0, 1] using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        normalized = pd.Series([0.5] * len(data), index=data.index)
+    else:
+        normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    result = data.copy()
+    result[f"{column}_normalized"] = normalized
+    return result
+
+def standardize_zscore(data, column):
+    """
+    Standardize column values using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+        
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        standardized = pd.Series([0] * len(data), index=data.index)
+    else:
+        standardized = (data[column] - mean_val) / std_val
+    
+    result = data.copy()
+    result[f"{column}_standardized"] = standardized
+    return result
+
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric columns to process
+        outlier_multiplier: IQR multiplier for outlier removal
+        
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            cleaned_data = normalize_minmax(cleaned_data, column)
+            cleaned_data = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns=None):
+    """
+    Validate data integrity and structure.
+    
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+        
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'has_data': not data.empty,
+        'row_count': len(data),
+        'column_count': len(data.columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'duplicate_rows': data.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        validation_results['missing_required_columns'] = missing_columns
+        validation_results['all_required_columns_present'] = len(missing_columns) == 0
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nData validation:")
+    validation = validate_data(sample_data)
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+    
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print("\nCleaned data shape:", cleaned.shape)
+    print("\nCleaned data columns:", cleaned.columns.tolist())
