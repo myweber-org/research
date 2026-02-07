@@ -316,4 +316,73 @@ def validate_data(data, required_columns, numeric_columns):
             if not pd.api.types.is_numeric_dtype(data[column]):
                 return False, f"Column '{column}' must be numeric"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import csv
+import re
+
+def clean_csv(input_file, output_file, remove_duplicates=True, strip_whitespace=True):
+    """
+    Clean a CSV file by removing duplicates and stripping whitespace.
+    """
+    rows = []
+    seen = set()
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        rows.append(header)
+        
+        for row in reader:
+            if strip_whitespace:
+                row = [cell.strip() if isinstance(cell, str) else cell for cell in row]
+            
+            row_tuple = tuple(row)
+            
+            if remove_duplicates:
+                if row_tuple in seen:
+                    continue
+                seen.add(row_tuple)
+            
+            rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(rows)
+    
+    return len(rows) - 1
+
+def validate_email_column(input_file, email_column_index):
+    """
+    Validate email addresses in a specific column of a CSV file.
+    """
+    email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    invalid_emails = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        
+        for i, row in enumerate(reader, start=2):
+            if email_column_index < len(row):
+                email = row[email_column_index]
+                if not email_pattern.match(email):
+                    invalid_emails.append((i, email))
+    
+    return invalid_emails
+
+def extract_domain_from_email(email):
+    """
+    Extract domain from an email address.
+    """
+    if '@' in email:
+        return email.split('@')[1]
+    return None
+
+if __name__ == "__main__":
+    cleaned_count = clean_csv('input.csv', 'output.csv')
+    print(f"Cleaned {cleaned_count} rows")
+    
+    invalid_emails = validate_email_column('output.csv', 2)
+    if invalid_emails:
+        print(f"Found {len(invalid_emails)} invalid emails:")
+        for line, email in invalid_emails:
+            print(f"  Line {line}: {email}")
