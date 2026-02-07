@@ -309,4 +309,137 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import numpy as np
+import pandas as pd
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows containing missing values.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        columns (list, optional): Specific columns to check. Defaults to all columns.
+    
+    Returns:
+        pd.DataFrame: Dataframe with missing rows removed
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns=None):
+    """
+    Fill missing values with column mean.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        columns (list, optional): Specific columns to fill. Defaults to all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Dataframe with filled values
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            df_filled[col] = df[col].fillna(df[col].mean())
+    
+    return df_filled
+
+def detect_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Detect outliers using IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        column (str): Column name to check for outliers
+        multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+        pd.Series: Boolean series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def remove_outliers(df, column, multiplier=1.5):
+    """
+    Remove outliers from a specific column.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        column (str): Column name to remove outliers from
+        multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+        pd.DataFrame: Dataframe with outliers removed
+    """
+    outliers = detect_outliers_iqr(df, column, multiplier)
+    return df[~outliers].reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        columns (list, optional): Columns to standardize. Defaults to all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Dataframe with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df_standardized[col] = (df[col] - mean) / std
+    
+    return df_standardized
+
+def clean_dataset(df, missing_strategy='remove', outlier_columns=None, standardize=False):
+    """
+    Comprehensive dataset cleaning pipeline.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe
+        missing_strategy (str): 'remove' or 'mean' for handling missing values
+        outlier_columns (list): Columns to check for outliers
+        standardize (bool): Whether to standardize numeric columns
+    
+    Returns:
+        pd.DataFrame: Cleaned dataframe
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'remove':
+        cleaned_df = remove_missing_rows(cleaned_df)
+    elif missing_strategy == 'mean':
+        cleaned_df = fill_missing_with_mean(cleaned_df)
+    
+    # Remove outliers
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers(cleaned_df, col)
+    
+    # Standardize if requested
+    if standardize:
+        cleaned_df = standardize_columns(cleaned_df)
+    
+    return cleaned_df
