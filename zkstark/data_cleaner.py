@@ -114,4 +114,53 @@ if __name__ == "__main__":
     if result is not None:
         print("Data cleaning completed successfully")
         print(result.head())
-        result.to_csv('cleaned_data.csv', index=False)
+        result.to_csv('cleaned_data.csv', index=False)import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Remove columns with more than 50% missing values
+        threshold = len(df) * 0.5
+        df = df.dropna(thresh=threshold, axis=1)
+        print(f"After dropping high-missing columns: {df.shape}")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    clean_data(input_csv, output_csv)
