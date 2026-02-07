@@ -277,4 +277,111 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
-    return df[mask]
+    return df[mask]import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or array-like): The dataset containing the column to clean.
+    column (int or str): The index or name of the column to process.
+    
+    Returns:
+    tuple: A tuple containing:
+        - cleaned_data (numpy array): Data with outliers removed.
+        - outlier_indices (numpy array): Indices of removed outliers.
+    """
+    data_array = np.array(data)
+    col_data = data_array[:, column] if isinstance(column, int) else data_array[column]
+    
+    Q1 = np.percentile(col_data, 25)
+    Q3 = np.percentile(col_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outlier_mask = (col_data < lower_bound) | (col_data > upper_bound)
+    cleaned_data = data_array[~outlier_mask]
+    
+    return cleaned_data, np.where(outlier_mask)[0]
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (numpy array): The cleaned dataset.
+    column (int): The index of the column to analyze.
+    
+    Returns:
+    dict: Dictionary containing mean, median, std, min, and max values.
+    """
+    col_data = data[:, column]
+    
+    stats = {
+        'mean': np.mean(col_data),
+        'median': np.median(col_data),
+        'std': np.std(col_data),
+        'min': np.min(col_data),
+        'max': np.max(col_data),
+        'count': len(col_data)
+    }
+    
+    return stats
+
+def clean_dataset(data, columns_to_clean):
+    """
+    Main function to clean multiple columns in a dataset.
+    
+    Parameters:
+    data (list or array-like): The original dataset.
+    columns_to_clean (list): List of column indices to clean.
+    
+    Returns:
+    dict: Dictionary containing cleaned data and cleaning report.
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    cleaning_report = {}
+    current_data = data.copy()
+    
+    for col in columns_to_clean:
+        cleaned_data, outliers = remove_outliers_iqr(current_data, col)
+        stats = calculate_statistics(cleaned_data, col)
+        
+        cleaning_report[col] = {
+            'outliers_removed': len(outliers),
+            'outlier_indices': outliers.tolist(),
+            'statistics': stats,
+            'original_count': len(current_data),
+            'cleaned_count': len(cleaned_data)
+        }
+        
+        current_data = cleaned_data
+    
+    return {
+        'cleaned_data': current_data,
+        'report': cleaning_report
+    }
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.random.randn(100, 3) * 10 + 50
+    sample_data[10, 0] = 200  # Add an outlier
+    sample_data[20, 1] = -100  # Add another outlier
+    
+    result = clean_dataset(sample_data, [0, 1, 2])
+    
+    print(f"Original data shape: {sample_data.shape}")
+    print(f"Cleaned data shape: {result['cleaned_data'].shape}")
+    
+    for col, report in result['report'].items():
+        print(f"\nColumn {col}:")
+        print(f"  Outliers removed: {report['outliers_removed']}")
+        print(f"  Original count: {report['original_count']}")
+        print(f"  Cleaned count: {report['cleaned_count']}")
+        print(f"  Mean: {report['statistics']['mean']:.2f}")
+        print(f"  Std: {report['statistics']['std']:.2f}")
