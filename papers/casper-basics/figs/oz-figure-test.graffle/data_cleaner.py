@@ -1,94 +1,45 @@
 
-def remove_duplicates(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-import numpy as np
+import pandas as pd
+import re
 
-def remove_outliers_iqr(data, column):
+def clean_dataframe(df, column_names=None):
     """
-    Remove outliers from a specified column using the IQR method.
-    
-    Args:
-        data (list or np.array): Input data
-        column (int): Column index if data is 2D, ignored if data is 1D
-    
-    Returns:
-        np.array: Data with outliers removed
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
     """
-    data_array = np.array(data)
+    df_clean = df.copy()
     
-    if data_array.ndim == 2:
-        column_data = data_array[:, column]
-    else:
-        column_data = data_array
+    # Remove duplicate rows
+    df_clean = df_clean.drop_duplicates()
     
-    q1 = np.percentile(column_data, 25)
-    q3 = np.percentile(column_data, 75)
-    iqr = q3 - q1
+    # If specific columns are provided, clean only those; otherwise, clean all object columns
+    if column_names is None:
+        column_names = df_clean.select_dtypes(include=['object']).columns
     
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
+    for col in column_names:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].apply(_normalize_string)
     
-    if data_array.ndim == 2:
-        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
-        return data_array[mask]
-    else:
-        return column_data[(column_data >= lower_bound) & (column_data <= upper_bound)]
+    return df_clean
 
-def calculate_statistics(data):
+def _normalize_string(s):
     """
-    Calculate basic statistics for the data.
-    
-    Args:
-        data (list or np.array): Input data
-    
-    Returns:
-        dict: Dictionary containing mean, median, std, min, max
+    Normalize a string: lowercase, strip whitespace, and remove extra spaces.
     """
-    data_array = np.array(data)
-    
-    return {
-        'mean': np.mean(data_array),
-        'median': np.median(data_array),
-        'std': np.std(data_array),
-        'min': np.min(data_array),
-        'max': np.max(data_array)
-    }
+    if pd.isna(s):
+        return s
+    s = str(s)
+    s = s.lower()
+    s = s.strip()
+    s = re.sub(r'\s+', ' ', s)
+    return s
 
-def clean_dataset(data, columns_to_clean=None):
+def validate_email_column(df, email_column):
     """
-    Clean dataset by removing outliers from specified columns.
-    
-    Args:
-        data (np.array): 2D array of data
-        columns_to_clean (list): List of column indices to clean
-    
-    Returns:
-        np.array: Cleaned dataset
+    Validate email addresses in a specified column.
+    Returns a Series with boolean values.
     """
-    if columns_to_clean is None:
-        columns_to_clean = list(range(data.shape[1]))
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
     
-    cleaned_data = data.copy()
-    
-    for col in columns_to_clean:
-        if col < data.shape[1]:
-            cleaned_data = remove_outliers_iqr(cleaned_data, col)
-    
-    return cleaned_data
-
-if __name__ == "__main__":
-    sample_data = np.random.randn(100, 3) * 10 + 50
-    
-    print("Original data shape:", sample_data.shape)
-    print("Original statistics:", calculate_statistics(sample_data[:, 0]))
-    
-    cleaned = clean_dataset(sample_data, columns_to_clean=[0, 1, 2])
-    
-    print("Cleaned data shape:", cleaned.shape)
-    print("Cleaned statistics:", calculate_statistics(cleaned[:, 0]))
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[email_column].str.match(email_pattern, na=False)
