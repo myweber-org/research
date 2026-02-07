@@ -131,3 +131,81 @@ def load_and_clean_data(filepath):
     except Exception as e:
         print(f"Error processing file: {e}")
         return None
+import pandas as pd
+import hashlib
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: 'first', 'last', or False to drop all duplicates
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def generate_hash(row):
+    """
+    Generate a hash for a row to identify duplicates.
+    
+    Args:
+        row: pandas Series representing a row
+    
+    Returns:
+        MD5 hash string
+    """
+    row_string = str(row.values).encode('utf-8')
+    return hashlib.md5(row_string).hexdigest()
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Main function to clean a dataset by removing duplicates.
+    
+    Args:
+        file_path: path to input CSV file
+        output_path: path to save cleaned CSV (optional)
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original dataset shape: {df.shape}")
+        
+        # Add hash column for duplicate detection
+        df['row_hash'] = df.apply(generate_hash, axis=1)
+        
+        # Remove duplicates based on hash
+        df_clean = df.drop_duplicates(subset=['row_hash'], keep='first')
+        df_clean = df_clean.drop(columns=['row_hash'])
+        
+        print(f"Cleaned dataset shape: {df_clean.shape}")
+        print(f"Removed {len(df) - len(df_clean)} duplicate rows")
+        
+        if output_path:
+            df_clean.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df_clean
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_dataset(input_file, output_file)
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully")
+        print(f"Sample of cleaned data:\n{cleaned_df.head()}")
