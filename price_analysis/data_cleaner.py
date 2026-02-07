@@ -566,3 +566,17 @@ def validate_data(df, required_columns=None, allow_nan=False, min_rows=1):
             return False, f"Dataset contains {nan_count} NaN values"
     
     return True, "Dataset is valid"
+import re
+
+def clean_string(text):
+    """
+    Clean and normalize a string by:
+    - Removing leading/trailing whitespace.
+    - Converting multiple spaces to a single space.
+    - Converting the string to lowercase.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    return text.lower()
