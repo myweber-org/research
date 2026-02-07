@@ -579,4 +579,77 @@ def clean_string(text):
         raise TypeError("Input must be a string")
     text = text.strip()
     text = re.sub(r'\s+', ' ', text)
-    return text.lower()
+    return text.lower()import pandas as pd
+import numpy as np
+
+def load_and_clean_data(filepath):
+    """
+    Load a CSV file and perform basic data cleaning.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error loading file: {e}")
+        return None
+
+    # Remove duplicate rows
+    initial_rows = df.shape[0]
+    df.drop_duplicates(inplace=True)
+    duplicates_removed = initial_rows - df.shape[0]
+    print(f"Removed {duplicates_removed} duplicate rows.")
+
+    # Handle missing values: fill numeric columns with median, categorical with mode
+    for column in df.columns:
+        if df[column].dtype in ['int64', 'float64']:
+            median_val = df[column].median()
+            df[column].fillna(median_val, inplace=True)
+        else:
+            mode_val = df[column].mode()[0] if not df[column].mode().empty else 'Unknown'
+            df[column].fillna(mode_val, inplace=True)
+
+    # Remove outliers using IQR method for numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    rows_before = df.shape[0]
+    for col in numeric_cols:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+    outliers_removed = rows_before - df.shape[0]
+    print(f"Removed {outliers_removed} rows containing outliers.")
+
+    # Normalize numeric columns to range [0, 1]
+    for col in numeric_cols:
+        min_val = df[col].min()
+        max_val = df[col].max()
+        if max_val > min_val:
+            df[col] = (df[col] - min_val) / (max_val - min_val)
+        else:
+            df[col] = 0
+
+    print(f"Final data shape: {df.shape}")
+    return df
+
+def save_cleaned_data(df, output_filepath):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    try:
+        df.to_csv(output_filepath, index=False)
+        print(f"Cleaned data saved to {output_filepath}")
+    except Exception as e:
+        print(f"Error saving file: {e}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+
+    cleaned_df = load_and_clean_data(input_file)
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
