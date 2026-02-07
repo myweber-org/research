@@ -143,4 +143,88 @@ def example_usage():
     return cleaned_df, report
 
 if __name__ == "__main__":
-    cleaned_data, cleaning_report = example_usage()
+    cleaned_data, cleaning_report = example_usage()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy ('mean', 'median', 'mode')
+    outlier_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    for column in df_clean.columns:
+        if df_clean[column].isnull().any():
+            if strategy == 'mean':
+                df_clean[column].fillna(df_clean[column].mean(), inplace=True)
+            elif strategy == 'median':
+                df_clean[column].fillna(df_clean[column].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[column].fillna(df_clean[column].mode()[0], inplace=True)
+    
+    # Remove outliers using Z-score method
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs((df_clean[numeric_cols] - df_clean[numeric_cols].mean()) / df_clean[numeric_cols].std())
+    outlier_mask = (z_scores < outlier_threshold).all(axis=1)
+    df_clean = df_clean[outlier_mask]
+    
+    # Reset index after cleaning
+    df_clean.reset_index(drop=True, inplace=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with missing values and outliers
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, np.nan, 7, 8, 9],
+        'C': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {is_valid} - {message}")
