@@ -320,3 +320,107 @@ def process_data_pipeline(df: pd.DataFrame,
                 processed_df = normalize_column(processed_df, col, method='minmax')
     
     return processed_df
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: Optional dictionary to rename columns
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        for column in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[column] = cleaned_df[column].apply(
+                lambda x: str(x).strip().lower() if pd.notnull(x) else x
+            )
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    
+    Args:
+        email: Email string to validate
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to check for outliers
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    removed = len(df) - len(filtered_df)
+    
+    if removed > 0:
+        print(f"Removed {removed} outliers from column '{column}'")
+    
+    return filtered_df
+
+def main():
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'ALICE WONDER'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.com', 'alice@wonderland.net'],
+        'age': [25, 30, 25, 150, 28],
+        'score': [85.5, 92.0, 85.5, 45.2, 88.7]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    email_validity = cleaned['email'].apply(validate_email)
+    print(f"\nValid emails: {email_validity.sum()} out of {len(email_validity)}")
+    
+    filtered = remove_outliers_iqr(cleaned, 'age')
+    print(f"\nData after outlier removal: {len(filtered)} rows")
+
+if __name__ == "__main__":
+    main()
