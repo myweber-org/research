@@ -446,3 +446,87 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, strategy='mean'):
+    """
+    Clean CSV data by handling missing values.
+    
+    Parameters:
+    input_path (str): Path to input CSV file.
+    output_path (str, optional): Path for cleaned output CSV.
+    strategy (str): Method for handling missing values.
+                    Options: 'mean', 'median', 'drop', 'zero'.
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    
+    if not Path(input_path).exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    
+    df = pd.read_csv(input_path)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].mean())
+    elif strategy == 'median':
+        df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].median())
+    elif strategy == 'zero':
+        df[numeric_columns] = df[numeric_columns].fillna(0)
+    elif strategy == 'drop':
+        df = df.dropna(subset=numeric_columns)
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate.
+    required_columns (list, optional): List of required column names.
+    
+    Returns:
+    bool: True if validation passes.
+    """
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = set(required_columns) - set(df.columns)
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.isnull().any().any():
+        print("Warning: DataFrame contains missing values")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv', strategy='mean')
+    print("Data cleaning completed successfully")
+    print(f"Original shape: {test_df.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    
+    Path('test_data.csv').unlink(missing_ok=True)
+    Path('cleaned_data.csv').unlink(missing_ok=True)
