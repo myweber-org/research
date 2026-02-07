@@ -209,3 +209,11 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         print("Data cleaning completed successfully")
         print(f"Sample of cleaned data:\n{cleaned_df.head()}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
