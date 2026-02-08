@@ -2,93 +2,58 @@
 import pandas as pd
 import numpy as np
 
-def remove_missing_rows(df, columns=None):
+def remove_outliers_iqr(df, columns, factor=1.5):
     """
-    Remove rows with missing values from DataFrame.
-    If columns specified, only consider missing values in those columns.
+    Remove outliers using the Interquartile Range method.
     """
-    if columns:
-        return df.dropna(subset=columns)
-    return df.dropna()
-
-def fill_missing_with_mean(df, columns):
-    """
-    Fill missing values in specified columns with column mean.
-    """
-    df_filled = df.copy()
+    df_clean = df.copy()
     for col in columns:
         if col in df.columns:
-            df_filled[col] = df_filled[col].fillna(df[col].mean())
-    return df_filled
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
 
-def detect_outliers_iqr(df, column, threshold=1.5):
+def normalize_minmax(df, columns):
     """
-    Detect outliers using IQR method.
-    Returns boolean Series where True indicates outlier.
+    Normalize specified columns using Min-Max scaling.
     """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - threshold * IQR
-    upper_bound = Q3 + threshold * IQR
-    return (df[column] < lower_bound) | (df[column] > upper_bound)
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df_norm[col] = 0
+    return df_norm
 
-def cap_outliers(df, column, method='iqr', threshold=1.5):
+def clean_dataset(df, numeric_columns):
     """
-    Cap outliers to specified bounds.
-    Supports IQR method for outlier detection.
+    Main cleaning pipeline: remove outliers and normalize numeric columns.
     """
-    df_capped = df.copy()
+    if df.empty:
+        return df
     
-    if method == 'iqr':
-        Q1 = df[column].quantile(0.25)
-        Q3 = df[column].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - threshold * IQR
-        upper_bound = Q3 + threshold * IQR
-        
-        df_capped[column] = np.where(df_capped[column] < lower_bound, lower_bound, df_capped[column])
-        df_capped[column] = np.where(df_capped[column] > upper_bound, upper_bound, df_capped[column])
-    
-    return df_capped
+    df_clean = remove_outliers_iqr(df, numeric_columns)
+    df_clean = normalize_minmax(df_clean, numeric_columns)
+    df_clean = df_clean.reset_index(drop=True)
+    return df_clean
 
-def normalize_column(df, column, method='minmax'):
-    """
-    Normalize specified column using selected method.
-    Supports 'minmax' and 'zscore' normalization.
-    """
-    df_normalized = df.copy()
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': np.random.normal(50, 15, 100),
+        'feature_b': np.random.exponential(10, 100),
+        'category': np.random.choice(['X', 'Y', 'Z'], 100)
+    }
+    df_sample = pd.DataFrame(sample_data)
+    numeric_cols = ['feature_a', 'feature_b']
     
-    if method == 'minmax':
-        min_val = df[column].min()
-        max_val = df[column].max()
-        if max_val != min_val:
-            df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
-    
-    elif method == 'zscore':
-        mean_val = df[column].mean()
-        std_val = df[column].std()
-        if std_val != 0:
-            df_normalized[column] = (df[column] - mean_val) / std_val
-    
-    return df_normalized
-
-def clean_dataset(df, missing_strategy='remove', outlier_strategy='cap'):
-    """
-    Comprehensive data cleaning function.
-    Applies missing value handling and outlier treatment.
-    """
-    cleaned_df = df.copy()
-    
-    if missing_strategy == 'remove':
-        cleaned_df = remove_missing_rows(cleaned_df)
-    elif missing_strategy == 'mean':
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        cleaned_df = fill_missing_with_mean(cleaned_df, numeric_cols)
-    
-    if outlier_strategy == 'cap':
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            cleaned_df = cap_outliers(cleaned_df, col)
-    
-    return cleaned_df
+    cleaned_df = clean_dataset(df_sample, numeric_cols)
+    print(f"Original shape: {df_sample.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(cleaned_df.head())
