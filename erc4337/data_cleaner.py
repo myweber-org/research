@@ -158,3 +158,46 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask]
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path):
+    """
+    Load CSV data, handle missing values, and save cleaned version.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Remove rows where critical columns are still null
+        critical_columns = ['id', 'timestamp']
+        existing_critical = [col for col in critical_columns if col in df.columns]
+        if existing_critical:
+            df = df.dropna(subset=existing_critical)
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        print(f"Data cleaned successfully. Saved to {output_path}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_path} not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    clean_csv_data('raw_data.csv', 'cleaned_data.csv')
