@@ -418,3 +418,62 @@ def load_and_clean_data(filepath):
     except Exception as e:
         print(f"Error processing file: {e}")
         return None
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): List of column names to check for duplicates.
+            If None, checks all columns. Defaults to None.
+        drop_duplicates (bool, optional): Whether to drop duplicate rows. Defaults to True.
+        fill_missing (str, optional): Method to fill missing values.
+            Options: 'mean', 'median', 'mode', or 'drop'. Defaults to 'mean'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates(subset=columns_to_check, keep='first')
+    
+    if fill_missing == 'drop':
+        df_clean = df_clean.dropna()
+    elif fill_missing in ['mean', 'median', 'mode']:
+        numeric_cols = df_clean.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+            elif fill_missing == 'median':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+            elif fill_missing == 'mode':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False
+    
+    return True
