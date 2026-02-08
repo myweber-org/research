@@ -162,3 +162,70 @@ def organize_files(directory):
 if __name__ == "__main__":
     target_directory = input("Enter the directory path to organize: ").strip()
     organize_files(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(directory):
+    """
+    Organizes files in the given directory by moving them into
+    subfolders based on their file extensions.
+    """
+    if not os.path.isdir(directory):
+        print(f"Error: Directory '{directory}' does not exist.")
+        return
+
+    # Define categories and their associated extensions
+    categories = {
+        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'Archives': ['.zip', '.tar', '.gz', '.rar', '.7z'],
+        'Code': ['.py', '.js', '.html', '.css', '.java', '.cpp'],
+        'Audio': ['.mp3', '.wav', '.flac', '.aac'],
+        'Video': ['.mp4', '.avi', '.mov', '.mkv'],
+    }
+
+    # Create category folders if they don't exist
+    for category in categories:
+        category_path = os.path.join(directory, category)
+        os.makedirs(category_path, exist_ok=True)
+
+    # Track files that don't match any category
+    other_files = []
+
+    for item in os.listdir(directory):
+        item_path = os.path.join(directory, item)
+
+        # Skip directories
+        if os.path.isdir(item_path):
+            continue
+
+        # Get file extension
+        file_extension = Path(item).suffix.lower()
+
+        # Find the appropriate category
+        moved = False
+        for category, extensions in categories.items():
+            if file_extension in extensions:
+                dest_folder = os.path.join(directory, category)
+                try:
+                    shutil.move(item_path, dest_folder)
+                    print(f"Moved: {item} -> {category}/")
+                    moved = True
+                    break
+                except Exception as e:
+                    print(f"Failed to move {item}: {e}")
+
+        if not moved:
+            other_files.append(item)
+
+    # Print summary
+    print("\nOrganization complete.")
+    if other_files:
+        print(f"Files not categorized ({len(other_files)}):")
+        for f in other_files:
+            print(f"  {f}")
+
+if __name__ == "__main__":
+    target_dir = input("Enter the directory path to organize: ").strip()
+    organize_files(target_dir)
