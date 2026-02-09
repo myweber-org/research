@@ -106,3 +106,73 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import json
+import sys
+from datetime import datetime
+
+def get_weather(api_key, city):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    
+    try:
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+
+def display_weather(weather_data):
+    if not weather_data:
+        return
+    
+    try:
+        city = weather_data['name']
+        country = weather_data['sys']['country']
+        temp = weather_data['main']['temp']
+        feels_like = weather_data['main']['feels_like']
+        humidity = weather_data['main']['humidity']
+        description = weather_data['weather'][0]['description']
+        wind_speed = weather_data['wind']['speed']
+        
+        print(f"Weather in {city}, {country}:")
+        print(f"Temperature: {temp}°C (Feels like: {feels_like}°C)")
+        print(f"Conditions: {description.capitalize()}")
+        print(f"Humidity: {humidity}%")
+        print(f"Wind Speed: {wind_speed} m/s")
+        print(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+    except KeyError as e:
+        print(f"Unexpected data format: Missing key {e}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python fetch_weather.py <city_name>")
+        print("Example: python fetch_weather.py London")
+        sys.exit(1)
+    
+    city = ' '.join(sys.argv[1:])
+    
+    api_key = "your_api_key_here"
+    
+    if api_key == "your_api_key_here":
+        print("Please replace 'your_api_key_here' with your actual OpenWeatherMap API key")
+        print("Get a free API key at: https://openweathermap.org/api")
+        sys.exit(1)
+    
+    print(f"Fetching weather for {city}...")
+    weather_data = get_weather(api_key, city)
+    
+    if weather_data and weather_data.get('cod') == 200:
+        display_weather(weather_data)
+    else:
+        error_msg = weather_data.get('message', 'Unknown error') if weather_data else 'Connection failed'
+        print(f"Failed to get weather data: {error_msg}")
+
+if __name__ == "__main__":
+    main()
