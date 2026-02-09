@@ -217,3 +217,86 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_strategy='mean'):
+    """
+    Load a CSV file, handle missing values, and optionally save cleaned data.
+    
+    Args:
+        file_path (str): Path to input CSV file.
+        output_path (str, optional): Path to save cleaned CSV. If None, returns DataFrame.
+        fill_strategy (str): Method to fill missing values ('mean', 'median', 'mode', 'zero').
+    
+    Returns:
+        pd.DataFrame or None: Cleaned DataFrame if output_path is None, else None.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if fill_strategy == 'mean':
+            fill_values = df[numeric_cols].mean()
+        elif fill_strategy == 'median':
+            fill_values = df[numeric_cols].median()
+        elif fill_strategy == 'mode':
+            fill_values = df[numeric_cols].mode().iloc[0]
+        elif fill_strategy == 'zero':
+            fill_values = 0
+        else:
+            raise ValueError("Invalid fill_strategy. Use 'mean', 'median', 'mode', or 'zero'.")
+        
+        df[numeric_cols] = df[numeric_cols].fillna(fill_values)
+        
+        print(f"Missing values after cleaning:\n{df.isnull().sum()}")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+            return None
+        else:
+            return df
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Columns to consider for duplicates.
+        keep (str): Which duplicates to keep ('first', 'last', False).
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    initial_count = len(df)
+    df_clean = df.drop_duplicates(subset=subset, keep=keep)
+    removed_count = initial_count - len(df_clean)
+    print(f"Removed {removed_count} duplicate rows")
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='mean')
+    
+    if cleaned_df is not None:
+        print("Sample cleaned data:")
+        print(cleaned_df.head())
