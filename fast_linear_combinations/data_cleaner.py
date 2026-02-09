@@ -55,3 +55,88 @@ def validate_data(df, required_columns, allow_nan=False):
             raise ValueError(f"Data contains NaN values in columns: {nan_counts[nan_counts > 0].index.tolist()}")
     
     return True
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    stats = {
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'min': np.min(data[column]),
+        'max': np.max(data[column]),
+        'count': len(data[column])
+    }
+    
+    return stats
+
+def normalize_column(data, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    data_copy = data.copy()
+    
+    if method == 'minmax':
+        min_val = data_copy[column].min()
+        max_val = data_copy[column].max()
+        if max_val != min_val:
+            data_copy[column] = (data_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = data_copy[column].mean()
+        std_val = data_copy[column].std()
+        if std_val != 0:
+            data_copy[column] = (data_copy[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
+    
+    return data_copy
