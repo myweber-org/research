@@ -232,4 +232,131 @@ def validate_dataframe(df, required_columns=None, allow_nan=False):
     if not allow_nan and df.isnull().any().any():
         return False, "DataFrame contains NaN values"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, drop_na=True, fill_strategy='mean'):
+    """
+    Load and clean a CSV file.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        drop_na (bool): If True, drop rows with any NaN values.
+                        If False, fill NaN values based on fill_strategy.
+        fill_strategy (str): Strategy to fill NaN values if drop_na is False.
+                             Options: 'mean', 'median', 'zero', 'ffill'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return pd.DataFrame()
+    
+    original_rows = len(df)
+    original_cols = len(df.columns)
+    
+    if drop_na:
+        df_cleaned = df.dropna()
+        rows_removed = original_rows - len(df_cleaned)
+        print(f"Dropped {rows_removed} rows with NaN values.")
+    else:
+        df_cleaned = df.copy()
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if fill_strategy == 'mean':
+                fill_value = df_cleaned[col].mean()
+            elif fill_strategy == 'median':
+                fill_value = df_cleaned[col].median()
+            elif fill_strategy == 'zero':
+                fill_value = 0
+            elif fill_strategy == 'ffill':
+                df_cleaned[col] = df_cleaned[col].ffill()
+                continue
+            else:
+                fill_value = df_cleaned[col].mean()
+            
+            df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+        
+        print(f"Filled NaN values using '{fill_strategy}' strategy.")
+    
+    string_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in string_cols:
+        df_cleaned[col] = df_cleaned[col].str.strip()
+    
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    print(f"Original data: {original_rows} rows, {original_cols} columns")
+    print(f"Cleaned data: {len(df_cleaned)} rows, {len(df_cleaned.columns)} columns")
+    
+    return df_cleaned
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list): Columns to consider for identifying duplicates.
+        keep (str): Which duplicates to keep. Options: 'first', 'last', False.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    original_rows = len(df)
+    df_deduped = df.drop_duplicates(subset=subset, keep=keep)
+    rows_removed = original_rows - len(df_deduped)
+    
+    print(f"Removed {rows_removed} duplicate rows.")
+    
+    return df_deduped
+
+def validate_data_types(df, expected_types):
+    """
+    Validate that columns have expected data types.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        expected_types (dict): Dictionary mapping column names to expected types.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {}
+    
+    for column, expected_type in expected_types.items():
+        if column not in df.columns:
+            validation_results[column] = {
+                'valid': False,
+                'message': f"Column '{column}' not found in DataFrame."
+            }
+            continue
+        
+        actual_type = str(df[column].dtype)
+        
+        if expected_type == 'numeric':
+            is_valid = np.issubdtype(df[column].dtype, np.number)
+            type_name = 'numeric'
+        elif expected_type == 'string':
+            is_valid = df[column].dtype == 'object'
+            type_name = 'string'
+        else:
+            is_valid = actual_type == expected_type
+            type_name = expected_type
+        
+        validation_results[column] = {
+            'valid': is_valid,
+            'expected': type_name,
+            'actual': actual_type
+        }
+    
+    return validation_results
