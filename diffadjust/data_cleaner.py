@@ -355,4 +355,96 @@ def clean_dataset(df: pd.DataFrame, steps: List[dict]) -> pd.DataFrame:
             column = step.get('column')
             cleaner.normalize_column(column)
     
-    return cleaner.get_cleaned_data()
+    return cleaner.get_cleaned_data()import pandas as pd
+import numpy as np
+from typing import Optional, Dict, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df.dropna(subset=[col], inplace=True)
+        
+        return self
+    
+    def convert_types(self, type_map: Dict[str, str]) -> 'DataCleaner':
+        for col, dtype in type_map.items():
+            if col in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[col] = pd.to_datetime(self.df[col])
+                    else:
+                        self.df[col] = self.df[col].astype(dtype)
+                except Exception as e:
+                    print(f"Failed to convert {col} to {dtype}: {e}")
+        
+        return self
+    
+    def remove_outliers(self, columns: List[str], method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                if method == 'iqr':
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - threshold * IQR
+                    upper_bound = Q3 + threshold * IQR
+                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        print(f"Columns: {self.df.columns.tolist()}")
+        
+        return self.df
+    
+    def save_to_csv(self, filepath: str) -> None:
+        self.df.to_csv(filepath, index=False)
+        print(f"Data saved to {filepath}")
+
+def clean_csv_file(input_path: str, output_path: str, missing_strategy: str = 'mean') -> pd.DataFrame:
+    df = pd.read_csv(input_path)
+    cleaner = DataCleaner(df)
+    
+    cleaned_df = (cleaner
+                 .handle_missing_values(strategy=missing_strategy)
+                 .convert_types({'date': 'datetime', 'category': 'category'})
+                 .get_cleaned_data())
+    
+    cleaner.save_to_csv(output_path)
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, np.nan, 15.2, 100.0, 12.3],
+        'date': ['2023-01-01', '2023-01-02', None, '2023-01-04', '2023-01-05'],
+        'category': ['A', 'B', 'A', 'C', 'B']
+    })
+    
+    cleaner = DataCleaner(sample_data)
+    result = (cleaner
+             .handle_missing_values(strategy='mean')
+             .convert_types({'date': 'datetime', 'category': 'category'})
+             .remove_outliers(['value'])
+             .get_cleaned_data())
+    
+    print(result.info())
+    print(result.head())
