@@ -90,3 +90,97 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return filtered_df
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data (np.ndarray): Input data array
+        column (int): Index of column to clean
+    
+    Returns:
+        np.ndarray: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    column_data = data[:, column]
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    cleaned_data = data[mask]
+    
+    return cleaned_data
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Args:
+        data (np.ndarray): Input data array
+    
+    Returns:
+        dict: Dictionary containing mean, median, and standard deviation
+    """
+    if data.size == 0:
+        return {"mean": np.nan, "median": np.nan, "std": np.nan}
+    
+    stats = {
+        "mean": np.mean(data, axis=0),
+        "median": np.median(data, axis=0),
+        "std": np.std(data, axis=0)
+    }
+    
+    return stats
+
+def validate_data(data, expected_columns):
+    """
+    Validate data shape and structure.
+    
+    Args:
+        data (np.ndarray): Input data array
+        expected_columns (int): Expected number of columns
+    
+    Returns:
+        bool: True if data is valid, False otherwise
+    """
+    if not isinstance(data, np.ndarray):
+        return False
+    
+    if len(data.shape) != 2:
+        return False
+    
+    if data.shape[1] != expected_columns:
+        return False
+    
+    return True
+
+def process_dataset(data, column_to_clean):
+    """
+    Main function to process dataset by removing outliers and calculating statistics.
+    
+    Args:
+        data (np.ndarray): Input data array
+        column_to_clean (int): Index of column to clean
+    
+    Returns:
+        tuple: (cleaned_data, statistics)
+    """
+    if not validate_data(data, expected_columns=data.shape[1]):
+        raise ValueError("Invalid data format")
+    
+    cleaned_data = remove_outliers_iqr(data, column_to_clean)
+    stats = calculate_statistics(cleaned_data)
+    
+    return cleaned_data, stats
