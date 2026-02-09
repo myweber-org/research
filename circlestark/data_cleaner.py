@@ -286,3 +286,52 @@ def validate_dataframe(df, checks):
         )
     
     return results
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df):
+    """
+    Validate that the DataFrame has no missing values after cleaning.
+    """
+    missing_values = df.isnull().sum().sum()
+    if missing_values == 0:
+        return True
+    else:
+        print(f"Warning: {missing_values} missing values found after cleaning")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    data = pd.DataFrame({
+        'A': [1, 2, 2, None, 5],
+        'B': ['x', 'y', 'y', None, 'z'],
+        'C': [10.5, 20.3, 20.3, 15.7, None]
+    })
+    
+    print("Original data:")
+    print(data)
+    print("\nCleaned data:")
+    cleaned_data = clean_dataset(data)
+    print(cleaned_data)
+    
+    is_valid = validate_data(cleaned_data)
+    print(f"\nData validation passed: {is_valid}")
