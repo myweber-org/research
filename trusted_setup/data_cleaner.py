@@ -222,3 +222,82 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    columns (list): List of columns to process, None for all columns
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.columns.tolist()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    
+    for col in columns:
+        if col in df_clean.columns:
+            if df_clean[col].isnull().any():
+                if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(df_clean[col]):
+                    df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+                elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(df_clean[col]):
+                    df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+                elif fill_missing == 'mode':
+                    df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else np.nan)
+                elif fill_missing == 'drop':
+                    df_clean = df_clean.dropna(subset=[col])
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of columns that must be present
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (bool, str) Validation result and message
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (fill with mean):")
+    cleaned_df = clean_dataset(df, fill_missing='mean')
+    print(cleaned_df)
+    
+    is_valid, message = validate_data(cleaned_df, required_columns=['A', 'B'])
+    print(f"\nValidation: {is_valid} - {message}")
