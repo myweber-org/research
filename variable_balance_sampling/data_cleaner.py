@@ -901,4 +901,93 @@ def clean_csv_data(input_file, output_file):
 
 if __name__ == "__main__":
     cleaned_df = clean_csv_data('raw_data.csv', 'cleaned_data.csv')
-    print(f"Data cleaning complete. Shape: {cleaned_df.shape}")
+    print(f"Data cleaning complete. Shape: {cleaned_df.shape}")import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: Dictionary mapping old column names to new ones
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+            # Remove extra whitespace
+            cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x))
+        print(f"Normalized {len(text_columns)} text columns")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of column names that must be present
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     sample_data = {
+#         'Name': ['John Doe', 'Jane Smith', 'John Doe', '  BOB JOHNSON  '],
+#         'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'BOB@EXAMPLE.COM'],
+#         'Age': [25, 30, 25, 35]
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\n" + "="*50 + "\n")
+#     
+#     # Clean the data
+#     cleaned = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
+#     print("Cleaned DataFrame:")
+#     print(cleaned)
+#     
+#     # Validate
+#     is_valid, message = validate_dataframe(cleaned, required_columns=['Name', 'Email'])
+#     print(f"\nValidation: {message}")
