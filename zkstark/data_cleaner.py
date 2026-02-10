@@ -503,3 +503,107 @@ class DataCleaner:
             'data_types': self.df.dtypes.to_dict()
         }
         return summary
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str): Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    if subset is not None:
+        if not all(col in df.columns for col in subset):
+            raise ValueError("All subset columns must exist in DataFrame")
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned numeric columns
+    """
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    dict: Dictionary containing validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'empty_rows': 0,
+        'null_values': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    validation_results['empty_rows'] = df.isnull().all(axis=1).sum()
+    
+    for col in df.columns:
+        null_count = df[col].isnull().sum()
+        if null_count > 0:
+            validation_results['null_values'][col] = null_count
+    
+    return validation_results
+
+def process_dataframe(df, cleaning_steps=None):
+    """
+    Apply multiple cleaning steps to a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    cleaning_steps (list, optional): List of cleaning functions to apply
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if cleaning_steps is None:
+        cleaning_steps = [
+            lambda x: remove_duplicates(x),
+            lambda x: clean_numeric_columns(x, x.select_dtypes(include=[np.number]).columns)
+        ]
+    
+    result_df = df.copy()
+    
+    for step in cleaning_steps:
+        result_df = step(result_df)
+    
+    return result_df
