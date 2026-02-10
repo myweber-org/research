@@ -236,3 +236,107 @@ if __name__ == "__main__":
     df_normalized = normalize_numeric_columns(df_clean, method='minmax')
     print("Normalized DataFrame:")
     print(df_normalized)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, deduplicate=True, fill_na=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        deduplicate (bool): Whether to remove duplicate rows
+        fill_na (bool): Whether to fill null values
+        fill_value: Value to use for filling nulls (default: 0)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_na:
+        null_count = cleaned_df.isnull().sum().sum()
+        if null_count > 0:
+            cleaned_df = cleaned_df.fillna(fill_value)
+            print(f"Filled {null_count} null values with {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            print(f"Error: Missing required columns: {missing}")
+            return False
+    
+    return True
+
+def remove_outliers(df, column, threshold=3):
+    """
+    Remove outliers from a DataFrame column using z-score method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+        threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        print(f"Error: Column '{column}' not found in DataFrame")
+        return df
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        print(f"Error: Column '{column}' is not numeric")
+        return df
+    
+    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+    filtered_df = df[z_scores < threshold].copy()
+    
+    removed = len(df) - len(filtered_df)
+    if removed > 0:
+        print(f"Removed {removed} outliers from column '{column}'")
+    
+    return filtered_df
+
+def sample_data(df, sample_size=1000, random_state=42):
+    """
+    Create a random sample from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        sample_size (int): Number of rows to sample
+        random_state (int): Random seed for reproducibility
+    
+    Returns:
+        pd.DataFrame: Sampled DataFrame
+    """
+    if len(df) <= sample_size:
+        return df.copy()
+    
+    return df.sample(n=sample_size, random_state=random_state)
