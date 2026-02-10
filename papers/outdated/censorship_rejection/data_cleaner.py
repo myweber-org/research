@@ -236,4 +236,31 @@ def validate_data(df, required_columns, numeric_threshold=0.8):
     if len(numeric_cols) / len(df.columns) < numeric_threshold:
         print(f"Warning: Only {len(numeric_cols)}/{len(df.columns)} columns are numeric")
     
-    return True
+    return Trueimport re
+
+def clean_text(text):
+    """
+    Cleans the input text by:
+    1. Removing leading/trailing whitespace.
+    2. Replacing multiple spaces/newlines/tabs with a single space.
+    3. Converting the text to lowercase.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+
+    # Remove leading/trailing whitespace
+    text = text.strip()
+    # Replace any sequence of whitespace characters with a single space
+    text = re.sub(r'\s+', ' ', text)
+    # Convert to lowercase
+    text = text.lower()
+    return text
+
+def normalize_whitespace(text):
+    """
+    A more specific function that only normalizes whitespace,
+    preserving case.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+    return re.sub(r'\s+', ' ', text.strip())
