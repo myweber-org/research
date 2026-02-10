@@ -1161,4 +1161,22 @@ if __name__ == "__main__":
     print("Original data shape:", sample_data.shape)
     cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b', 'feature_c'])
     print("Cleaned data shape:", cleaned.shape)
-    print("Data validation passed:", validate_data(cleaned, ['feature_a', 'feature_b', 'feature_c']))
+    print("Data validation passed:", validate_data(cleaned, ['feature_a', 'feature_b', 'feature_c']))import re
+
+def clean_text(text):
+    """
+    Cleans and normalizes the input text by:
+    1. Removing leading/trailing whitespace.
+    2. Converting multiple spaces/newlines/tabs to a single space.
+    3. Converting the text to lowercase.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+
+    # Remove leading/trailing whitespace
+    text = text.strip()
+    # Replace multiple whitespace characters (spaces, newlines, tabs) with a single space
+    text = re.sub(r'\s+', ' ', text)
+    # Convert to lowercase
+    text = text.lower()
+    return text
