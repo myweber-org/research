@@ -213,4 +213,60 @@ def clean_dataset(df, numeric_columns):
             removed_count = original_count - len(cleaned_df)
             print(f"Removed {removed_count} outliers from column '{column}'")
     
+    return cleaned_dfimport pandas as pd
+
+def clean_dataset(df, drop_duplicates=True):
+    """
+    Clean a pandas DataFrame by removing null values and optionally duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.dropna()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
     return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+def sample_data(df, sample_size=1000, random_state=42):
+    """
+    Take a random sample from the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        sample_size (int): Number of rows to sample.
+        random_state (int): Random seed for reproducibility.
+    
+    Returns:
+        pd.DataFrame: Sampled DataFrame.
+    """
+    if len(df) <= sample_size:
+        return df
+    
+    return df.sample(n=sample_size, random_state=random_state)
