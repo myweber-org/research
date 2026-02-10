@@ -1,17 +1,17 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
     Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        pd.DataFrame: DataFrame with outliers removed
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -27,16 +27,16 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df.reset_index(drop=True)
 
-def calculate_summary_statistics(df, column):
+def calculate_basic_stats(df, column):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Calculate basic statistics for a DataFrame column.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
     
     Returns:
-    dict: Dictionary containing summary statistics
+        dict: Dictionary containing statistical measures
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -47,48 +47,58 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': len(df[column])
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
     return stats
 
-def process_dataset(file_path, column_to_clean):
+def clean_numeric_data(df, columns=None):
     """
-    Load a dataset from file and clean specified column.
+    Clean numeric data by removing outliers from specified columns.
     
-    Parameters:
-    file_path (str): Path to CSV file
-    column_to_clean (str): Column name to clean
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean. 
+                                 If None, cleans all numeric columns.
     
     Returns:
-    tuple: (cleaned DataFrame, original stats, cleaned stats)
+        pd.DataFrame: Cleaned DataFrame
     """
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
     
-    original_stats = calculate_summary_statistics(df, column_to_clean)
-    cleaned_df = remove_outliers_iqr(df, column_to_clean)
-    cleaned_stats = calculate_summary_statistics(cleaned_df, column_to_clean)
+    cleaned_df = df.copy()
     
-    return cleaned_df, original_stats, cleaned_stats
+    for column in columns:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    # Example usage
     sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 14, 13, 12, 11, 14, 13, 12, 14, 13]
+        'temperature': [22, 23, 24, 25, 26, 100, 27, 28, 29, -10, 30, 31],
+        'humidity': [45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 200, 55],
+        'pressure': [1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023, 500]
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original data:")
+    print("Original DataFrame:")
     print(df)
+    print("\nOriginal shape:", df.shape)
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned data:")
+    cleaned_df = clean_numeric_data(df)
+    print("\nCleaned DataFrame:")
     print(cleaned_df)
+    print("\nCleaned shape:", cleaned_df.shape)
     
-    stats = calculate_summary_statistics(cleaned_df, 'values')
-    print("\nSummary statistics:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+    for column in df.columns:
+        stats = calculate_basic_stats(df, column)
+        print(f"\nStatistics for '{column}':")
+        for key, value in stats.items():
+            print(f"  {key}: {value:.2f}")
