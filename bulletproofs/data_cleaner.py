@@ -311,4 +311,56 @@ def create_sample_data():
     data['feature_a'][0] = 500
     data['feature_b'][1] = 300
     
-    return pd.DataFrame(data)
+    return pd.DataFrame(data)import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fillna_method=None, fillna_value=None):
+    """
+    Clean a pandas DataFrame by handling null values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fillna_method (str): Method to fill nulls: 'ffill', 'bfill', or None. Default None.
+    fillna_value: Value to fill nulls if fillna_method is None and fillna_value is provided.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle null values
+    if fillna_method in ['ffill', 'bfill']:
+        cleaned_df = cleaned_df.fillna(method=fillna_method)
+    elif fillna_value is not None:
+        cleaned_df = cleaned_df.fillna(fillna_value)
+    
+    # Drop duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataset is valid"
