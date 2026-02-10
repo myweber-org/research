@@ -457,3 +457,34 @@ def get_data_summary(data):
     }
     
     return summary
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    drop_duplicates (bool): If True, remove duplicate rows.
+    fill_missing (str or dict): Method to fill missing values.
+                                 Options: 'mean', 'median', 'mode', or a dict of column:value.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    
+    return cleaned_df
