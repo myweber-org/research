@@ -1,60 +1,62 @@
+import re
+from typing import List, Optional
 
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    if max_val == min_val:
-        return df[column]
-    return (df[column] - min_val) / (max_val - min_val)
-
-def standardize_zscore(df, column):
-    mean_val = df[column].mean()
-    std_val = df[column].std()
-    if std_val == 0:
-        return df[column]
-    return (df[column] - mean_val) / std_val
-
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
-
-def validate_dataframe(df):
-    required_checks = [
-        lambda x: isinstance(x, pd.DataFrame),
-        lambda x: not x.empty,
-        lambda x: x.isnull().sum().sum() == 0
-    ]
-    for check in required_checks:
-        if not check(df):
-            return False
-    return True
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 1000),
-        'feature_b': np.random.exponential(50, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    })
-    
-    numeric_cols = ['feature_a', 'feature_b']
-    processed_data = clean_dataset(sample_data, numeric_cols)
-    
-    if validate_dataframe(processed_data):
-        print(f"Data cleaned successfully. Shape: {processed_data.shape}")
-        print(processed_data.describe())
+def remove_special_characters(text: str, keep_spaces: bool = True) -> str:
+    """
+    Remove all non-alphanumeric characters from the input string.
+    Optionally preserve spaces.
+    """
+    if keep_spaces:
+        pattern = r'[^A-Za-z0-9\s]'
     else:
-        print("Data validation failed")
+        pattern = r'[^A-Za-z0-9]'
+    return re.sub(pattern, '', text)
+
+def normalize_whitespace(text: str) -> str:
+    """
+    Replace multiple whitespace characters with a single space.
+    Also strip leading and trailing whitespace.
+    """
+    return ' '.join(text.split())
+
+def tokenize_text(text: str, lowercase: bool = True) -> List[str]:
+    """
+    Split text into tokens (words). Optionally convert to lowercase.
+    """
+    if lowercase:
+        text = text.lower()
+    tokens = text.split()
+    return tokens
+
+def clean_text_pipeline(
+    text: str,
+    remove_special: bool = True,
+    normalize_ws: bool = True,
+    tokenize: bool = False
+) -> Optional[str]:
+    """
+    Apply a series of cleaning operations to the input text.
+    Returns cleaned string or token list based on parameters.
+    """
+    if not isinstance(text, str):
+        return None
+
+    cleaned = text
+
+    if remove_special:
+        cleaned = remove_special_characters(cleaned)
+
+    if normalize_ws:
+        cleaned = normalize_whitespace(cleaned)
+
+    if tokenize:
+        return tokenize_text(cleaned)
+
+    return cleaned
+
+def batch_clean_texts(texts: List[str], **kwargs) -> List[Optional[str]]:
+    """
+    Apply cleaning pipeline to a list of text strings.
+    Returns list of cleaned texts (or None for invalid inputs).
+    """
+    return [clean_text_pipeline(text, **kwargs) for text in texts]
