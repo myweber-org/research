@@ -184,3 +184,11 @@ def process_dataset(data, column_to_clean):
     stats = calculate_statistics(cleaned_data)
     
     return cleaned_data, stats
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
