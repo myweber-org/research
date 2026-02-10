@@ -1180,3 +1180,84 @@ def clean_text(text):
     # Convert to lowercase
     text = text.lower()
     return text
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers_zscore(data, column, z_threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < z_threshold)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize=True):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if outlier_method == 'iqr':
+            outliers, lower, upper = detect_outliers_iqr(cleaned_df, col)
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower) & (cleaned_df[col] <= upper)]
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalize:
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    
+    return cleaned_df
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    df_filled = df.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if strategy == 'mean':
+            df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+        elif strategy == 'median':
+            df_filled[col].fillna(df_filled[col].median(), inplace=True)
+        elif strategy == 'mode':
+            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+    
+    return df_filled
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
