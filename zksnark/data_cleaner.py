@@ -34,3 +34,88 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
     print(f"Removed rows: {sample_data.shape[0] - cleaned.shape[0]}")
+import pandas as pd
+
+def clean_dataset(df, missing_strategy='drop', duplicate_strategy='drop_first'):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for missing values - 'drop' or 'fill_mean'.
+    duplicate_strategy (str): Strategy for duplicates - 'drop_first' or 'drop_all'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'fill_mean':
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+    
+    # Handle duplicates
+    if duplicate_strategy == 'drop_first':
+        cleaned_df = cleaned_df.drop_duplicates(keep='first')
+    elif duplicate_strategy == 'drop_all':
+        cleaned_df = cleaned_df.drop_duplicates(keep=False)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage function
+def process_sample_data():
+    """
+    Demonstrate the data cleaning functions with sample data.
+    """
+    # Create sample data with issues
+    sample_data = {
+        'id': [1, 2, 3, 4, 4, 5],
+        'value': [10.5, None, 15.2, 20.1, 20.1, None],
+        'category': ['A', 'B', 'A', 'C', 'C', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='fill_mean', duplicate_strategy='drop_first')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned, required_columns=['id', 'value', 'category'])
+    print(f"\nValidation: {message}")
+    
+    return cleaned
+
+if __name__ == "__main__":
+    process_sample_data()
