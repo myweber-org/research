@@ -443,4 +443,49 @@ if __name__ == "__main__":
     print("\nSummary statistics after cleaning:")
     for col in cleaned_df.columns:
         stats = calculate_summary_stats(cleaned_df, col)
-        print(f"\n{col}: {stats}")
+        print(f"\n{col}: {stats}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates()
+
+def fill_missing_values(df, strategy='mean'):
+    """Fill missing values using specified strategy."""
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.fillna(0)
+
+def normalize_column(df, column_name):
+    """Normalize specified column to range [0,1]."""
+    if column_name in df.columns:
+        col_min = df[column_name].min()
+        col_max = df[column_name].max()
+        if col_max != col_min:
+            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    return df
+
+def clean_dataset(file_path, output_path=None):
+    """Main function to clean dataset from CSV file."""
+    try:
+        df = pd.read_csv(file_path)
+        df = remove_duplicates(df)
+        df = fill_missing_values(df, 'mean')
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df = normalize_column(df, col)
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        
+        return df
+    except Exception as e:
+        print(f"Error cleaning dataset: {e}")
+        return None
