@@ -260,3 +260,127 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (bool): Whether to fill missing values
+        fill_value: Value to use for filling missing data
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        missing_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = cleaned_df.fillna(fill_value)
+        missing_after = cleaned_df.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        validation_results['warnings'].append("DataFrame is empty")
+    
+    if df.isnull().any().any():
+        null_counts = df.isnull().sum()
+        columns_with_nulls = null_counts[null_counts > 0].index.tolist()
+        validation_results['warnings'].append(f"Columns with null values: {columns_with_nulls}")
+    
+    return validation_results
+
+def process_csv_file(input_path, output_path=None, **clean_kwargs):
+    """
+    Process a CSV file through the data cleaning pipeline.
+    
+    Args:
+        input_path (str): Path to input CSV file
+        output_path (str): Path to save cleaned CSV file
+        **clean_kwargs: Additional arguments for clean_dataframe
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Loaded data from {input_path}")
+        print(f"Original shape: {df.shape}")
+        
+        validation = validate_dataframe(df)
+        if not validation['is_valid']:
+            print("Validation errors:", validation['errors'])
+            return None
+        
+        if validation['warnings']:
+            print("Validation warnings:", validation['warnings'])
+        
+        cleaned_df = clean_dataframe(df, **clean_kwargs)
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Saved cleaned data to {output_path}")
+        
+        return cleaned_df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"Error: File at {input_path} is empty")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10, 20, 20, None, 40, 50],
+        'category': ['A', 'B', 'B', 'C', None, 'E']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Sample data before cleaning:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(df, drop_duplicates=True, fill_missing=True)
+    print("\nSample data after cleaning:")
+    print(cleaned)
