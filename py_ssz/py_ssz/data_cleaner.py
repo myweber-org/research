@@ -631,4 +631,25 @@ if __name__ == "__main__":
     raw_data = load_dataset('raw_dataset.csv')
     numeric_cols = ['age', 'income', 'score']
     cleaned_data = clean_data(raw_data, numeric_cols)
-    save_cleaned_data(cleaned_data, 'cleaned_dataset.csv')
+    save_cleaned_data(cleaned_data, 'cleaned_dataset.csv')import re
+
+def clean_string(text):
+    """
+    Clean and normalize a string by:
+    1. Removing leading/trailing whitespace.
+    2. Replacing multiple spaces/newlines/tabs with a single space.
+    3. Converting to lowercase.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string")
+
+    # Remove leading/trailing whitespace
+    text = text.strip()
+
+    # Replace any sequence of whitespace characters (spaces, newlines, tabs) with a single space
+    text = re.sub(r'\s+', ' ', text)
+
+    # Convert to lowercase
+    text = text.lower()
+
+    return text
