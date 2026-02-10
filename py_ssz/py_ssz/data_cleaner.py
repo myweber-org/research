@@ -652,4 +652,112 @@ def clean_string(text):
     # Convert to lowercase
     text = text.lower()
 
-    return text
+    return textimport pandas as pd
+
+def clean_dataset(df, column_names=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_names (list, optional): List of column names to normalize. 
+                                      If None, all object dtype columns are normalized.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = cleaned_df.shape[0]
+    cleaned_df = cleaned_df.drop_duplicates()
+    removed_duplicates = initial_rows - cleaned_df.shape[0]
+    
+    # Normalize string columns
+    if column_names is None:
+        # Automatically select object/string columns
+        string_columns = cleaned_df.select_dtypes(include=['object']).columns
+    else:
+        # Use provided column names
+        string_columns = [col for col in column_names if col in cleaned_df.columns]
+    
+    for col in string_columns:
+        if cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = (
+                cleaned_df[col]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .replace({'nan': None, 'none': None, '': None})
+            )
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    print(f"Removed {removed_duplicates} duplicate rows.")
+    print(f"Normalized {len(string_columns)} columns: {list(string_columns)}")
+    
+    return cleaned_df
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        email_column (str): Name of the column containing email addresses.
+    
+    Returns:
+        pd.DataFrame: DataFrame with additional validation columns.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    validation_df = df.copy()
+    
+    # Basic email validation pattern
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validation_df['email_valid'] = (
+        validation_df[email_column]
+        .astype(str)
+        .str.match(email_pattern)
+    )
+    
+    validation_df['email_domain'] = (
+        validation_df[email_column]
+        .str.extract(r'@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})')
+    )
+    
+    valid_count = validation_df['email_valid'].sum()
+    total_count = len(validation_df)
+    
+    print(f"Email validation: {valid_count}/{total_count} valid emails ({valid_count/total_count*100:.1f}%)")
+    
+    return validation_df
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'john doe', 'Bob Johnson', 'Jane Smith'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.co', 'jane@test.org'],
+        'age': [25, 30, 25, 35, 30],
+        'city': ['New York', 'Los Angeles', 'new york', 'Chicago', 'Los Angeles']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate emails
+    print("\n" + "="*50 + "\n")
+    validated = validate_email_column(cleaned, 'email')
+    print("\nDataFrame with email validation:")
+    print(validated[['name', 'email', 'email_valid', 'email_domain']])
