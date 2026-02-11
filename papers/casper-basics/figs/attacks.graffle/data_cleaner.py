@@ -385,3 +385,73 @@ if __name__ == "__main__":
         print(f"  Cleaned count: {report['cleaned_count']}")
         print(f"  Mean: {report['statistics']['mean']:.2f}")
         print(f"  Std: {report['statistics']['std']:.2f}")
+import pandas as pd
+import re
+
+def clean_dataset(df, text_columns=None, drop_na=True):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names containing text data
+    drop_na (bool): Whether to drop rows with null values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str)
+                cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
+                cleaned_df[col] = cleaned_df[col].str.lower()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', None, 'Bob Johnson'],
+        'email': ['john@example.com', 'jane@example.com', 'bob@example.com', None],
+        'notes': ['  Important Client  ', 'regular customer', None, 'VIP   status']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df, text_columns=['name', 'notes'], drop_na=True)
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, required_columns=['name', 'email'])
+    print(f"\nValidation: {is_valid} - {message}")
