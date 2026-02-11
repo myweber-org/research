@@ -1,33 +1,48 @@
-
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
+def normalize_minmax(data, column):
+    """
+    Normalize a column to range [0, 1] using min-max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def clean_dataset(file_path, numeric_columns):
-    df = pd.read_csv(file_path)
-    
-    for column in numeric_columns:
-        if column in df.columns:
-            df = remove_outliers_iqr(df, column)
-            df = normalize_minmax(df, column)
-    
-    cleaned_file = file_path.replace('.csv', '_cleaned.csv')
-    df.to_csv(cleaned_file, index=False)
-    return cleaned_file
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    """
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df
 
 if __name__ == "__main__":
-    cleaned = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
-    print(f"Cleaned data saved to: {cleaned}")
+    sample_data = pd.DataFrame({
+        'A': np.random.randn(100),
+        'B': np.random.uniform(0, 100, 100),
+        'C': np.random.randint(1, 50, 100)
+    })
+    numeric_cols = ['A', 'B', 'C']
+    result = clean_dataset(sample_data, numeric_cols)
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {result.shape}")
+    print(result.head())
