@@ -547,3 +547,60 @@ def validate_data(df, required_columns=None, unique_columns=None):
                     validation_results['is_valid'] = False
     
     return validation_results
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+
+def load_and_clean_data(filepath):
+    """
+    Load CSV data and perform cleaning operations.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    
+    # Handle missing values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    df[categorical_cols] = df[categorical_cols].fillna('Unknown')
+    
+    # Remove duplicates
+    initial_rows = df.shape[0]
+    df = df.drop_duplicates()
+    removed = initial_rows - df.shape[0]
+    print(f"Removed {removed} duplicate rows")
+    
+    # Normalize numeric columns
+    if len(numeric_cols) > 0:
+        scaler = StandardScaler()
+        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+        print(f"Normalized {len(numeric_cols)} numeric columns")
+    
+    # Clean column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    print(f"Final data shape: {df.shape}")
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+        return True
+    return False
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = load_and_clean_data(input_file)
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
