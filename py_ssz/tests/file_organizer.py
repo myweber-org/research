@@ -3,33 +3,23 @@ import os
 import shutil
 
 def organize_files(directory):
-    if not os.path.isdir(directory):
-        print(f"Error: {directory} is not a valid directory.")
+    if not os.path.exists(directory):
+        print(f"Directory {directory} does not exist.")
         return
 
     for filename in os.listdir(directory):
         file_path = os.path.join(directory, filename)
-
         if os.path.isfile(file_path):
-            _, extension = os.path.splitext(filename)
-            extension = extension.lower()
+            file_extension = filename.split('.')[-1] if '.' in filename else 'NoExtension'
+            folder_name = file_extension.upper() + "_FILES"
+            folder_path = os.path.join(directory, folder_name)
 
-            if extension:
-                folder_name = extension[1:] + "_files"
-            else:
-                folder_name = "no_extension_files"
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
 
-            target_folder = os.path.join(directory, folder_name)
-
-            if not os.path.exists(target_folder):
-                os.makedirs(target_folder)
-
-            try:
-                shutil.move(file_path, os.path.join(target_folder, filename))
-                print(f"Moved: {filename} -> {folder_name}/")
-            except Exception as e:
-                print(f"Failed to move {filename}: {e}")
+            shutil.move(file_path, os.path.join(folder_path, filename))
+            print(f"Moved {filename} to {folder_name}/")
 
 if __name__ == "__main__":
-    target_directory = input("Enter the directory path to organize: ").strip()
+    target_directory = input("Enter the directory path to organize: ")
     organize_files(target_directory)
