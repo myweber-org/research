@@ -990,4 +990,42 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
 #     
 #     # Validate
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['Name', 'Email'])
-#     print(f"\nValidation: {message}")
+#     print(f"\nValidation: {message}")import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Remove duplicate rows and standardize text in specified column.
+    """
+    # Remove duplicates
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Standardize text: lowercase, remove extra spaces
+    if text_column in df_clean.columns:
+        df_clean[text_column] = df_clean[text_column].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+        )
+    
+    return df_clean
+
+def validate_email(email):
+    """
+    Basic email validation using regex.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Alice   Johnson  '],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'alice@company.co']
+    })
+    
+    cleaned = clean_dataframe(sample_data, 'name')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    print("\nEmail Validation:")
+    for email in cleaned['email']:
+        print(f"{email}: {validate_email(email)}")
