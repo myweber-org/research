@@ -465,3 +465,75 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    return cleaned_df
+
+def get_cleaning_report(original_df, cleaned_df):
+    """
+    Generate a report showing how many rows were removed during cleaning.
+    
+    Args:
+        original_df (pd.DataFrame): Original DataFrame
+        cleaned_df (pd.DataFrame): Cleaned DataFrame
+    
+    Returns:
+        dict: Cleaning statistics
+    """
+    original_rows = len(original_df)
+    cleaned_rows = len(cleaned_df)
+    removed_rows = original_rows - cleaned_rows
+    removal_percentage = (removed_rows / original_rows) * 100 if original_rows > 0 else 0
+    
+    return {
+        'original_rows': original_rows,
+        'cleaned_rows': cleaned_rows,
+        'removed_rows': removed_rows,
+        'removal_percentage': round(removal_percentage, 2)
+    }
