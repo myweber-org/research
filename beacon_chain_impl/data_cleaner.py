@@ -120,3 +120,70 @@ if __name__ == "__main__":
         print(f"Error: File '{input_file}' not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    """Remove outliers using IQR method."""
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns):
+    """Normalize data using min-max scaling."""
+    df_normalized = df.copy()
+    for col in columns:
+        min_val = df_normalized[col].min()
+        max_val = df_normalized[col].max()
+        df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values with specified strategy."""
+    df_filled = df.copy()
+    numeric_cols = df_filled.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+    
+    return df_filled
+
+def clean_dataset(filepath, numeric_columns):
+    """Main function to clean dataset."""
+    df = load_dataset(filepath)
+    df = handle_missing_values(df, strategy='median')
+    df = remove_outliers_iqr(df, numeric_columns)
+    df = normalize_data(df, numeric_columns)
+    return df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'feature3': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_dataset('sample_data.csv', ['feature1', 'feature2', 'feature3'])
+    print("Cleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned data summary:")
+    print(cleaned_df.describe())
