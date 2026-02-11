@@ -114,3 +114,46 @@ def validate_data(data, required_columns=None, allow_nan=False):
             raise ValueError(f"Dataset contains {nan_count} NaN values")
     
     return True
+import re
+import pandas as pd
+from typing import Optional, Union
+
+def normalize_string(text: str) -> str:
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping leading/trailing spaces.
+    """
+    if not isinstance(text, str):
+        return text
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+def clean_numeric(value: Union[str, int, float]) -> Optional[float]:
+    """
+    Attempt to convert a value to a float, handling common data issues.
+    Returns None if conversion fails.
+    """
+    if pd.isna(value):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.replace(',', '').strip()
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+def remove_outliers_iqr(series: pd.Series, multiplier: float = 1.5) -> pd.Series:
+    """
+    Remove outliers from a pandas Series using the Interquartile Range (IQR) method.
+    Returns a Series with outliers replaced by NaN.
+    """
+    q1 = series.quantile(0.25)
+    q3 = series.quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    return series.where((series >= lower_bound) & (series <= upper_bound))
