@@ -102,3 +102,32 @@ if __name__ == "__main__":
         print(f"\nStatistics for '{column}':")
         for key, value in stats.items():
             print(f"  {key}: {value:.2f}")
+import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file, column_name):
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        df.drop_duplicates(subset=[column_name], keep='first', inplace=True)
+        final_count = len(df)
+        df.to_csv(output_file, index=False)
+        return initial_count - final_count
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        sys.exit(1)
+    except KeyError:
+        print(f"Error: Column '{column_name}' not found in the CSV.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python data_cleaner.py <input_file> <output_file> <column_name>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    column_name = sys.argv[3]
+    
+    removed = remove_duplicates(input_file, output_file, column_name)
+    print(f"Removed {removed} duplicate entries based on column '{column_name}'.")
