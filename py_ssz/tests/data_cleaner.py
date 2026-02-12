@@ -259,4 +259,105 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_basic_stats(cleaned_df, 'A'))
+    print(calculate_basic_stats(cleaned_df, 'A'))import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, drop_na=True, fill_value=None):
+    """
+    Load and clean CSV data.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        drop_na (bool): Whether to drop rows with missing values.
+        fill_value: Value to fill missing values with if drop_na is False.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    if drop_na:
+        df = df.dropna()
+    elif fill_value is not None:
+        df = df.fillna(fill_value)
+    
+    df = df.reset_index(drop=True)
+    return df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        print(f"Warning: Column '{column}' not found.")
+        return df
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to standardize.
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df[col] = (df[col] - mean) / std
+            else:
+                print(f"Warning: Column '{col}' has zero standard deviation.")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a CSV file.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to save.
+        output_path (str): Path for the output CSV file.
+    
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to '{output_path}'")
+        return True
+    except Exception as e:
+        print(f"Error saving file: {e}")
+        return False
