@@ -546,4 +546,100 @@ def sample_data_cleaning():
     print(f"\nValidation: {message}")
 
 if __name__ == "__main__":
-    sample_data_cleaning()
+    sample_data_cleaning()import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, clean missing values, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        # Check for missing values
+        missing_values = df.isnull().sum()
+        if missing_values.any():
+            print("Missing values found:")
+            print(missing_values[missing_values > 0])
+            
+            # Fill missing numeric values with median
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    median_val = df[col].median()
+                    df[col].fillna(median_val, inplace=True)
+                    print(f"Filled missing values in {col} with median: {median_val}")
+            
+            # Fill missing categorical values with mode
+            categorical_cols = df.select_dtypes(include=['object']).columns
+            for col in categorical_cols:
+                if df[col].isnull().any():
+                    mode_val = df[col].mode()[0]
+                    df[col].fillna(mode_val, inplace=True)
+                    print(f"Filled missing values in {col} with mode: {mode_val}")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df.drop_duplicates(inplace=True)
+        duplicates_removed = initial_rows - len(df)
+        if duplicates_removed > 0:
+            print(f"Removed {duplicates_removed} duplicate rows")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Final data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_data(df):
+    """
+    Perform basic data validation checks.
+    """
+    if df is None:
+        return False
+    
+    validation_passed = True
+    
+    # Check for remaining missing values
+    if df.isnull().any().any():
+        print("Validation failed: Missing values still present")
+        validation_passed = False
+    
+    # Check for negative values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if (df[col] < 0).any():
+            print(f"Validation warning: Negative values found in {col}")
+    
+    # Check data types
+    print("Data types:")
+    print(df.dtypes)
+    
+    return validation_passed
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        print("\nData validation:")
+        if validate_data(cleaned_df):
+            print("Data validation passed")
+        else:
+            print("Data validation failed - review the data")
+        
+        # Show basic statistics
+        print("\nBasic statistics:")
+        print(cleaned_df.describe())
