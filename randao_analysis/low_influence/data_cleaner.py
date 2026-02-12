@@ -575,3 +575,144 @@ def save_cleaned_data(df, output_path, index=False):
     except Exception as e:
         print(f"Error saving data: {e}")
         return False
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    mean_val = data_copy[column].mean()
+    std_val = data_copy[column].std()
+    
+    if std_val == 0:
+        data_copy[f'{column}_normalized'] = 0
+    else:
+        data_copy[f'{column}_normalized'] = (data_copy[column] - mean_val) / std_val
+    
+    return data_copy
+
+def min_max_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    min_val = data_copy[column].min()
+    max_val = data_copy[column].max()
+    
+    if max_val == min_val:
+        data_copy[f'{column}_scaled'] = feature_range[0]
+    else:
+        scaled = (data_copy[column] - min_val) / (max_val - min_val)
+        scaled = scaled * (feature_range[1] - feature_range[0]) + feature_range[0]
+        data_copy[f'{column}_scaled'] = scaled
+    
+    return data_copy
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of columns to process, None for all numeric columns
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    data_copy = data.copy()
+    
+    if columns is None:
+        columns = data_copy.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col not in data_copy.columns:
+            continue
+            
+        if strategy == 'drop':
+            data_copy = data_copy.dropna(subset=[col])
+        elif strategy == 'mean':
+            data_copy[col] = data_copy[col].fillna(data_copy[col].mean())
+        elif strategy == 'median':
+            data_copy[col] = data_copy[col].fillna(data_copy[col].median())
+        elif strategy == 'mode':
+            mode_val = data_copy[col].mode()
+            if not mode_val.empty:
+                data_copy[col] = data_copy[col].fillna(mode_val.iloc[0])
+    
+    return data_copy
+
+def validate_dataframe(data, required_columns=None, numeric_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        data: pandas DataFrame to validate
+        required_columns: list of required column names
+        numeric_columns: list of columns that should be numeric
+    
+    Returns:
+        tuple of (is_valid, error_message)
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if numeric_columns:
+        non_numeric = [col for col in numeric_columns if not pd.api.types.is_numeric_dtype(data[col])]
+        if non_numeric:
+            return False, f"Non-numeric columns found: {non_numeric}"
+    
+    return True, "DataFrame validation passed"
