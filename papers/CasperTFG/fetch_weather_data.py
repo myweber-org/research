@@ -1,58 +1,36 @@
-
 import requests
-import json
 
-def get_weather(api_key, city):
+def get_weather(city_name, api_key):
     base_url = "http://api.openweathermap.org/data/2.5/weather"
     params = {
-        'q': city,
+        'q': city_name,
         'appid': api_key,
         'units': 'metric'
     }
-    
     try:
         response = requests.get(base_url, params=params)
         response.raise_for_status()
         data = response.json()
-        
-        if data['cod'] != 200:
-            print(f"Error: {data.get('message', 'Unknown error')}")
-            return None
-            
-        weather_info = {
-            'city': data['name'],
-            'country': data['sys']['country'],
-            'temperature': data['main']['temp'],
-            'feels_like': data['main']['feels_like'],
-            'humidity': data['main']['humidity'],
-            'pressure': data['main']['pressure'],
-            'weather': data['weather'][0]['description'],
-            'wind_speed': data['wind']['speed']
-        }
-        return weather_info
-        
+        return data
     except requests.exceptions.RequestException as e:
-        print(f"Network error: {e}")
-        return None
-    except json.JSONDecodeError:
-        print("Error parsing response")
+        print(f"Error fetching weather data: {e}")
         return None
 
 def display_weather(weather_data):
-    if not weather_data:
-        return
-        
-    print(f"Weather in {weather_data['city']}, {weather_data['country']}:")
-    print(f"  Temperature: {weather_data['temperature']}°C")
-    print(f"  Feels like: {weather_data['feels_like']}°C")
-    print(f"  Conditions: {weather_data['weather']}")
-    print(f"  Humidity: {weather_data['humidity']}%")
-    print(f"  Pressure: {weather_data['pressure']} hPa")
-    print(f"  Wind Speed: {weather_data['wind_speed']} m/s")
+    if weather_data:
+        city = weather_data['name']
+        temp = weather_data['main']['temp']
+        description = weather_data['weather'][0]['description']
+        humidity = weather_data['main']['humidity']
+        print(f"Weather in {city}:")
+        print(f"  Temperature: {temp}°C")
+        print(f"  Conditions: {description}")
+        print(f"  Humidity: {humidity}%")
+    else:
+        print("No weather data to display.")
 
 if __name__ == "__main__":
     API_KEY = "your_api_key_here"
-    CITY = "London"
-    
-    weather = get_weather(API_KEY, CITY)
+    city = input("Enter city name: ")
+    weather = get_weather(city, API_KEY)
     display_weather(weather)
