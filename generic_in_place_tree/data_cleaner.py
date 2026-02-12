@@ -1,124 +1,87 @@
 
-import numpy as np
+import re
 import pandas as pd
+from typing import Union, List, Optional
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+def remove_duplicates(data: Union[List, pd.Series, pd.DataFrame]) -> Union[List, pd.Series, pd.DataFrame]:
+    """Remove duplicate entries from a list, Series, or DataFrame."""
+    if isinstance(data, list):
+        return list(dict.fromkeys(data))
+    elif isinstance(data, pd.Series):
+        return data.drop_duplicates()
+    elif isinstance(data, pd.DataFrame):
+        return data.drop_duplicates()
+    else:
+        raise TypeError("Input must be a list, pandas Series, or pandas DataFrame")
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column.
+def validate_email(email: str) -> bool:
+    """Validate an email address format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def normalize_string(text: str, case: str = 'lower') -> str:
+    """Normalize string by converting to specified case and stripping whitespace."""
+    text = text.strip()
+    if case == 'lower':
+        return text.lower()
+    elif case == 'upper':
+        return text.upper()
+    elif case == 'title':
+        return text.title()
+    else:
+        return text
+
+def fill_missing_values(df: pd.DataFrame, column: str, value: Union[str, int, float]) -> pd.DataFrame:
+    """Fill missing values in a DataFrame column with a specified value."""
+    df_copy = df.copy()
+    df_copy[column] = df_copy[column].fillna(value)
+    return df_copy
+
+def filter_by_threshold(data: List[float], threshold: float) -> List[float]:
+    """Filter a list of floats, keeping values above a specified threshold."""
+    return [x for x in data if x > threshold]
+
+def calculate_statistics(numbers: List[float]) -> dict:
+    """Calculate basic statistics from a list of numbers."""
+    if not numbers:
+        return {'mean': None, 'median': None, 'min': None, 'max': None}
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
+    sorted_nums = sorted(numbers)
+    n = len(numbers)
     
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column]),
-        'q1': df[column].quantile(0.25),
-        'q3': df[column].quantile(0.75)
+    return {
+        'mean': sum(numbers) / n,
+        'median': sorted_nums[n // 2] if n % 2 != 0 else (sorted_nums[n // 2 - 1] + sorted_nums[n // 2]) / 2,
+        'min': min(numbers),
+        'max': max(numbers)
     }
-    
-    return stats
 
-def validate_dataframe(df):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    
-    Returns:
-    dict: Validation results
-    """
-    validation_results = {
-        'is_dataframe': isinstance(df, pd.DataFrame),
-        'has_data': not df.empty,
-        'columns': list(df.columns),
-        'shape': df.shape,
-        'null_counts': df.isnull().sum().to_dict(),
-        'dtypes': df.dtypes.to_dict()
-    }
-    
-    return validation_results
+def sanitize_filename(filename: str) -> str:
+    """Sanitize a string to be safe for use as a filename."""
+    sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    sanitized = re.sub(r'\s+', '_', sanitized)
+    return sanitized.strip('_.')
 
-if __name__ == "__main__":
-    sample_data = {
-        'values': np.random.normal(100, 15, 1000).tolist() + [500, -200]
-    }
-    df = pd.DataFrame(sample_data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("Original summary statistics:", calculate_summary_statistics(df, 'values'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned summary statistics:", calculate_summary_statistics(cleaned_df, 'values'))
-    
-    print("\nDataFrame validation:", validate_dataframe(cleaned_df))
-import pandas as pd
-import numpy as np
-from scipy import stats
+def convert_to_boolean(value: Union[str, int, bool]) -> Optional[bool]:
+    """Convert various representations to boolean."""
+    if isinstance(value, bool):
+        return value
+    elif isinstance(value, (int, float)):
+        return bool(value)
+    elif isinstance(value, str):
+        lower_val = value.lower().strip()
+        if lower_val in ('true', 'yes', 'y', '1', 't'):
+            return True
+        elif lower_val in ('false', 'no', 'n', '0', 'f'):
+            return False
+    return None
 
-def load_and_clean_data(filepath):
-    df = pd.read_csv(filepath)
-    
-    # Remove duplicate rows
-    df = df.drop_duplicates()
-    
-    # Handle missing values
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-    
-    # Remove outliers using z-score method
-    z_scores = np.abs(stats.zscore(df[numeric_cols]))
-    df = df[(z_scores < 3).all(axis=1)]
-    
-    # Normalize numeric columns
-    df[numeric_cols] = (df[numeric_cols] - df[numeric_cols].min()) / (df[numeric_cols].max() - df[numeric_cols].min())
-    
-    return df
+def split_camel_case(text: str) -> str:
+    """Split camelCase or PascalCase strings into separate words."""
+    return re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
 
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    
-    cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+def validate_phone_number(phone: str) -> bool:
+    """Validate a phone number format (basic international format)."""
+    pattern = r'^\+?[1-9]\d{1,14}$'
+    cleaned = re.sub(r'[\s\-()]', '', phone)
+    return bool(re.match(pattern, cleaned))
