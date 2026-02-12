@@ -173,4 +173,116 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str or dict): Method to fill missing values:
+        - 'mean': Fill with column mean (numeric only)
+        - 'median': Fill with column median (numeric only)
+        - 'mode': Fill with column mode
+        - dict: Column-specific fill values
+        - None: Don't fill missing values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing is not None:
+        if cleaned_df.isnull().sum().sum() > 0:
+            if fill_missing == 'mean':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+            elif fill_missing == 'median':
+                cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+            elif fill_missing == 'mode':
+                for col in cleaned_df.columns:
+                    if cleaned_df[col].dtype == 'object':
+                        mode_val = cleaned_df[col].mode()
+                        if not mode_val.empty:
+                            cleaned_df[col] = cleaned_df[col].fillna(mode_val[0])
+            elif isinstance(fill_missing, dict):
+                cleaned_df = cleaned_df.fillna(fill_missing)
+            
+            remaining_nulls = cleaned_df.isnull().sum().sum()
+            print(f"Filled missing values. Remaining nulls: {remaining_nulls}")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, unique_columns=None):
+    """
+    Validate dataset structure and constraints.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): Columns that must be present
+    unique_columns (list): Columns that should have unique values
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'issues': []
+    }
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['issues'].append(f"Missing required columns: {missing_cols}")
+    
+    if unique_columns:
+        for col in unique_columns:
+            if col in df.columns:
+                duplicates = df[col].duplicated().sum()
+                if duplicates > 0:
+                    validation_results['issues'].append(f"Column '{col}' has {duplicates} duplicate values")
+    
+    null_counts = df.isnull().sum()
+    columns_with_nulls = null_counts[null_counts > 0]
+    if not columns_with_nulls.empty:
+        validation_results['issues'].append(f"Columns with null values: {dict(columns_with_nulls)}")
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("Cleaned dataset:")
+    print(cleaned)
+    
+    validation = validate_dataset(
+        cleaned, 
+        required_columns=['id', 'name', 'age'],
+        unique_columns=['id']
+    )
+    
+    print("\nValidation results:")
+    print(f"Is valid: {validation['is_valid']}")
+    if validation['issues']:
+        print("Issues found:")
+        for issue in validation['issues']:
+            print(f"  - {issue}")
