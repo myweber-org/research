@@ -131,3 +131,69 @@ if __name__ == "__main__":
     
     removed = remove_duplicates(input_file, output_file, column_name)
     print(f"Removed {removed} duplicate entries based on column '{column_name}'.")
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def filter_by_column(df, column_name, threshold):
+    """
+    Filter DataFrame rows where column value is greater than threshold.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to filter by.
+        threshold (float): Threshold value.
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    filtered_df = df[df[column_name] > threshold]
+    return filtered_df
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numerical columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+        dict: Dictionary containing statistics.
+    """
+    stats = {}
+    
+    # Select only numerical columns
+    numerical_cols = df.select_dtypes(include=['float64', 'int64']).columns
+    
+    for col in numerical_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max()
+        }
+    
+    return stats
