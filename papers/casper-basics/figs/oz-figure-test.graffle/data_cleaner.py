@@ -552,4 +552,108 @@ def example_usage():
 if __name__ == "__main__":
     result = example_usage()
     print(f"Cleaned data shape: {result.shape}")
-    print(f"Cleaned data head:\n{result.head()}")
+    print(f"Cleaned data head:\n{result.head()}")import pandas as pd
+import numpy as np
+import re
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by handling missing values,
+    standardizing text columns, and removing duplicates.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    # Fill missing categorical values with 'Unknown'
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        cleaned_df[col] = cleaned_df[col].fillna('Unknown')
+    
+    # Standardize text columns: trim whitespace and convert to lowercase
+    for col in categorical_cols:
+        cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Remove special characters from text columns
+    for col in categorical_cols:
+        cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'[^\w\s]', '', x))
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    Returns a dictionary with validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+def process_csv_file(input_path, output_path=None):
+    """
+    Main function to process a CSV file through the cleaning pipeline.
+    """
+    try:
+        # Read CSV file
+        df = pd.read_csv(input_path)
+        
+        # Validate original data
+        original_stats = validate_dataframe(df)
+        print("Original data statistics:")
+        for key, value in original_stats.items():
+            print(f"{key}: {value}")
+        
+        # Clean the data
+        cleaned_df = clean_dataframe(df)
+        
+        # Validate cleaned data
+        cleaned_stats = validate_dataframe(cleaned_df)
+        print("\nCleaned data statistics:")
+        for key, value in cleaned_stats.items():
+            print(f"{key}: {value}")
+        
+        # Save cleaned data if output path is provided
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"\nCleaned data saved to: {output_path}")
+        
+        return cleaned_df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    result = process_csv_file(input_file, output_file)
+    
+    if result is not None:
+        print(f"\nData cleaning completed successfully.")
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {result.shape}")
