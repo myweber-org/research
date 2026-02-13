@@ -217,3 +217,48 @@ def validate_data(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import pandas as pd
+
+def clean_dataset(df, subset=None, fill_method='mean'):
+    """
+    Cleans a pandas DataFrame by removing duplicates and handling missing values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame to clean.
+        subset (list, optional): Column labels to consider for identifying duplicates.
+                                 If None, all columns are used.
+        fill_method (str, optional): Method to fill missing values.
+                                     Options: 'mean', 'median', 'mode', or a constant value.
+                                     Defaults to 'mean' for numeric columns.
+
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates(subset=subset, keep='first')
+
+    # Handle missing values
+    for column in cleaned_df.columns:
+        if cleaned_df[column].isnull().any():
+            if pd.api.types.is_numeric_dtype(cleaned_df[column]):
+                if fill_method == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_method == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_method == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                else:
+                    try:
+                        fill_value = float(fill_method)
+                    except ValueError:
+                        raise ValueError(f"Invalid fill_method for numeric column '{column}': {fill_method}")
+                cleaned_df[column].fillna(fill_value, inplace=True)
+            else:
+                # For non-numeric columns, fill with the mode (most frequent value)
+                fill_value = cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 'Unknown'
+                cleaned_df[column].fillna(fill_value, inplace=True)
+
+    return cleaned_df
