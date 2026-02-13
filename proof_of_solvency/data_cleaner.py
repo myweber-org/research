@@ -536,4 +536,91 @@ def get_cleaning_report(original_df, cleaned_df):
         'cleaned_rows': cleaned_rows,
         'removed_rows': removed_rows,
         'removal_percentage': round(removal_percentage, 2)
+    }import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers from multiple numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+        numeric_columns: List of column names to clean
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_len = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_len - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that required columns exist and have no null values.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: List of required column names
+    
+    Returns:
+        Boolean indicating if data is valid
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    
+    null_counts = df[required_columns].isnull().sum()
+    if null_counts.any():
+        print("Found null values in required columns:")
+        print(null_counts[null_counts > 0])
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100),
+        'score': np.random.uniform(0, 1, 100)
     }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'value'] = 500
+    df.loc[20, 'value'] = -200
+    
+    print(f"Original dataset shape: {df.shape}")
+    
+    if validate_data(df, ['id', 'value', 'score']):
+        cleaned_df = clean_dataset(df, ['value', 'score'])
+        print(f"Cleaned dataset shape: {cleaned_df.shape}")
+        print(f"Removed {len(df) - len(cleaned_df)} total outliers")
