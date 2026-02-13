@@ -487,4 +487,94 @@ def remove_outliers_iqr(data, column):
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns_to_check=None, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    df_clean = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean = df_clean.drop_duplicates()
+    removed_duplicates = initial_rows - df_clean.shape[0]
+    
+    # Handle missing values
+    if columns_to_check is None:
+        columns_to_check = df_clean.columns
+    
+    missing_counts = {}
+    for column in columns_to_check:
+        if column in df_clean.columns:
+            missing_count = df_clean[column].isnull().sum()
+            missing_counts[column] = missing_count
+            
+            if missing_count > 0:
+                if fill_missing == 'mean' and pd.api.types.is_numeric_dtype(df_clean[column]):
+                    df_clean[column].fillna(df_clean[column].mean(), inplace=True)
+                elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(df_clean[column]):
+                    df_clean[column].fillna(df_clean[column].median(), inplace=True)
+                elif fill_missing == 'mode':
+                    df_clean[column].fillna(df_clean[column].mode()[0], inplace=True)
+                elif fill_missing == 'drop':
+                    df_clean = df_clean.dropna(subset=[column])
+                else:
+                    df_clean[column].fillna(0, inplace=True)
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    # Print cleaning summary
+    print(f"Data cleaning completed:")
+    print(f"  - Removed {removed_duplicates} duplicate rows")
+    print(f"  - Missing values handled using method: {fill_missing}")
+    for column, count in missing_counts.items():
+        if count > 0:
+            print(f"  - Column '{column}': {count} missing values filled")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and data types.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with duplicates and missing values
+    sample_data = {
+        'id': [1, 2, 3, 2, 5, 6, 7, 8],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'Eve', 'Frank', None, 'Grace'],
+        'age': [25, 30, None, 30, 28, 35, 40, 22],
+        'score': [85.5, 92.0, 78.5, 92.0, 88.0, None, 95.5, 91.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, fill_missing='mean')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
