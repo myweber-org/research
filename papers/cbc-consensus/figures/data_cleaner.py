@@ -292,3 +292,42 @@ if __name__ == "__main__":
     print("\nSummary statistics for 'values':")
     for key, value in stats.items():
         print(f"{key}: {value}")
+import pandas as pd
+
+def clean_dataset(df, id_column='id'):
+    """
+    Remove duplicate rows based on ID column and standardize column names.
+    """
+    if df.empty:
+        return df
+    
+    # Remove duplicates keeping the first occurrence
+    df_cleaned = df.drop_duplicates(subset=[id_column], keep='first')
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that the dataframe contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def sample_data(df, sample_size=1000, random_state=42):
+    """
+    Return a random sample of the dataframe for testing purposes.
+    """
+    if len(df) <= sample_size:
+        return df
+    
+    return df.sample(n=sample_size, random_state=random_state)
