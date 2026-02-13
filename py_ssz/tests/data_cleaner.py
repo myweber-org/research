@@ -459,4 +459,23 @@ if __name__ == "__main__":
     print(cleaned_df['value'].describe())
     
     is_valid, message = validate_dataframe(cleaned_df, ['id', 'value', 'category'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")def remove_duplicates(data_list):
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data_with_key(data_list, key_func=None):
+    if key_func is None:
+        return remove_duplicates(data_list)
+    seen = set()
+    result = []
+    for item in data_list:
+        key = key_func(item)
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
