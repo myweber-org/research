@@ -520,3 +520,162 @@ if __name__ == "__main__":
     print(cleaned_df.head())
     print("\nData statistics:")
     print(cleaned_df.describe())
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_value: Value to use for filling missing data.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Method for outlier detection ('iqr' or 'zscore').
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = df[column].copy()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (data >= lower_bound) & (data <= upper_bound)
+    
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = np.abs((data - mean) / std)
+        mask = z_scores <= threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask]
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize values in a specific column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to normalize.
+    method (str): Normalization method ('minmax' or 'standard').
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    data = df_copy[column]
+    
+    if method == 'minmax':
+        min_val = data.min()
+        max_val = data.max()
+        if max_val != min_val:
+            df_copy[column] = (data - min_val) / (max_val - min_val)
+    
+    elif method == 'standard':
+        mean = data.mean()
+        std = data.std()
+        if std != 0:
+            df_copy[column] = (data - mean) / std
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'standard'")
+    
+    return df_copy
+
+def validate_dataframe(df, required_columns=None, check_types=True):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    check_types (bool): Whether to check for numeric columns.
+    
+    Returns:
+    dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    if df.empty:
+        validation_results['warnings'].append('DataFrame is empty')
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    if check_types:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_columns) == 0:
+            validation_results['warnings'].append('No numeric columns found in DataFrame')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, np.nan, 100.2, 150.7],
+        'category': ['A', 'B', 'B', 'C', 'D', 'E']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
+    print("Validation Results:")
+    print(validation)
