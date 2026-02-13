@@ -687,3 +687,124 @@ def validate_data(df, required_columns=None, allow_nan=False, min_rows=1):
             raise ValueError(f"Columns with NaN values: {nan_columns}")
     
     return True
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def load_csv_data(file_path):
+    """Load CSV file into pandas DataFrame."""
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Successfully loaded {len(df)} rows from {file_path}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File {file_path} not found")
+        return None
+    except Exception as e:
+        print(f"Error loading CSV: {str(e)}")
+        return None
+
+def clean_missing_values(df, strategy='mean'):
+    """Handle missing values in DataFrame."""
+    if df is None or df.empty:
+        return df
+    
+    missing_count = df.isnull().sum().sum()
+    if missing_count == 0:
+        print("No missing values found")
+        return df
+    
+    print(f"Found {missing_count} missing values")
+    
+    cleaned_df = df.copy()
+    
+    for column in cleaned_df.columns:
+        if cleaned_df[column].dtype in ['float64', 'int64']:
+            if strategy == 'mean':
+                cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+            elif strategy == 'median':
+                cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+            elif strategy == 'zero':
+                cleaned_df[column].fillna(0, inplace=True)
+        else:
+            cleaned_df[column].fillna(cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 'Unknown', inplace=True)
+    
+    print(f"Cleaned {missing_count} missing values using {strategy} strategy")
+    return cleaned_df
+
+def remove_duplicates(df):
+    """Remove duplicate rows from DataFrame."""
+    if df is None or df.empty:
+        return df
+    
+    initial_count = len(df)
+    cleaned_df = df.drop_duplicates()
+    removed_count = initial_count - len(cleaned_df)
+    
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    else:
+        print("No duplicates found")
+    
+    return cleaned_df
+
+def validate_data_types(df):
+    """Validate and convert data types where possible."""
+    if df is None or df.empty:
+        return df
+    
+    cleaned_df = df.copy()
+    
+    for column in cleaned_df.columns:
+        try:
+            if cleaned_df[column].dtype == 'object':
+                pd.to_numeric(cleaned_df[column], errors='ignore')
+        except Exception:
+            continue
+    
+    return cleaned_df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned DataFrame to CSV file."""
+    if df is None or df.empty:
+        print("No data to save")
+        return False
+    
+    try:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(output_path, index=False)
+        print(f"Successfully saved cleaned data to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {str(e)}")
+        return False
+
+def clean_data_pipeline(input_file, output_file, missing_strategy='mean'):
+    """Complete data cleaning pipeline."""
+    print(f"Starting data cleaning pipeline for {input_file}")
+    
+    df = load_csv_data(input_file)
+    if df is None:
+        return False
+    
+    df = clean_missing_values(df, strategy=missing_strategy)
+    df = remove_duplicates(df)
+    df = validate_data_types(df)
+    
+    success = save_cleaned_data(df, output_file)
+    
+    if success:
+        print(f"Data cleaning completed successfully")
+        print(f"Original shape: {df.shape}")
+        print(f"Final shape: {df.shape}")
+    else:
+        print("Data cleaning failed")
+    
+    return success
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    clean_data_pipeline(input_csv, output_csv, missing_strategy='median')
