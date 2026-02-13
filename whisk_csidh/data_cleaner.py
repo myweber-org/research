@@ -127,3 +127,117 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean'):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero').
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        missing_counts = df.isnull().sum()
+        if missing_counts.any():
+            print(f"Missing values found:\n{missing_counts[missing_counts > 0]}")
+            
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+            
+            for col in df.columns:
+                if df[col].isnull().any():
+                    if col in numeric_cols:
+                        if fill_method == 'mean':
+                            fill_value = df[col].mean()
+                        elif fill_method == 'median':
+                            fill_value = df[col].median()
+                        elif fill_method == 'zero':
+                            fill_value = 0
+                        else:
+                            fill_value = df[col].mean()
+                        df[col].fillna(fill_value, inplace=True)
+                        print(f"Filled missing values in '{col}' with {fill_method}: {fill_value}")
+                    
+                    elif col in categorical_cols:
+                        mode_value = df[col].mode()[0] if not df[col].mode().empty else 'Unknown'
+                        df[col].fillna(mode_value, inplace=True)
+                        print(f"Filled missing values in '{col}' with mode: {mode_value}")
+        
+        print(f"Cleaned data shape: {df.shape}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        df (pandas.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+    
+    Returns:
+        pandas.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        print(f"Column '{column}' not found in DataFrame")
+        return df
+    
+    if not np.issubdtype(df[column].dtype, np.number):
+        print(f"Column '{column}' is not numeric")
+        return df
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    original_count = len(df)
+    df_clean = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    removed_count = original_count - len(df_clean)
+    
+    print(f"Removed {removed_count} outliers from '{column}' (IQR method)")
+    print(f"Lower bound: {lower_bound:.2f}, Upper bound: {upper_bound:.2f}")
+    
+    return df_clean
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Args:
+        df (pandas.DataFrame): Cleaned DataFrame.
+        output_path (str): Path to save the cleaned data.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    else:
+        print("No data to save")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, fill_method='median')
+    
+    if cleaned_df is not None:
+        for col in cleaned_df.select_dtypes(include=[np.number]).columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        
+        save_cleaned_data(cleaned_df, output_file)
