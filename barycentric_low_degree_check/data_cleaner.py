@@ -90,3 +90,16 @@ if __name__ == "__main__":
         print(f"Data validation result: {is_valid}")
         print("\nCleaned data preview:")
         print(cleaned_df.head())
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data(data_list):
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    return remove_duplicates(data_list)
