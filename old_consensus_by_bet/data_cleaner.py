@@ -378,4 +378,53 @@ if __name__ == "__main__":
     output_file = "cleaned_data.csv"
     
     cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    save_cleaned_data(cleaned_df, output_file)import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True):
+    """
+    Clean a pandas DataFrame by removing null values and optionally duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.dropna()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    return all(col in df.columns for col in required_columns)
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, None, 4, 4],
+        'B': [5, None, 7, 8, 8],
+        'C': [9, 10, 11, 12, 12]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    has_columns = validate_data(cleaned, ['A', 'B', 'C'])
+    print(f"\nHas required columns: {has_columns}")
