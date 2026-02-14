@@ -496,3 +496,63 @@ if __name__ == "__main__":
     
     is_valid = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nDataset valid: {is_valid}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns, method='minmax'):
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            if method == 'minmax':
+                df_norm[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+            elif method == 'zscore':
+                df_norm[col] = (df[col] - df[col].mean()) / df[col].std()
+            elif method == 'robust':
+                median = df[col].median()
+                iqr = stats.iqr(df[col])
+                df_norm[col] = (df[col] - median) / iqr
+    return df_norm
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    if outlier_method == 'iqr':
+        df_clean = remove_outliers_iqr(df, numeric_columns)
+    else:
+        df_clean = df.copy()
+    
+    df_normalized = normalize_data(df_clean, numeric_columns, method=normalize_method)
+    return df_normalized
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'feature3': np.random.uniform(0, 1, 200)
+    })
+    
+    cleaned_df = clean_dataset(
+        sample_data, 
+        numeric_columns=['feature1', 'feature2', 'feature3'],
+        outlier_method='iqr',
+        normalize_method='zscore'
+    )
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(f"Cleaned data statistics:\n{cleaned_df.describe()}")
