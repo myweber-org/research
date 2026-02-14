@@ -286,4 +286,124 @@ def clean_dataset(data, outlier_method='iqr', outlier_columns=None,
                 elif normalize_method == 'zscore':
                     cleaned_data[f'{column}_standardized'] = normalize_zscore(cleaned_data, column)
     
-    return cleaned_data
+    return cleaned_dataimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from dataset
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with different strategies
+    """
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def clean_dataset(df, numeric_columns=None, outlier_threshold=1.5, 
+                  normalization_method='standardize', missing_strategy='mean'):
+    """
+    Complete data cleaning pipeline
+    """
+    # Validate input
+    validate_dataframe(df)
+    
+    # Create copy to avoid modifying original
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    # Process numeric columns
+    if numeric_columns is None:
+        numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            # Remove outliers
+            cleaned_df = remove_outliers(cleaned_df, col, threshold=outlier_threshold)
+            
+            # Normalize/Standardize
+            if normalization_method == 'normalize':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif normalization_method == 'standardize':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def get_data_summary(df):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': df.shape,
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': df.describe().to_dict() if df.select_dtypes(include=[np.number]).shape[1] > 0 else {},
+        'categorical_stats': df.select_dtypes(include=['object']).describe().to_dict() if df.select_dtypes(include=['object']).shape[1] > 0 else {}
+    }
+    return summary
