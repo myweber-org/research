@@ -199,3 +199,11 @@ def clean_dataset(df, outlier_threshold=1.5, normalize_method='zscore', missing_
     cleaner.normalize_data(method=normalize_method)
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
