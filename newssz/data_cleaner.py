@@ -482,4 +482,11 @@ def validate_data(data, required_columns, min_rows=10):
     if data.isnull().sum().sum() > 0:
         print("Warning: Dataset contains missing values")
     
-    return True
+    return Truedef remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
