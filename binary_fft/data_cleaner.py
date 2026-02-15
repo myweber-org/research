@@ -832,3 +832,101 @@ def clean_dataset(df, outlier_method='iqr', normalize_method=None, fill_method='
         cleaner.fill_missing_median()
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (list or np.array): The dataset
+    column (int): Index of the column to clean
+    
+    Returns:
+    np.array: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    column_data = data[:, column].astype(float)
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    
+    return data[mask]
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    data (list or np.array): The dataset
+    column (int): Index of the column
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    column_data = data[:, column].astype(float)
+    
+    stats = {
+        'mean': np.mean(column_data),
+        'median': np.median(column_data),
+        'std': np.std(column_data),
+        'min': np.min(column_data),
+        'max': np.max(column_data),
+        'count': len(column_data)
+    }
+    
+    return stats
+
+def clean_dataset(data, columns_to_clean):
+    """
+    Clean multiple columns in a dataset.
+    
+    Parameters:
+    data (list or np.array): The dataset
+    columns_to_clean (list): List of column indices to clean
+    
+    Returns:
+    np.array: Cleaned dataset
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    cleaned_data = data.copy()
+    
+    for column in columns_to_clean:
+        cleaned_data = remove_outliers_iqr(cleaned_data, column)
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.array([
+        [1, 10.5, 100],
+        [2, 12.3, 150],
+        [3, 9.8, 120],
+        [4, 50.0, 130],  # Outlier in column 1
+        [5, 11.2, 500],  # Outlier in column 2
+        [6, 10.9, 110]
+    ])
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nOriginal stats for column 1:")
+    print(calculate_basic_stats(sample_data, 1))
+    
+    cleaned = clean_dataset(sample_data, [1, 2])
+    print("\nCleaned data:")
+    print(cleaned)
+    print("\nCleaned stats for column 1:")
+    print(calculate_basic_stats(cleaned, 1))
