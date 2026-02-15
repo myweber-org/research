@@ -227,3 +227,157 @@ def validate_data(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to analyze
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        Boolean mask of outliers
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    return (data[column] < lower_bound) | (data[column] > upper_bound)
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: Z-score threshold (default 3)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].fillna(0)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with standardized values
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].fillna(0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of columns to process (None for all numeric columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    data_clean = data.copy()
+    
+    for col in columns:
+        if strategy == 'mean':
+            fill_value = data[col].mean()
+        elif strategy == 'median':
+            fill_value = data[col].median()
+        elif strategy == 'mode':
+            fill_value = data[col].mode()[0] if not data[col].mode().empty else 0
+        elif strategy == 'drop':
+            data_clean = data_clean.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        data_clean[col] = data[col].fillna(fill_value)
+    
+    return data_clean
+
+def process_dataframe(df, config):
+    """
+    Main function to process DataFrame with given configuration.
+    
+    Args:
+        df: Input DataFrame
+        config: Dictionary with processing configuration
+    
+    Returns:
+        Processed DataFrame
+    """
+    result_df = df.copy()
+    
+    # Handle missing values
+    if 'missing_values' in config:
+        strategy = config['missing_values'].get('strategy', 'mean')
+        columns = config['missing_values'].get('columns')
+        result_df = clean_missing_values(result_df, strategy, columns)
+    
+    # Remove outliers
+    if 'remove_outliers' in config:
+        for col in config['remove_outliers'].get('columns', []):
+            if col in result_df.columns:
+                result_df = remove_outliers_zscore(
+                    result_df, 
+                    col, 
+                    config['remove_outliers'].get('threshold', 3)
+                )
+    
+    # Normalize columns
+    if 'normalize' in config:
+        method = config['normalize'].get('method', 'minmax')
+        for col in config['normalize'].get('columns', []):
+            if col in result_df.columns:
+                if method == 'minmax':
+                    result_df[col] = normalize_minmax(result_df, col)
+                elif method == 'zscore':
+                    result_df[col] = normalize_zscore(result_df, col)
+    
+    return result_df
