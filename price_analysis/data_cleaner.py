@@ -754,3 +754,75 @@ def validate_data(data, required_columns, numeric_columns=None):
                     raise ValueError(f"Column '{col}' must be numeric")
     
     return True
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def standardize_column(df, column):
+    """
+    Standardize a column to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to standardize.
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    mean_val = df_copy[column].mean()
+    std_val = df_copy[column].std()
+    
+    if std_val > 0:
+        df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    strategy (str): Imputation strategy ('mean', 'median', or 'drop').
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return df.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        return df.fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        return df.fillna(df[numeric_cols].median())
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
