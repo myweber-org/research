@@ -34,18 +34,18 @@ class DataCleaner:
     
     def detect_outliers_zscore(self, threshold=3):
         numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        outliers_mask = pd.Series([False] * len(self.df))
+        outlier_mask = pd.Series([False] * len(self.df))
         
         for col in numeric_cols:
             z_scores = np.abs(stats.zscore(self.df[col].dropna()))
             col_outliers = z_scores > threshold
-            outliers_mask = outliers_mask | col_outliers.reindex(self.df.index, fill_value=False)
+            outlier_mask = outlier_mask | col_outliers.reindex(self.df.index, fill_value=False)
         
-        return outliers_mask
+        return outlier_mask
     
     def remove_outliers(self, threshold=3):
-        outliers_mask = self.detect_outliers_zscore(threshold)
-        self.df = self.df[~outliers_mask]
+        outlier_mask = self.detect_outliers_zscore(threshold)
+        self.df = self.df[~outlier_mask]
         return self
     
     def normalize_data(self, method='minmax'):
@@ -55,14 +55,14 @@ class DataCleaner:
             for col in numeric_cols:
                 min_val = self.df[col].min()
                 max_val = self.df[col].max()
-                if max_val != min_val:
+                if max_val > min_val:
                     self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
         
         elif method == 'zscore':
             for col in numeric_cols:
                 mean_val = self.df[col].mean()
                 std_val = self.df[col].std()
-                if std_val != 0:
+                if std_val > 0:
                     self.df[col] = (self.df[col] - mean_val) / std_val
         
         return self
@@ -71,7 +71,7 @@ class DataCleaner:
         return self.df
     
     def get_cleaning_report(self):
-        rows_removed = self.original_shape[0] - len(self.df)
+        rows_removed = self.original_shape[0] - self.df.shape[0]
         cols_removed = self.original_shape[1] - self.df.shape[1]
         
         report = {
@@ -79,13 +79,13 @@ class DataCleaner:
             'cleaned_shape': self.df.shape,
             'rows_removed': rows_removed,
             'columns_removed': cols_removed,
-            'missing_values': self.df.isnull().sum().sum()
+            'remaining_missing': self.df.isnull().sum().sum()
         }
         
         return report
 
-def clean_dataset(df, remove_outliers=True, normalize=True):
-    cleaner = DataCleaner(df)
+def clean_dataset(dataframe, remove_outliers=True, normalize=True):
+    cleaner = DataCleaner(dataframe)
     
     cleaner.remove_missing(threshold=0.3)
     cleaner.fill_numeric_missing(method='median')
