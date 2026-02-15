@@ -35,4 +35,11 @@ def clean_dataset(input_path, output_path):
 if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
-    cleaned_df = clean_dataset(input_file, output_file)
+    cleaned_df = clean_dataset(input_file, output_file)def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
