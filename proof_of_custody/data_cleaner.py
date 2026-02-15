@@ -1352,3 +1352,45 @@ def create_sample_data():
     
     df = pd.DataFrame(data)
     return df
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    
+    Args:
+        input_list: A list containing elements that may have duplicates.
+    
+    Returns:
+        A new list with duplicates removed, preserving the original order.
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_data_with_threshold(data_list, threshold=1):
+    """
+    Remove elements that appear more than the specified threshold.
+    
+    Args:
+        data_list: List of elements to clean.
+        threshold: Maximum allowed occurrences (default: 1).
+    
+    Returns:
+        A cleaned list with elements occurring <= threshold times.
+    """
+    from collections import Counter
+    
+    count = Counter(data_list)
+    return [item for item in data_list if count[item] <= threshold]
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 4, 5, 1, 6]
+    
+    print("Original data:", sample_data)
+    print("After removing duplicates:", remove_duplicates(sample_data))
+    print("With threshold 2:", clean_data_with_threshold(sample_data, 2))
