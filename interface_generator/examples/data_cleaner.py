@@ -328,3 +328,11 @@ def remove_special_characters(text_series, keep_chars='a-zA-Z0-9\s'):
     """
     pattern = f'[^{keep_chars}]'
     return text_series.str.replace(pattern, '', regex=True)
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
