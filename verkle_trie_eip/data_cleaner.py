@@ -388,3 +388,124 @@ def clean_dataset(data, numeric_columns=None, outlier_method='iqr', normalize_me
     report['rows_removed'] = report['original_rows'] - report['final_rows']
     
     return cleaned_data, report
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def zscore_normalization(data, column):
+    """
+    Normalize data using z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def minmax_normalization(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    a, b = feature_range
+    normalized = a + ((data[column] - min_val) * (b - a)) / (max_val - min_val)
+    return normalized
+
+def detect_missing_patterns(data, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values
+    """
+    missing_percentage = data.isnull().sum() / len(data) * 100
+    high_missing_cols = missing_percentage[missing_percentage > threshold].index.tolist()
+    
+    missing_info = {
+        'total_missing': data.isnull().sum().sum(),
+        'missing_percentage': missing_percentage,
+        'high_missing_columns': high_missing_cols
+    }
+    
+    return missing_info
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    cleaning_report = {
+        'original_shape': data.shape,
+        'outliers_removed': {},
+        'normalized_columns': []
+    }
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            try:
+                filtered_data, outliers = remove_outliers_iqr(cleaned_data, col, outlier_factor)
+                cleaning_report['outliers_removed'][col] = outliers
+                cleaned_data = filtered_data
+                
+                if normalize_method == 'zscore':
+                    cleaned_data[f'{col}_normalized'] = zscore_normalization(cleaned_data, col)
+                elif normalize_method == 'minmax':
+                    cleaned_data[f'{col}_normalized'] = minmax_normalization(cleaned_data, col)
+                
+                cleaning_report['normalized_columns'].append(col)
+            except Exception as e:
+                print(f"Error processing column {col}: {str(e)}")
+                continue
+    
+    cleaning_report['final_shape'] = cleaned_data.shape
+    cleaning_report['rows_removed'] = data.shape[0] - cleaned_data.shape[0]
+    cleaning_report['columns_added'] = len(cleaned_data.columns) - len(data.columns)
+    
+    return cleaned_data, cleaning_report
+
+def validate_cleaned_data(data, original_data):
+    """
+    Validate that cleaning didn't corrupt the data
+    """
+    validation_results = {
+        'has_nulls': data.isnull().sum().sum() == 0,
+        'shape_changed': data.shape != original_data.shape,
+        'columns_preserved': all(col in data.columns for col in original_data.columns),
+        'dtypes_consistent': all(data[col].dtype == original_data[col].dtype 
+                                for col in original_data.columns if col in data.columns)
+    }
+    
+    return validation_results
