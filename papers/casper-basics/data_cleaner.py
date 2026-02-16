@@ -89,3 +89,76 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     cleaned_df = clean_dataset(input_file, output_file)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values. Default True.
+    rename_columns (bool): If True, rename columns to lowercase with underscores. Default True.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if rename_columns:
+        df_clean.columns = (
+            df_clean.columns
+            .str.lower()
+            .str.replace(r'[^a-z0-9]+', '_', regex=True)
+            .str.strip('_')
+        )
+    
+    return df_clean
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    dict: Dictionary with validation results.
+    """
+    validation = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation['missing_columns'] = missing_columns
+        validation['all_required_present'] = len(missing_columns) == 0
+    
+    return validation
+
+if __name__ == "__main__":
+    sample_data = {
+        'Product Name': ['Widget A', 'Widget B', None, 'Widget C'],
+        'Price ($)': [10.99, 15.50, 20.00, 12.75],
+        'Quantity in Stock': [100, 50, 75, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation before cleaning:")
+    print(validate_data(df))
+    
+    cleaned_df = clean_dataset(df, drop_na=True, rename_columns=True)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nValidation after cleaning:")
+    print(validate_data(cleaned_df))
