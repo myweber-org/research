@@ -1044,3 +1044,129 @@ if __name__ == "__main__":
     numeric_cleaned = clean_numeric_data(numeric_data)
     print(f"Numeric original: {numeric_data}")
     print(f"Numeric cleaned: {numeric_cleaned}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, factor=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def zscore_normalize(dataframe, column):
+    """
+    Normalize a column using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val == 0:
+        return dataframe[column] - mean_val
+    
+    return (dataframe[column] - mean_val) / std_val
+
+def minmax_normalize(dataframe, column, feature_range=(0, 1)):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+        feature_range: Desired range of transformed data (default 0-1)
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val == min_val:
+        return dataframe[column] * 0 + feature_range[0]
+    
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        normalized = normalized * (feature_range[1] - feature_range[0]) + feature_range[0]
+    
+    return normalized
+
+def detect_missing_patterns(dataframe, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: Missing value threshold (default 0.3 = 30%)
+    
+    Returns:
+        List of column names exceeding the threshold
+    """
+    missing_ratios = dataframe.isnull().sum() / len(dataframe)
+    high_missing_cols = missing_ratios[missing_ratios > threshold].index.tolist()
+    
+    return high_missing_cols
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_factor=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        numeric_columns: List of numeric columns to process (default: all numeric)
+        outlier_factor: IQR factor for outlier removal
+        normalize_method: 'zscore', 'minmax', or None
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    df_clean = dataframe.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, col, outlier_factor)
+            
+            if normalize_method == 'zscore':
+                df_clean[col] = zscore_normalize(df_clean, col)
+            elif normalize_method == 'minmax':
+                df_clean[col] = minmax_normalize(df_clean, col)
+    
+    high_missing = detect_missing_patterns(df_clean)
+    if high_missing:
+        print(f"Warning: Columns with >30% missing values: {high_missing}")
+    
+    return df_clean
