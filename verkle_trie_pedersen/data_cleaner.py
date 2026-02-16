@@ -1,83 +1,74 @@
 
 import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(data, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a specified column using the IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    data (list or np.array): The dataset
+    column (int): Index of the column to clean
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    np.array: Data with outliers removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+    col_data = data[:, column].astype(float)
+    
+    Q1 = np.percentile(col_data, 25)
+    Q3 = np.percentile(col_data, 75)
     IQR = Q3 - Q1
     
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
     
-    return filtered_df.reset_index(drop=True)
+    return data[mask]
 
-def calculate_summary_statistics(df, column):
+def calculate_statistics(data, column):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Calculate basic statistics for a column.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    data (np.array): The dataset
+    column (int): Index of the column
     
     Returns:
-    dict: Dictionary containing summary statistics
+    dict: Dictionary containing statistics
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    col_data = data[:, column].astype(float)
     
     stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column])
+        'mean': np.mean(col_data),
+        'median': np.median(col_data),
+        'std': np.std(col_data),
+        'min': np.min(col_data),
+        'max': np.max(col_data)
     }
     
     return stats
 
-def clean_dataset(df, columns_to_clean=None):
-    """
-    Clean multiple columns in a DataFrame by removing outliers.
+if __name__ == "__main__":
+    sample_data = np.array([
+        [1, 150.5, 'A'],
+        [2, 165.3, 'B'],
+        [3, 172.8, 'A'],
+        [4, 158.1, 'C'],
+        [5, 210.7, 'B'],
+        [6, 95.2, 'A'],
+        [7, 168.9, 'C'],
+        [8, 155.4, 'B'],
+        [9, 190.3, 'A'],
+        [10, 82.1, 'C']
+    ])
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
+    print("Original data shape:", sample_data.shape)
     
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of summary statistics for each cleaned column
-    """
-    if columns_to_clean is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns_to_clean = list(numeric_cols)
+    cleaned_data = remove_outliers_iqr(sample_data, 1)
+    print("Cleaned data shape:", cleaned_data.shape)
     
-    cleaned_df = df.copy()
-    statistics = {}
-    
-    for column in columns_to_clean:
-        if column in df.columns and pd.api.types.is_numeric_dtype(df[column]):
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            stats = calculate_summary_statistics(cleaned_df, column)
-            stats['outliers_removed'] = removed_count
-            statistics[column] = stats
-    
-    return cleaned_df, statistics
+    stats = calculate_statistics(cleaned_data, 1)
+    print("Statistics after cleaning:", stats)
