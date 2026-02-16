@@ -322,3 +322,124 @@ def calculate_summary_stats(data, column):
         'max': data[column].max()
     }
     return stats
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, id_column='id'):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        id_column (str): Column name to use for duplicate identification
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if df.empty:
+        return df
+    
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows based on specified ID column
+    if id_column in df.columns:
+        df = df.drop_duplicates(subset=[id_column], keep='first')
+    else:
+        df = df.drop_duplicates()
+    
+    # Reset index after cleaning
+    df = df.reset_index(drop=True)
+    
+    return df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results with status and issues
+    """
+    validation_result = {
+        'is_valid': True,
+        'issues': [],
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
+    
+    if df.empty:
+        validation_result['is_valid'] = False
+        validation_result['issues'].append('DataFrame is empty')
+        return validation_result
+    
+    # Check for required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_result['is_valid'] = False
+            validation_result['issues'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for null values in critical columns
+    if 'id' in df.columns:
+        null_ids = df['id'].isnull().sum()
+        if null_ids > 0:
+            validation_result['issues'].append(f'Found {null_ids} null values in ID column')
+    
+    return validation_result
+
+def standardize_numeric_columns(df, numeric_columns=None):
+    """
+    Standardize numeric columns by converting to appropriate data types.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list): List of column names to standardize as numeric
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized numeric columns
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
+        method (str): Method for outlier detection ('iqr' or 'zscore')
+        threshold (float): Threshold for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        return df
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = np.abs((df[column] - mean) / std)
+        mask = z_scores <= threshold
+    else:
+        return df
+    
+    return df[mask]
