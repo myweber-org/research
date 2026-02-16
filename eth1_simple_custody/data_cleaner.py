@@ -1,78 +1,32 @@
 
-import pandas as pd
 import numpy as np
-from scipy import stats
 
-def remove_outliers_iqr(df, columns):
-    cleaned_df = df.copy()
-    for col in columns:
-        if col in cleaned_df.columns:
-            Q1 = cleaned_df[col].quantile(0.25)
-            Q3 = cleaned_df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
-    return cleaned_df
-
-def normalize_data(df, columns, method='minmax'):
-    normalized_df = df.copy()
-    for col in columns:
-        if col in normalized_df.columns:
-            if method == 'minmax':
-                min_val = normalized_df[col].min()
-                max_val = normalized_df[col].max()
-                if max_val != min_val:
-                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
-            elif method == 'zscore':
-                mean_val = normalized_df[col].mean()
-                std_val = normalized_df[col].std()
-                if std_val != 0:
-                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
-    return normalized_df
-
-def handle_missing_values(df, strategy='mean'):
-    handled_df = df.copy()
-    numeric_cols = handled_df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if handled_df[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = handled_df[col].mean()
-            elif strategy == 'median':
-                fill_value = handled_df[col].median()
-            elif strategy == 'mode':
-                fill_value = handled_df[col].mode()[0]
-            else:
-                fill_value = 0
-            handled_df[col].fillna(fill_value, inplace=True)
-    return handled_df
-
-def clean_dataset(df, numeric_columns, outlier_removal=True, normalization=True, missing_strategy='mean'):
-    df_cleaned = df.copy()
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column in a dataset using the IQR method.
     
-    if outlier_removal:
-        df_cleaned = remove_outliers_iqr(df_cleaned, numeric_columns)
+    Parameters:
+    data (numpy.ndarray): The dataset.
+    column (int): Index of the column to clean.
     
-    df_cleaned = handle_missing_values(df_cleaned, strategy=missing_strategy)
+    Returns:
+    numpy.ndarray: Dataset with outliers removed from the specified column.
+    """
+    if not isinstance(data, np.ndarray):
+        raise ValueError("Input data must be a numpy array")
     
-    if normalization:
-        df_cleaned = normalize_data(df_cleaned, numeric_columns, method='minmax')
+    if column >= data.shape[1] or column < 0:
+        raise ValueError("Column index out of bounds")
     
-    return df_cleaned
-
-if __name__ == "__main__":
-    sample_data = {
-        'feature1': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
-        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-        'feature3': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
-    }
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
     
-    numeric_cols = ['feature1', 'feature2', 'feature3']
-    cleaned_df = clean_dataset(df, numeric_cols)
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    cleaned_data = data[mask]
     
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    return cleaned_data
