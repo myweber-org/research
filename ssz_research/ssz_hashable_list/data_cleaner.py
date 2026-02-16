@@ -269,4 +269,67 @@ def validate_data(data, check_missing=True, check_infinite=True):
                 inf_counts[col] = inf_mask.sum()
             validation_results['infinite_counts'] = inf_counts
     
-    return validation_results
+    return validation_resultsimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    """
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val > min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def standardize_zscore(df, columns):
+    """
+    Standardize specified columns using Z-score normalization.
+    """
+    standardized_df = df.copy()
+    for col in columns:
+        if col in standardized_df.columns:
+            mean_val = standardized_df[col].mean()
+            std_val = standardized_df[col].std()
+            if std_val > 0:
+                standardized_df[col] = (standardized_df[col] - mean_val) / std_val
+    return standardized_df
+
+def handle_missing_mean(df, columns):
+    """
+    Fill missing values with the mean of the column.
+    """
+    filled_df = df.copy()
+    for col in columns:
+        if col in filled_df.columns:
+            mean_val = filled_df[col].mean()
+            filled_df[col].fillna(mean_val, inplace=True)
+    return filled_df
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
