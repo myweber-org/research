@@ -509,3 +509,81 @@ def validate_cleaned_data(data, original_data):
     }
     
     return validation_results
+import pandas as pd
+
+def clean_dataframe(df, drop_na=True, column_case='lower'):
+    """
+    Clean a pandas DataFrame by handling null values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values. Default True.
+    column_case (str): Target case for column names ('lower', 'upper', 'title'). Default 'lower'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Handle null values
+    if drop_na:
+        df_clean = df_clean.dropna()
+    else:
+        df_clean = df_clean.fillna(0)
+    
+    # Standardize column names
+    if column_case == 'lower':
+        df_clean.columns = df_clean.columns.str.lower()
+    elif column_case == 'upper':
+        df_clean.columns = df_clean.columns.str.upper()
+    elif column_case == 'title':
+        df_clean.columns = df_clean.columns.str.title()
+    
+    # Remove any leading/trailing whitespace from column names
+    df_clean.columns = df_clean.columns.str.strip()
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', None, 'David'],
+        'Age': [25, None, 35, 40],
+        'Score': [85.5, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataframe(df, drop_na=True, column_case='lower')
+    print(cleaned_df)
+    
+    # Validation test
+    is_valid = validate_dataframe(cleaned_df, required_columns=['name', 'age'])
+    print(f"\nDataFrame validation: {is_valid}")
