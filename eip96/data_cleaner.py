@@ -337,3 +337,56 @@ if __name__ == "__main__":
         print("Data cleaning completed successfully")
     else:
         print("Data cleaning failed")
+import re
+import unicodedata
+
+def clean_text(text):
+    """
+    Clean and normalize a given text string.
+
+    Args:
+        text (str): The input text to be cleaned.
+
+    Returns:
+        str: The cleaned and normalized text.
+    """
+    if not isinstance(text, str):
+        return ""
+
+    # Convert to lowercase
+    text = text.lower()
+
+    # Remove extra whitespace
+    text = " ".join(text.split())
+
+    # Normalize unicode characters
+    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+
+    # Remove special characters, keep alphanumeric and basic punctuation
+    text = re.sub(r'[^a-z0-9\s.,!?]', '', text)
+
+    return text.strip()
+
+def remove_punctuation(text):
+    """
+    Remove all punctuation from the text.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: Text without punctuation.
+    """
+    return re.sub(r'[^\w\s]', '', text)
+
+def tokenize_text(text):
+    """
+    Simple tokenization by splitting on whitespace.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        list: List of tokens.
+    """
+    return text.split()
