@@ -30,3 +30,11 @@ def remove_outliers_iqr(data, column):
     mask = (col_data >= lower_bound) & (col_data <= upper_bound)
     
     return data[mask]
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
