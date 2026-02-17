@@ -1,42 +1,63 @@
 
-import numpy as np
+import pandas as pd
 
-def remove_outliers_iqr(data, column):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers from a pandas DataFrame column using the IQR method.
+    Remove duplicate rows from a DataFrame.
     
-    Parameters:
-    data (pd.DataFrame): The input DataFrame.
-    column (str): The column name to process.
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: 'first', 'last', or False to drop all duplicates
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+        DataFrame with duplicates removed
     """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if df.empty:
+        return df
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    removed_count = len(df) - len(cleaned_df)
+    
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
 
-def calculate_summary_stats(data, column):
+def clean_numeric_columns(df, columns):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Clean numeric columns by converting to appropriate types and handling errors.
     
-    Parameters:
-    data (pd.DataFrame): The input DataFrame.
-    column (str): The column name to analyze.
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to clean
     
     Returns:
-    dict: Dictionary containing count, mean, std, min, max.
+        DataFrame with cleaned numeric columns
     """
-    stats = {
-        'count': data[column].count(),
-        'mean': data[column].mean(),
-        'std': data[column].std(),
-        'min': data[column].min(),
-        'max': data[column].max()
-    }
-    return stats
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        Tuple of (is_valid, message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
