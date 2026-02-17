@@ -2,106 +2,53 @@
 import pandas as pd
 import numpy as np
 
-def clean_missing_data(df, method='mean', columns=None):
+def remove_outliers_iqr(df, column):
     """
-    Clean missing values in a DataFrame using specified method.
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
     
-    Args:
-        df: pandas DataFrame containing data
-        method: Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
-        columns: List of columns to clean, if None cleans all columns
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to clean.
     
     Returns:
-        Cleaned DataFrame
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    if df.empty:
-        return df
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    if columns is None:
-        columns = df.columns
-    
-    df_clean = df.copy()
-    
-    for col in columns:
-        if col not in df_clean.columns:
-            continue
-            
-        if method == 'drop':
-            df_clean = df_clean.dropna(subset=[col])
-        elif method == 'mean' and pd.api.types.is_numeric_dtype(df_clean[col]):
-            df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
-        elif method == 'median' and pd.api.types.is_numeric_dtype(df_clean[col]):
-            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
-        elif method == 'mode':
-            mode_value = df_clean[col].mode()
-            if not mode_value.empty:
-                df_clean[col] = df_clean[col].fillna(mode_value[0])
-        else:
-            df_clean[col] = df_clean[col].fillna(method='ffill').fillna(method='bfill')
-    
-    return df_clean
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
 
-def validate_dataframe(df, required_columns=None):
+def clean_dataset(file_path, output_path):
     """
-    Validate DataFrame structure and content.
+    Load a dataset, clean specified columns, and save the cleaned data.
     
-    Args:
-        df: DataFrame to validate
-        required_columns: List of columns that must be present
-    
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame is valid"
-
-def load_and_clean_csv(filepath, cleaning_method='mean'):
-    """
-    Load CSV file and clean missing values.
-    
-    Args:
-        filepath: Path to CSV file
-        cleaning_method: Method for handling missing values
-    
-    Returns:
-        Cleaned DataFrame
+    Parameters:
+    file_path (str): Path to the input CSV file.
+    output_path (str): Path to save the cleaned CSV file.
     """
     try:
-        df = pd.read_csv(filepath)
-        is_valid, message = validate_dataframe(df)
+        df = pd.read_csv(file_path)
+        print(f"Original dataset shape: {df.shape}")
         
-        if not is_valid:
-            raise ValueError(f"Invalid DataFrame: {message}")
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
-        return clean_missing_data(df, method=cleaning_method)
+        for col in numeric_cols:
+            df = remove_outliers_iqr(df, col)
+        
+        print(f"Cleaned dataset shape: {df.shape}")
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {filepath}")
-    except pd.errors.EmptyDataError:
-        raise ValueError("CSV file is empty")
+        print(f"Error: File not found at {file_path}")
     except Exception as e:
-        raise RuntimeError(f"Error processing file: {str(e)}")
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, np.nan, 4, 5],
-        'B': [np.nan, 2, 3, np.nan, 5],
-        'C': [1, 2, 3, 4, 5]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    
-    cleaned_df = clean_missing_data(df, method='mean')
-    print("\nCleaned DataFrame (mean method):")
-    print(cleaned_df)
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    clean_dataset(input_file, output_file)
