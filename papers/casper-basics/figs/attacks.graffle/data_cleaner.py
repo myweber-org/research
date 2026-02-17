@@ -216,3 +216,190 @@ if __name__ == "__main__":
     if cleaned_df is not None:
         validation = validate_numeric_columns(cleaned_df, ['value', 'score'])
         print(f"Validation results: {validation}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def zscore_normalize(dataframe, columns=None):
+    """
+    Normalize specified columns using z-score normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(normalized_df[col].dtype, np.number):
+            raise TypeError(f"Column '{col}' must be numeric for normalization")
+        
+        mean_val = normalized_df[col].mean()
+        std_val = normalized_df[col].std()
+        
+        if std_val > 0:
+            normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def minmax_normalize(dataframe, columns=None, feature_range=(0, 1)):
+    """
+    Normalize specified columns using min-max normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(normalized_df[col].dtype, np.number):
+            raise TypeError(f"Column '{col}' must be numeric for normalization")
+        
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        
+        if col_max > col_min:
+            normalized_df[col] = ((normalized_df[col] - col_min) / 
+                                 (col_max - col_min)) * (max_val - min_val) + min_val
+        else:
+            normalized_df[col] = min_val
+    
+    return normalized_df
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with skewed distributions using skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    threshold (float): Absolute skewness threshold for detection
+    
+    Returns:
+    dict: Dictionary with column names and their skewness values
+    """
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    skewed_columns = {}
+    
+    for col in numeric_cols:
+        skewness = stats.skew(dataframe[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_columns[col] = skewness
+    
+    return skewed_columns
+
+def log_transform(dataframe, columns):
+    """
+    Apply log transformation to specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to transform
+    
+    Returns:
+    pd.DataFrame: DataFrame with transformed columns
+    """
+    transformed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in transformed_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(transformed_df[col].dtype, np.number):
+            raise TypeError(f"Column '{col}' must be numeric for log transformation")
+        
+        min_val = transformed_df[col].min()
+        if min_val <= 0:
+            transformed_df[col] = np.log(transformed_df[col] - min_val + 1)
+        else:
+            transformed_df[col] = np.log(transformed_df[col])
+    
+    return transformed_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    columns (list): List of column names to process. If None, process all columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns
+    
+    processed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if processed_df[col].isnull().any():
+            if strategy == 'drop':
+                processed_df = processed_df.dropna(subset=[col])
+            elif strategy == 'mean':
+                if np.issubdtype(processed_df[col].dtype, np.number):
+                    processed_df[col] = processed_df[col].fillna(processed_df[col].mean())
+            elif strategy == 'median':
+                if np.issubdtype(processed_df[col].dtype, np.number):
+                    processed_df[col] = processed_df[col].fillna(processed_df[col].median())
+            elif strategy == 'mode':
+                processed_df[col] = processed_df[col].fillna(processed_df[col].mode()[0])
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return processed_df
