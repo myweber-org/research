@@ -66,3 +66,85 @@ def clean_dataset(df, numeric_columns, outlier_removal=True, normalization='stan
         elif normalization == 'standard':
             cleaned_df[col] = standardize_zscore(cleaned_df, col)
     return cleaned_df.reset_index(drop=True)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
+        
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        self.df = self.df[z_scores < threshold]
+        return self
+        
+    def fill_missing_mean(self, column):
+        self.df[column].fillna(self.df[column].mean(), inplace=True)
+        return self
+        
+    def fill_missing_median(self, column):
+        self.df[column].fillna(self.df[column].median(), inplace=True)
+        return self
+        
+    def fill_missing_mode(self, column):
+        self.df[column].fillna(self.df[column].mode()[0], inplace=True)
+        return self
+        
+    def drop_missing_rows(self, threshold=0.8):
+        self.df.dropna(thresh=threshold * len(self.df.columns), inplace=True)
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df
+        
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
+        
+    def summary(self):
+        print(f"Original rows: {self.original_shape[0]}")
+        print(f"Cleaned rows: {self.df.shape[0]}")
+        print(f"Rows removed: {self.get_removed_count()}")
+        print(f"Original columns: {self.original_shape[1]}")
+        print(f"Cleaned columns: {self.df.shape[1]}")
+
+def clean_dataset(df, config):
+    cleaner = DataCleaner(df)
+    
+    if 'outlier_method' in config:
+        method = config['outlier_method']
+        columns = config.get('outlier_columns', df.select_dtypes(include=[np.number]).columns)
+        
+        for col in columns:
+            if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+                if method == 'iqr':
+                    cleaner.remove_outliers_iqr(col, config.get('iqr_multiplier', 1.5))
+                elif method == 'zscore':
+                    cleaner.remove_outliers_zscore(col, config.get('zscore_threshold', 3))
+    
+    if 'missing_strategy' in config:
+        strategy = config['missing_strategy']
+        columns = config.get('missing_columns', df.columns)
+        
+        for col in columns:
+            if col in df.columns and self.df[col].isnull().any():
+                if strategy == 'mean':
+                    cleaner.fill_missing_mean(col)
+                elif strategy == 'median':
+                    cleaner.fill_missing_median(col)
+                elif strategy == 'mode':
+                    cleaner.fill_missing_mode(col)
+                elif strategy == 'drop':
+                    cleaner.drop_missing_rows(config.get('drop_threshold', 0.8))
+    
+    return cleaner.get_cleaned_data()
