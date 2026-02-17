@@ -1175,3 +1175,175 @@ def validate_dataframe(df, required_columns=None):
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
 #     print(f"\nValidation: {is_valid}, Message: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using Interquartile Range method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    mask = z_scores < threshold
+    
+    filtered_data = data[mask]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].copy()
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].copy()
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with different strategies
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_copy = data.copy()
+    
+    for column in columns:
+        if column not in data_copy.columns:
+            continue
+            
+        if data_copy[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = data_copy[column].mean()
+            elif strategy == 'median':
+                fill_value = data_copy[column].median()
+            elif strategy == 'mode':
+                fill_value = data_copy[column].mode()[0]
+            elif strategy == 'ffill':
+                data_copy[column] = data_copy[column].fillna(method='ffill')
+                continue
+            elif strategy == 'bfill':
+                data_copy[column] = data_copy[column].fillna(method='bfill')
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data_copy[column] = data_copy[column].fillna(fill_value)
+    
+    return data_copy
+
+def validate_data_types(data, schema):
+    """
+    Validate data types according to provided schema
+    """
+    validation_results = {}
+    
+    for column, expected_type in schema.items():
+        if column not in data.columns:
+            validation_results[column] = {'status': 'missing', 'message': 'Column not found'}
+            continue
+        
+        actual_type = str(data[column].dtype)
+        
+        if expected_type == 'numeric':
+            is_numeric = pd.api.types.is_numeric_dtype(data[column])
+            validation_results[column] = {
+                'status': 'valid' if is_numeric else 'invalid',
+                'expected': expected_type,
+                'actual': actual_type
+            }
+        elif expected_type == 'datetime':
+            try:
+                pd.to_datetime(data[column])
+                validation_results[column] = {
+                    'status': 'valid',
+                    'expected': expected_type,
+                    'actual': actual_type
+                }
+            except:
+                validation_results[column] = {
+                    'status': 'invalid',
+                    'expected': expected_type,
+                    'actual': actual_type
+                }
+        else:
+            validation_results[column] = {
+                'status': 'valid' if actual_type == expected_type else 'invalid',
+                'expected': expected_type,
+                'actual': actual_type
+            }
+    
+    return validation_results
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': data.shape,
+        'columns': list(data.columns),
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'unique_counts': {col: data[col].nunique() for col in data.columns},
+        'numeric_summary': {}
+    }
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_summary'][col] = {
+            'mean': data[col].mean(),
+            'std': data[col].std(),
+            'min': data[col].min(),
+            '25%': data[col].quantile(0.25),
+            '50%': data[col].median(),
+            '75%': data[col].quantile(0.75),
+            'max': data[col].max()
+        }
+    
+    return summary
