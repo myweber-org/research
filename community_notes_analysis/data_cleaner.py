@@ -514,4 +514,99 @@ if __name__ == "__main__":
     result = example_usage()
     print(f"Cleaned data shape: {result.shape}")
     print("First 5 rows:")
+    print(result.head())import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers(self, column, method='iqr', threshold=1.5):
+        if method == 'iqr':
+            Q1 = self.df[column].quantile(0.25)
+            Q3 = self.df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        elif method == 'zscore':
+            z_scores = np.abs(stats.zscore(self.df[column]))
+            self.df = self.df[z_scores < threshold]
+        return self
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+    
+    def fill_missing(self, column, method='mean'):
+        if method == 'mean':
+            fill_value = self.df[column].mean()
+        elif method == 'median':
+            fill_value = self.df[column].median()
+        elif method == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = method
+            
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self
+    
+    def get_cleaned_data(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Rows removed: {self.original_shape[0] - self.df.shape[0]}")
+        return self.df
+    
+    def summary(self):
+        print("Data Cleaning Summary")
+        print("=" * 50)
+        print(f"Dataset shape: {self.df.shape}")
+        print(f"Columns: {list(self.df.columns)}")
+        print("\nMissing values per column:")
+        print(self.df.isnull().sum())
+        print("\nData types:")
+        print(self.df.dtypes)
+        
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.randint(1, 100, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature1'] = np.nan
+    df.loc[5, 'feature2'] = 1000
+    
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                 .fill_missing('feature1', 'mean')
+                 .remove_outliers('feature2', 'iqr', 1.5)
+                 .normalize_column('feature1', 'standard')
+                 .get_cleaned_data())
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result = example_usage()
+    print("\nFirst 5 rows of cleaned data:")
     print(result.head())
