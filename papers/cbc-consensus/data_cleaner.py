@@ -21,12 +21,10 @@ def remove_outliers_iqr(data, column, factor=1.5):
     q1 = data[column].quantile(0.25)
     q3 = data[column].quantile(0.75)
     iqr = q3 - q1
-    
     lower_bound = q1 - factor * iqr
     upper_bound = q3 + factor * iqr
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
 
 def remove_outliers_zscore(data, column, threshold=3):
     """
@@ -44,13 +42,10 @@ def remove_outliers_zscore(data, column, threshold=3):
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
     z_scores = np.abs(stats.zscore(data[column].dropna()))
-    filtered_indices = np.where(z_scores < threshold)[0]
+    mask = z_scores < threshold
     
-    if len(filtered_indices) == 0:
-        return data.iloc[[]]
-    
-    filtered_data = data.iloc[filtered_indices]
-    return filtered_data
+    valid_indices = data[column].dropna().index[mask]
+    return data.loc[valid_indices]
 
 def normalize_minmax(data, column):
     """
@@ -61,21 +56,19 @@ def normalize_minmax(data, column):
         column: column name to normalize
     
     Returns:
-        DataFrame with normalized column
+        Series with normalized values
     """
     if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    data_copy = data.copy()
-    min_val = data_copy[column].min()
-    max_val = data_copy[column].max()
+    col_data = data[column].copy()
+    min_val = col_data.min()
+    max_val = col_data.max()
     
     if max_val == min_val:
-        data_copy[column] = 0.5
-    else:
-        data_copy[column] = (data_copy[column] - min_val) / (max_val - min_val)
+        return col_data * 0
     
-    return data_copy
+    return (col_data - min_val) / (max_val - min_val)
 
 def normalize_zscore(data, column):
     """
@@ -86,37 +79,35 @@ def normalize_zscore(data, column):
         column: column name to normalize
     
     Returns:
-        DataFrame with standardized column
+        Series with standardized values
     """
     if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    data_copy = data.copy()
-    mean_val = data_copy[column].mean()
-    std_val = data_copy[column].std()
+    col_data = data[column].copy()
+    mean_val = col_data.mean()
+    std_val = col_data.std()
     
     if std_val == 0:
-        data_copy[column] = 0
-    else:
-        data_copy[column] = (data_copy[column] - mean_val) / std_val
+        return col_data * 0
     
-    return data_copy
+    return (col_data - mean_val) / std_val
 
-def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+def clean_dataset(data, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
     """
     Comprehensive data cleaning pipeline.
     
     Args:
         data: pandas DataFrame
-        numeric_columns: list of numeric column names to process
-        outlier_method: 'iqr' or 'zscore' (default 'iqr')
-        normalize_method: 'minmax' or 'zscore' (default 'minmax')
+        numeric_columns: list of numeric columns to process (default: all numeric columns)
+        outlier_method: 'iqr' or 'zscore' (default: 'iqr')
+        normalize_method: 'minmax' or 'zscore' (default: 'minmax')
     
     Returns:
         Cleaned DataFrame
     """
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
     
     cleaned_data = data.copy()
     
@@ -129,91 +120,47 @@ def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method=
         elif outlier_method == 'zscore':
             cleaned_data = remove_outliers_zscore(cleaned_data, column)
         else:
-            raise ValueError("outlier_method must be 'iqr' or 'zscore'")
-        
-        if normalize_method == 'minmax':
-            cleaned_data = normalize_minmax(cleaned_data, column)
-        elif normalize_method == 'zscore':
-            cleaned_data = normalize_zscore(cleaned_data, column)
-        else:
-            raise ValueError("normalize_method must be 'minmax' or 'zscore'")
+            raise ValueError(f"Unknown outlier method: {outlier_method}")
     
-    return cleaned_data
+    for column in numeric_columns:
+        if column not in cleaned_data.columns:
+            continue
+            
+        if normalize_method == 'minmax':
+            cleaned_data[column] = normalize_minmax(cleaned_data, column)
+        elif normalize_method == 'zscore':
+            cleaned_data[column] = normalize_zscore(cleaned_data, column)
+        else:
+            raise ValueError(f"Unknown normalize method: {normalize_method}")
+    
+    return cleaned_data.reset_index(drop=True)
 
-def validate_data(data, required_columns, numeric_columns):
+def validate_data(data, required_columns=None, check_missing=True, check_duplicates=True):
     """
-    Validate dataset structure and content.
+    Validate dataset for common issues.
     
     Args:
         data: pandas DataFrame
         required_columns: list of required column names
-        numeric_columns: list of numeric column names
+        check_missing: flag to check for missing values
+        check_duplicates: flag to check for duplicate rows
     
     Returns:
-        tuple: (is_valid, error_message)
+        Dictionary with validation results
     """
-    if not isinstance(data, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
+    validation_results = {}
     
-    missing_columns = [col for col in required_columns if col not in data.columns]
-    if missing_columns:
-        return False, f"Missing required columns: {missing_columns}"
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        validation_results['missing_columns'] = missing_cols
     
-    for column in numeric_columns:
-        if column in data.columns and not pd.api.types.is_numeric_dtype(data[column]):
-            return False, f"Column '{column}' is not numeric"
+    if check_missing:
+        missing_counts = data.isnull().sum()
+        missing_counts = missing_counts[missing_counts > 0]
+        validation_results['missing_values'] = missing_counts.to_dict()
     
-    if data.empty:
-        return False, "DataFrame is empty"
+    if check_duplicates:
+        duplicate_count = data.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
     
-    return True, "Data validation passed"
-import csv
-import sys
-
-def remove_duplicates(input_file, output_file, key_column):
-    """
-    Remove duplicate rows from a CSV file based on a specified key column.
-    """
-    seen = set()
-    unique_rows = []
-    
-    try:
-        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-            reader = csv.DictReader(infile)
-            fieldnames = reader.fieldnames
-            
-            if key_column not in fieldnames:
-                raise ValueError(f"Key column '{key_column}' not found in CSV headers")
-            
-            for row in reader:
-                key_value = row[key_column]
-                if key_value not in seen:
-                    seen.add(key_value)
-                    unique_rows.append(row)
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(unique_rows)
-        
-        print(f"Removed {len(seen) - len(unique_rows)} duplicate rows")
-        print(f"Unique rows: {len(unique_rows)}")
-        print(f"Output saved to: {output_file}")
-        
-    except FileNotFoundError:
-        print(f"Error: Input file '{input_file}' not found")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: python data_cleaner.py <input_file> <output_file> <key_column>")
-        sys.exit(1)
-    
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    key_column = sys.argv[3]
-    
-    remove_duplicates(input_file, output_file, key_column)
+    return validation_results
