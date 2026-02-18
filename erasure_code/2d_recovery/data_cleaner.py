@@ -452,3 +452,131 @@ def summary_statistics(df, column):
         'skewness': series.skew(),
         'kurtosis': series.kurtosis()
     }
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.original_shape = data.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.data.columns
+            
+        clean_data = self.data.copy()
+        
+        for col in columns:
+            if self.data[col].dtype in ['int64', 'float64']:
+                Q1 = self.data[col].quantile(0.25)
+                Q3 = self.data[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                
+                mask = (self.data[col] >= lower_bound) & (self.data[col] <= upper_bound)
+                clean_data = clean_data[mask]
+                
+        return clean_data
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        normalized_data = self.data.copy()
+        
+        for col in columns:
+            if col in normalized_data.columns and normalized_data[col].dtype in ['int64', 'float64']:
+                min_val = normalized_data[col].min()
+                max_val = normalized_data[col].max()
+                
+                if max_val > min_val:
+                    normalized_data[col] = (normalized_data[col] - min_val) / (max_val - min_val)
+                    
+        return normalized_data
+    
+    def standardize_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        standardized_data = self.data.copy()
+        
+        for col in columns:
+            if col in standardized_data.columns and standardized_data[col].dtype in ['int64', 'float64']:
+                mean_val = standardized_data[col].mean()
+                std_val = standardized_data[col].std()
+                
+                if std_val > 0:
+                    z_scores = np.abs((standardized_data[col] - mean_val) / std_val)
+                    standardized_data = standardized_data[z_scores < threshold]
+                    
+        return standardized_data
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.data.select_dtypes(include=[np.number]).columns
+            
+        filled_data = self.data.copy()
+        
+        for col in columns:
+            if col in filled_data.columns and filled_data[col].dtype in ['int64', 'float64']:
+                if strategy == 'mean':
+                    fill_value = filled_data[col].mean()
+                elif strategy == 'median':
+                    fill_value = filled_data[col].median()
+                elif strategy == 'mode':
+                    fill_value = filled_data[col].mode()[0]
+                else:
+                    fill_value = 0
+                    
+                filled_data[col].fillna(fill_value, inplace=True)
+                
+        return filled_data
+    
+    def get_cleaning_report(self):
+        report = {
+            'original_shape': self.original_shape,
+            'current_shape': self.data.shape,
+            'missing_values': self.data.isnull().sum().to_dict(),
+            'numeric_columns': list(self.data.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.data.select_dtypes(include=['object']).columns)
+        }
+        return report
+
+def create_sample_data():
+    np.random.seed(42)
+    dates = pd.date_range('2023-01-01', periods=100, freq='D')
+    data = pd.DataFrame({
+        'date': dates,
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.uniform(30, 90, 100),
+        'pressure': np.random.normal(1013, 10, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    })
+    
+    data.loc[10:15, 'temperature'] = np.nan
+    data.loc[20, 'temperature'] = 100
+    data.loc[25, 'humidity'] = 150
+    
+    return data
+
+if __name__ == "__main__":
+    sample_data = create_sample_data()
+    cleaner = DataCleaner(sample_data)
+    
+    print("Original data shape:", cleaner.original_shape)
+    print("\nMissing values:")
+    print(sample_data.isnull().sum())
+    
+    cleaned_data = cleaner.remove_outliers_iqr(['temperature', 'humidity', 'pressure'])
+    print("\nAfter outlier removal:", cleaned_data.shape)
+    
+    normalized_data = cleaner.normalize_minmax(['temperature', 'humidity', 'pressure'])
+    print("\nAfter normalization:")
+    print(normalized_data[['temperature', 'humidity', 'pressure']].head())
+    
+    report = cleaner.get_cleaning_report()
+    print("\nCleaning report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
