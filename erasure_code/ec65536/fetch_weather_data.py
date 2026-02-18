@@ -91,4 +91,42 @@ if __name__ == "__main__":
     API_KEY = "your_api_key_here"
     city_name = input("Enter city name: ")
     weather_data = get_weather(API_KEY, city_name)
+    display_weather(weather_data)import requests
+
+def fetch_weather(api_key, city):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        return data
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+
+def display_weather(data):
+    if data and data.get('cod') == 200:
+        city = data['name']
+        temp = data['main']['temp']
+        weather_desc = data['weather'][0]['description']
+        humidity = data['main']['humidity']
+        wind_speed = data['wind']['speed']
+        
+        print(f"Weather in {city}:")
+        print(f"  Temperature: {temp}°C")
+        print(f"  Conditions: {weather_desc}")
+        print(f"  Humidity: {humidity}%")
+        print(f"  Wind Speed: {wind_speed} m/s")
+    else:
+        print("Unable to retrieve weather data.")
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    CITY = "London"
+    weather_data = fetch_weather(API_KEY, CITY)
     display_weather(weather_data)
