@@ -125,3 +125,63 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     clean_dataset(input_file, output_file)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or array-like): The dataset containing the column to clean.
+    column (int or str): The index or name of the column to process.
+    
+    Returns:
+    tuple: (cleaned_data, removed_indices)
+    """
+    if isinstance(data, list):
+        data_array = np.array(data)
+    else:
+        data_array = data
+    
+    col_data = data_array[:, column] if data_array.ndim > 1 else data_array
+    
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    removed_indices = np.where(~mask)[0]
+    
+    if data_array.ndim > 1:
+        cleaned_data = data_array[mask]
+    else:
+        cleaned_data = data_array[mask]
+    
+    return cleaned_data, removed_indices
+
+def test_remove_outliers():
+    """Test function for the outlier removal."""
+    test_data = np.array([
+        [1, 100],
+        [2, 200],
+        [3, 300],
+        [4, 400],
+        [5, 5000],  # Outlier
+        [6, 600],
+        [7, 700],
+        [8, 800],
+        [9, 900],
+        [10, 10000]  # Outlier
+    ])
+    
+    cleaned, removed = remove_outliers_iqr(test_data, 1)
+    print(f"Original shape: {test_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Removed indices: {removed}")
+    print(f"Cleaned data:\n{cleaned}")
+
+if __name__ == "__main__":
+    test_remove_outliers()
