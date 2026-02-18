@@ -464,3 +464,98 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'constant').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        categorical_cols = cleaned_df.select_dtypes(exclude=[np.number]).columns
+        
+        if fill_strategy == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_strategy == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_strategy == 'mode':
+            for col in numeric_cols:
+                mode_val = cleaned_df[col].mode()
+                if not mode_val.empty:
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_val.iloc[0])
+        elif fill_strategy == 'constant':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+        
+        for col in categorical_cols:
+            cleaned_df[col] = cleaned_df[col].fillna('Unknown')
+        
+        print(f"Missing values filled using {fill_strategy} strategy.")
+    
+    return cleaned_df
+
+def validate_dataset(df, check_missing=True, check_types=True):
+    """
+    Validate a DataFrame for common data quality issues.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    check_missing (bool): Check for missing values.
+    check_types (bool): Check for consistent data types.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        missing_cols = missing_counts[missing_counts > 0]
+        validation_results['missing_values'] = missing_cols.to_dict()
+    
+    if check_types:
+        type_info = {}
+        for col in df.columns:
+            unique_types = df[col].apply(type).unique()
+            type_info[col] = [str(t) for t in unique_types]
+        validation_results['data_types'] = type_info
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5.1, None, 7.3, 8.4, 9.5],
+        'C': ['x', 'y', 'y', None, 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned = clean_dataset(df, fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    validation = validate_dataset(cleaned)
+    print("Validation Results:")
+    print(validation)
