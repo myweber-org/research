@@ -405,3 +405,149 @@ if __name__ == "__main__":
     print("Final data shape:", clean_data.shape)
     print("Summary statistics:")
     print(clean_data.describe())
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', threshold=1.5):
+    """
+    Clean dataset by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    threshold (float): Threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median())
+    elif missing_strategy == 'mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    
+    # Handle outliers
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            # Cap outliers
+            cleaned_df[col] = cleaned_df[col].clip(lower=lower_bound, upper=upper_bound)
+            
+        elif outlier_method == 'zscore':
+            z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / cleaned_df[col].std())
+            
+            # Replace outliers with median
+            median_val = cleaned_df[col].median()
+            cleaned_df.loc[z_scores > threshold, col] = median_val
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=10):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if len(df) < min_rows:
+        return False, f"Dataset has less than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.any(np.isinf(df[col])):
+            return False, f"Column {col} contains infinite values"
+    
+    return True, "Dataset is valid"
+
+def normalize_data(df, method='minmax'):
+    """
+    Normalize numerical columns in the dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    method (str): Normalization method ('minmax', 'standard', 'robust')
+    
+    Returns:
+    pd.DataFrame: Normalized dataframe
+    """
+    
+    normalized_df = df.copy()
+    numeric_cols = normalized_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if method == 'minmax':
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val != min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+                
+        elif method == 'standard':
+            mean_val = normalized_df[col].mean()
+            std_val = normalized_df[col].std()
+            if std_val != 0:
+                normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+                
+        elif method == 'robust':
+            median_val = normalized_df[col].median()
+            iqr_val = normalized_df[col].quantile(0.75) - normalized_df[col].quantile(0.25)
+            if iqr_val != 0:
+                normalized_df[col] = (normalized_df[col] - median_val) / iqr_val
+    
+    return normalized_df
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'feature1': [1, 2, np.nan, 4, 100],
+        'feature2': [5, 6, 7, np.nan, 9],
+        'feature3': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original Data:")
+    print(df)
+    print()
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='median', outlier_method='iqr')
+    print("Cleaned Data:")
+    print(cleaned)
+    print()
+    
+    # Validate the data
+    is_valid, message = validate_data(cleaned, required_columns=['feature1', 'feature2', 'feature3'])
+    print(f"Validation: {is_valid} - {message}")
+    print()
+    
+    # Normalize the data
+    normalized = normalize_data(cleaned, method='minmax')
+    print("Normalized Data:")
+    print(normalized)
