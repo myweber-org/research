@@ -1235,4 +1235,11 @@ if __name__ == "__main__":
     
     cleaned_df = clean_numeric_data(df, columns=['A'])
     print("\nCleaned DataFrame (outliers removed from column 'A'):")
-    print(cleaned_df)
+    print(cleaned_df)def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
