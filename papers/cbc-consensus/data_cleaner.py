@@ -164,3 +164,87 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
         validation_results['duplicate_rows'] = duplicate_count
     
     return validation_results
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None, fill_na=True):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        text_columns: list of column names containing text data
+        fill_na: boolean indicating whether to fill missing values
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if fill_na:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].median())
+        
+        categorical_cols = df_clean.select_dtypes(include=['object']).columns
+        df_clean[categorical_cols] = df_clean[categorical_cols].fillna('Unknown')
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    df_clean = df_clean.drop_duplicates()
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def sample_data_processing():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'name': ['Alice', 'Bob', None, 'Charlie', 'Alice'],
+        'age': [25, 30, np.nan, 35, 25],
+        'city': ['New York', 'Los Angeles', '', 'Chicago', 'New York']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    is_valid, message = validate_dataframe(df, required_columns=['name', 'age'])
+    print(f"Validation: {is_valid} - {message}")
+    
+    if is_valid:
+        cleaned_df = clean_dataset(df, text_columns=['name', 'city'])
+        print("Cleaned DataFrame:")
+        print(cleaned_df)
+        
+        return cleaned_df
+
+if __name__ == "__main__":
+    sample_data_processing()
