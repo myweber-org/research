@@ -954,3 +954,184 @@ if __name__ == "__main__":
     input_csv = sys.argv[1]
     output_csv = sys.argv[2] if len(sys.argv) > 2 else None
     remove_duplicates(input_csv, output_csv)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, columns):
+    """
+    Remove outliers using IQR method from specified columns.
+    Returns cleaned dataframe and outlier indices.
+    """
+    cleaned_df = dataframe.copy()
+    outlier_indices = []
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            col_outliers = cleaned_df[(cleaned_df[col] < lower_bound) | (cleaned_df[col] > upper_bound)].index
+            outlier_indices.extend(col_outliers)
+            
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    
+    return cleaned_df, list(set(outlier_indices))
+
+def normalize_minmax(dataframe, columns):
+    """
+    Apply min-max normalization to specified columns.
+    Returns dataframe with normalized columns.
+    """
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            
+            if max_val != min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    
+    return normalized_df
+
+def standardize_zscore(dataframe, columns):
+    """
+    Apply z-score standardization to specified columns.
+    Returns dataframe with standardized columns.
+    """
+    standardized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in standardized_df.columns:
+            mean_val = standardized_df[col].mean()
+            std_val = standardized_df[col].std()
+            
+            if std_val > 0:
+                standardized_df[col] = (standardized_df[col] - mean_val) / std_val
+    
+    return standardized_df
+
+def handle_missing_values(dataframe, strategy='mean'):
+    """
+    Handle missing values using specified strategy.
+    Supported strategies: 'mean', 'median', 'mode', 'drop'
+    """
+    df_copy = dataframe.copy()
+    
+    if strategy == 'drop':
+        return df_copy.dropna()
+    
+    for col in df_copy.columns:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_copy[col].mean()
+            elif strategy == 'median':
+                fill_value = df_copy[col].median()
+            elif strategy == 'mode':
+                fill_value = df_copy[col].mode()[0]
+            else:
+                continue
+            
+            df_copy[col].fillna(fill_value, inplace=True)
+    
+    return df_copy
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    Returns boolean and error message if validation fails.
+    """
+    if dataframe.empty:
+        return False, "DataFrame is empty"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Validation passed"
+
+def create_data_summary(dataframe):
+    """
+    Create comprehensive summary statistics for dataframe.
+    Returns dictionary with summary information.
+    """
+    summary = {
+        'shape': dataframe.shape,
+        'columns': list(dataframe.columns),
+        'dtypes': dataframe.dtypes.to_dict(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': dataframe[col].mean(),
+            'median': dataframe[col].median(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max(),
+            'skewness': dataframe[col].skew()
+        }
+    
+    categorical_cols = dataframe.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        summary['categorical_stats'][col] = {
+            'unique_values': dataframe[col].nunique(),
+            'top_value': dataframe[col].mode().iloc[0] if not dataframe[col].mode().empty else None,
+            'top_count': dataframe[col].value_counts().iloc[0] if not dataframe[col].value_counts().empty else 0
+        }
+    
+    return summary
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    # Create sample data
+    np.random.seed(42)
+    sample_data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    # Introduce some outliers and missing values
+    sample_data['feature_a'][10] = 500  # Outlier
+    sample_data['feature_b'][20] = None  # Missing value
+    
+    df = pd.DataFrame(sample_data)
+    
+    # Validate data
+    is_valid, message = validate_dataframe(df, required_columns=['feature_a', 'feature_b'])
+    print(f"Data validation: {is_valid} - {message}")
+    
+    # Handle missing values
+    df_clean = handle_missing_values(df, strategy='mean')
+    
+    # Remove outliers from numeric columns
+    numeric_cols = ['feature_a', 'feature_b']
+    df_clean, outliers = remove_outliers_iqr(df_clean, numeric_cols)
+    
+    # Normalize data
+    df_normalized = normalize_minmax(df_clean, numeric_cols)
+    
+    # Create summary
+    summary = create_data_summary(df_normalized)
+    
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {df_clean.shape}")
+    print(f"Outliers removed: {len(outliers)}")
+    print(f"Normalized data range: {df_normalized[numeric_cols].min().min():.3f} to {df_normalized[numeric_cols].max().max():.3f}")
+
+if __name__ == "__main__":
+    main()
