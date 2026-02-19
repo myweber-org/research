@@ -590,3 +590,73 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned_df.shape)
     print("Missing values after:", cleaned_df.isnull().sum().sum())
     print("Data summary:", summary)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_data(df, columns, method='minmax'):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            if method == 'minmax':
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val != min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = normalized_df[col].mean()
+                std_val = normalized_df[col].std()
+                if std_val > 0:
+                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+    return normalized_df
+
+def clean_dataset(file_path, output_path, outlier_cols=None, norm_cols=None, norm_method='minmax'):
+    try:
+        df = pd.read_csv(file_path)
+        original_shape = df.shape
+        
+        if outlier_cols:
+            df = remove_outliers_iqr(df, outlier_cols)
+        
+        if norm_cols:
+            df = normalize_data(df, norm_cols, norm_method)
+        
+        df.to_csv(output_path, index=False)
+        
+        return {
+            'original_rows': original_shape[0],
+            'cleaned_rows': df.shape[0],
+            'removed_rows': original_shape[0] - df.shape[0],
+            'output_file': output_path
+        }
+    except Exception as e:
+        print(f"Error processing dataset: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    result = clean_dataset(
+        'input_data.csv',
+        'cleaned_data.csv',
+        outlier_cols=['age', 'income', 'score'],
+        norm_cols=['age', 'income', 'score'],
+        norm_method='zscore'
+    )
+    
+    if result:
+        print(f"Data cleaning completed:")
+        print(f"Original rows: {result['original_rows']}")
+        print(f"Cleaned rows: {result['cleaned_rows']}")
+        print(f"Removed rows: {result['removed_rows']}")
+        print(f"Output saved to: {result['output_file']}")
