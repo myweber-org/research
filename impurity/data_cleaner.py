@@ -369,4 +369,11 @@ if __name__ == "__main__":
     cleaned_data = example_usage()
     print(f"\nCleaned data shape: {cleaned_data.shape}")
     print("First 5 rows of cleaned data:")
-    print(cleaned_data.head())
+    print(cleaned_data.head())def deduplicate_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
