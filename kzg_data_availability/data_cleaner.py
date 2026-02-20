@@ -598,3 +598,11 @@ def validate_data(data, required_columns=None, allow_nan=False):
         raise ValueError("Data contains NaN values")
     
     return True
+def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
