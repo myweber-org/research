@@ -115,3 +115,11 @@ if __name__ == "__main__":
     normalized = normalize_column(no_outliers, 'C', method='minmax')
     print("\nData with normalized column C:")
     print(normalized)
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
