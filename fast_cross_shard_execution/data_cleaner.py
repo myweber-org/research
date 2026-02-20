@@ -388,3 +388,94 @@ def validate_data(df, required_columns=None, allow_nan=True, max_nan_ratio=0.1):
     
     is_valid = len(issues) == 0
     return is_valid, issues
+import csv
+import hashlib
+from collections import defaultdict
+
+def generate_row_hash(row):
+    """Generate a hash for a CSV row to identify duplicates."""
+    row_string = ''.join(str(field) for field in row)
+    return hashlib.md5(row_string.encode()).hexdigest()
+
+def remove_duplicates(input_file, output_file, key_columns=None):
+    """
+    Remove duplicate rows from a CSV file.
+    
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str): Path to output CSV file
+        key_columns (list): List of column indices to consider for duplicates.
+                          If None, entire row is considered.
+    """
+    seen_hashes = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        
+        for row in reader:
+            if key_columns:
+                key_data = [row[i] for i in key_columns]
+                row_hash = generate_row_hash(key_data)
+            else:
+                row_hash = generate_row_hash(row)
+            
+            if row_hash not in seen_hashes:
+                seen_hashes.add(row_hash)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(header)
+        writer.writerows(unique_rows)
+    
+    print(f"Removed {len(seen_hashes) - len(unique_rows)} duplicate rows")
+    print(f"Original: {len(seen_hashes)} rows, Cleaned: {len(unique_rows)} rows")
+
+def find_duplicate_stats(input_file, key_columns=None):
+    """
+    Analyze duplicate patterns in CSV data.
+    
+    Returns:
+        dict: Statistics about duplicates
+    """
+    hash_counts = defaultdict(int)
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        next(reader)  # Skip header
+        
+        for row in reader:
+            if key_columns:
+                key_data = [row[i] for i in key_columns]
+                row_hash = generate_row_hash(key_data)
+            else:
+                row_hash = generate_row_hash(row)
+            
+            hash_counts[row_hash] += 1
+    
+    duplicate_hashes = {h: c for h, c in hash_counts.items() if c > 1}
+    
+    stats = {
+        'total_rows': sum(hash_counts.values()),
+        'unique_rows': len(hash_counts),
+        'duplicate_rows': sum(hash_counts.values()) - len(hash_counts),
+        'duplicate_groups': len(duplicate_hashes),
+        'max_duplicates': max(hash_counts.values()) if hash_counts else 0
+    }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    # Remove duplicates based on first 3 columns
+    remove_duplicates(input_csv, output_csv, key_columns=[0, 1, 2])
+    
+    # Get statistics
+    stats = find_duplicate_stats(input_csv, key_columns=[0, 1, 2])
+    for key, value in stats.items():
+        print(f"{key}: {value}")
