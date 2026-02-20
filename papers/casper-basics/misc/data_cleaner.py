@@ -602,3 +602,101 @@ if __name__ == "__main__":
     result = clean_dataset(sample_data, numeric_cols)
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {result.shape}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    if subset:
+        return df.drop_duplicates(subset=subset, keep='first')
+    return df.drop_duplicates(keep='first')
+
+def convert_column_types(df, column_types):
+    """
+    Convert columns to specified data types.
+    """
+    for column, dtype in column_types.items():
+        if column in df.columns:
+            df[column] = df[column].astype(dtype)
+    return df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            return df.fillna(fill_value)
+        else:
+            return df.fillna(df.mean())
+    return df
+
+def normalize_column(df, column):
+    """
+    Normalize a column to range [0, 1].
+    """
+    if column in df.columns:
+        col_min = df[column].min()
+        col_max = df[column].max()
+        if col_max != col_min:
+            df[column] = (df[column] - col_min) / (col_max - col_min)
+    return df
+
+def clean_dataframe(df, config):
+    """
+    Apply multiple cleaning operations based on configuration.
+    """
+    if 'remove_duplicates' in config:
+        df = remove_duplicates(df, config.get('remove_duplicates'))
+    
+    if 'column_types' in config:
+        df = convert_column_types(df, config['column_types'])
+    
+    if 'missing_values' in config:
+        missing_config = config['missing_values']
+        df = handle_missing_values(
+            df, 
+            strategy=missing_config.get('strategy', 'drop'),
+            fill_value=missing_config.get('fill_value')
+        )
+    
+    if 'normalize_columns' in config:
+        for column in config['normalize_columns']:
+            df = normalize_column(df, column)
+    
+    return df
+
+def validate_dataframe(df, rules):
+    """
+    Validate DataFrame against a set of rules.
+    """
+    violations = []
+    
+    for rule in rules:
+        if rule['type'] == 'not_null':
+            null_count = df[rule['column']].isnull().sum()
+            if null_count > 0:
+                violations.append(f"Column {rule['column']} has {null_count} null values")
+        
+        elif rule['type'] == 'unique':
+            duplicate_count = df[rule['column']].duplicated().sum()
+            if duplicate_count > 0:
+                violations.append(f"Column {rule['column']} has {duplicate_count} duplicate values")
+        
+        elif rule['type'] == 'range':
+            min_val = rule.get('min')
+            max_val = rule.get('max')
+            if min_val is not None:
+                below_min = (df[rule['column']] < min_val).sum()
+                if below_min > 0:
+                    violations.append(f"Column {rule['column']} has {below_min} values below {min_val}")
+            if max_val is not None:
+                above_max = (df[rule['column']] > max_val).sum()
+                if above_max > 0:
+                    violations.append(f"Column {rule['column']} has {above_max} values above {max_val}")
+    
+    return violations
