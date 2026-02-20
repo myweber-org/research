@@ -770,3 +770,44 @@ def generate_sample_data():
         'feature_c': np.random.uniform(0, 200, 100)
     }
     return pd.DataFrame(data)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+def validate_data(df, required_columns):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': range(100),
+        'value': np.random.randn(100) * 10 + 50
+    })
+    sample_data.loc[95, 'value'] = 200
+    sample_data.loc[96, 'value'] = -100
+    
+    print("Original data shape:", sample_data.shape)
+    print("Data summary:")
+    print(sample_data['value'].describe())
+    
+    cleaned_data = clean_dataset(sample_data, ['value'])
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned data summary:")
+    print(cleaned_data['value'].describe())
