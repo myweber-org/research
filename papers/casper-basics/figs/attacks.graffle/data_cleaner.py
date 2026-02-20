@@ -121,3 +121,163 @@ if __name__ == "__main__":
     print(result.head())
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {result.shape}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, factor=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def zscore_normalize(dataframe, column):
+    """
+    Normalize column using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val > 0:
+        dataframe[column + '_normalized'] = (dataframe[column] - mean_val) / std_val
+    else:
+        dataframe[column + '_normalized'] = 0
+    
+    return dataframe
+
+def minmax_normalize(dataframe, column, feature_range=(0, 1)):
+    """
+    Normalize column using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+        feature_range: Desired range of transformed data
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val > min_val:
+        a, b = feature_range
+        dataframe[column + '_scaled'] = a + ((dataframe[column] - min_val) * (b - a)) / (max_val - min_val)
+    else:
+        dataframe[column + '_scaled'] = a
+    
+    return dataframe
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: Absolute skewness threshold
+    
+    Returns:
+        Dictionary of skewed columns and their skewness values
+    """
+    skewed_cols = {}
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
+    
+    return skewed_cols
+
+def log_transform(dataframe, column):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to transform
+    
+    Returns:
+        DataFrame with transformed column
+    """
+    if dataframe[column].min() <= 0:
+        offset = abs(dataframe[column].min()) + 1
+        dataframe[column + '_log'] = np.log(dataframe[column] + offset)
+    else:
+        dataframe[column + '_log'] = np.log(dataframe[column])
+    
+    return dataframe
+
+def clean_dataset(dataframe, numeric_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame
+        numeric_columns: List of numeric columns to process
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = zscore_normalize(cleaned_df, col)
+    
+    return cleaned_df
+
+def calculate_statistics(dataframe):
+    """
+    Calculate comprehensive statistics for numeric columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+    
+    Returns:
+        DataFrame with statistics
+    """
+    stats_df = pd.DataFrame()
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        col_stats = {
+            'mean': dataframe[col].mean(),
+            'median': dataframe[col].median(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max(),
+            'skewness': dataframe[col].skew(),
+            'kurtosis': dataframe[col].kurtosis(),
+            'missing': dataframe[col].isnull().sum()
+        }
+        stats_df[col] = pd.Series(col_stats)
+    
+    return stats_df
