@@ -889,3 +889,83 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    df_cleaned = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(df_cleaned)
+        df_cleaned = df_cleaned.drop_duplicates()
+        removed = initial_rows - len(df_cleaned)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df_cleaned[col].isnull().any():
+                median_val = df_cleaned[col].median()
+                df_cleaned[col] = df_cleaned[col].fillna(median_val)
+                print(f"Filled missing values in column '{col}' with median: {median_val}")
+        
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df_cleaned[col].isnull().any():
+                mode_val = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+                df_cleaned[col] = df_cleaned[col].fillna(mode_val)
+                print(f"Filled missing values in column '{col}' with mode: {mode_val}")
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame for common issues.
+    """
+    issues = []
+    
+    if df.empty:
+        issues.append("DataFrame is empty.")
+    
+    duplicate_rows = df.duplicated().sum()
+    if duplicate_rows > 0:
+        issues.append(f"Found {duplicate_rows} duplicate rows.")
+    
+    missing_values = df.isnull().sum().sum()
+    if missing_values > 0:
+        issues.append(f"Found {missing_values} missing values.")
+    
+    if issues:
+        print("Data validation issues found:")
+        for issue in issues:
+            print(f"  - {issue}")
+        return False
+    else:
+        print("Data validation passed.")
+        return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 90.0, 90.0, 78.5, None, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    validate_dataframe(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    validate_dataframe(cleaned_df)
