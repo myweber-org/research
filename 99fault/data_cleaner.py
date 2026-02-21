@@ -716,4 +716,70 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary statistics after cleaning:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+import re
+
+def clean_dataframe(df, text_columns=None, drop_duplicates=True, lowercase=True, remove_special=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        text_columns: list of column names to apply text cleaning to
+        drop_duplicates: whether to remove duplicate rows
+        lowercase: whether to convert text to lowercase
+        remove_special: whether to remove special characters from text
+        
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str)
+                
+                if lowercase:
+                    df_clean[col] = df_clean[col].str.lower()
+                
+                if remove_special:
+                    df_clean[col] = df_clean[col].apply(lambda x: re.sub(r'[^a-zA-Z0-9\s]', '', x))
+                
+                df_clean[col] = df_clean[col].str.strip()
+    
+    return df_clean
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    
+    Args:
+        email: string to validate as email
+        
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def split_name(full_name):
+    """
+    Split full name into first and last name.
+    
+    Args:
+        full_name: string containing full name
+        
+    Returns:
+        Tuple of (first_name, last_name)
+    """
+    parts = str(full_name).strip().split()
+    if len(parts) >= 2:
+        return parts[0], ' '.join(parts[1:])
+    elif len(parts) == 1:
+        return parts[0], ''
+    else:
+        return '', ''
