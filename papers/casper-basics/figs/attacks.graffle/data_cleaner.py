@@ -281,3 +281,11 @@ def calculate_statistics(dataframe):
         stats_df[col] = pd.Series(col_stats)
     
     return stats_df
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
