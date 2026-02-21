@@ -266,3 +266,95 @@ def clean_data(input_file, output_file):
 
 if __name__ == "__main__":
     clean_data("raw_data.csv", "cleaned_data.csv")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, standardize_columns=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to remove duplicate rows
+    standardize_columns (bool): Whether to standardize column names
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if standardize_columns:
+        original_columns = cleaned_df.columns.tolist()
+        cleaned_df.columns = [col.strip().lower().replace(' ', '_') for col in cleaned_df.columns]
+        print(f"Standardized column names")
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame for basic data quality checks.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Dictionary with validation results
+    """
+    
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        validation_results['numeric_columns_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return validation_results
+
+def sample_usage():
+    """
+    Demonstrate usage of the data cleaning functions.
+    """
+    
+    sample_data = {
+        'Customer ID': [1, 2, 2, 3, 4],
+        'First Name': ['John', 'Jane', 'Jane', 'Bob', 'Alice'],
+        'Last Name': ['Doe', 'Smith', 'Smith', 'Johnson', 'Brown'],
+        'Age': [25, 30, 30, 35, 28],
+        'Email': ['john@example.com', 'jane@example.com', 'jane@example.com', 'bob@example.com', 'alice@example.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_data(cleaned_df, required_columns=['customer_id', 'email'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+
+if __name__ == "__main__":
+    sample_usage()
