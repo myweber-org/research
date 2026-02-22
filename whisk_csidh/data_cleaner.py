@@ -457,4 +457,47 @@ def calculate_summary_statistics(data, column):
         'min': data[column].min(),
         'max': data[column].max()
     }
-    return stats
+    return statsimport re
+import string
+
+def clean_text(text):
+    """
+    Clean and normalize a given text string.
+    """
+    if not isinstance(text, str):
+        return ""
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove URLs
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    
+    # Remove user mentions and hash tags
+    text = re.sub(r'@\w+|#\w+', '', text)
+    
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
+
+def tokenize_text(text):
+    """
+    Tokenize the cleaned text into words.
+    """
+    cleaned = clean_text(text)
+    tokens = cleaned.split()
+    return tokens
+
+def remove_stopwords(tokens, stopwords=None):
+    """
+    Remove stopwords from a list of tokens.
+    """
+    if stopwords is None:
+        stopwords = set(['a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'])
+    
+    filtered_tokens = [token for token in tokens if token not in stopwords]
+    return filtered_tokens
