@@ -1,7 +1,8 @@
-def remove_duplicates(seq):
+
+def remove_duplicates_preserve_order(sequence):
     seen = set()
     result = []
-    for item in seq:
+    for item in sequence:
         if item not in seen:
             seen.add(item)
             result.append(item)
