@@ -782,4 +782,163 @@ def split_name(full_name):
     elif len(parts) == 1:
         return parts[0], ''
     else:
-        return '', ''
+        return '', ''import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Args:
+        df: pandas DataFrame containing data with potential missing values
+        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop', 'fill')
+        columns: List of column names to apply cleaning to (None for all columns)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().any():
+            if strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+            elif strategy == 'mean' and pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+            elif strategy == 'mode':
+                mode_value = df_clean[col].mode()
+                if not mode_value.empty:
+                    df_clean[col] = df_clean[col].fillna(mode_value.iloc[0])
+            elif strategy == 'fill':
+                df_clean[col] = df_clean[col].fillna(method='ffill').fillna(method='bfill')
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of column names to check for outliers
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df_clean.columns and pd.api.types.is_numeric_dtype(df_clean[col]):
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of column names to standardize
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df_standardized.columns and pd.api.types.is_numeric_dtype(df_standardized[col]):
+            mean = df_standardized[col].mean()
+            std = df_standardized[col].std()
+            if std > 0:
+                df_standardized[col] = (df_standardized[col] - mean) / std
+    
+    return df_standardized
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of required column names
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def process_csv_file(file_path, cleaning_strategy='mean', remove_outliers=True):
+    """
+    Complete pipeline for processing a CSV file.
+    
+    Args:
+        file_path: Path to CSV file
+        cleaning_strategy: Strategy for handling missing values
+        remove_outliers: Whether to remove outliers using IQR method
+    
+    Returns:
+        Cleaned and processed DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        is_valid, message = validate_dataframe(df)
+        if not is_valid:
+            raise ValueError(f"Data validation failed: {message}")
+        
+        df_clean = clean_missing_data(df, strategy=cleaning_strategy)
+        
+        if remove_outliers:
+            numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) > 0:
+                df_clean = remove_outliers_iqr(df_clean, columns=numeric_cols)
+        
+        return df_clean
+    
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    except pd.errors.EmptyDataError:
+        raise ValueError("CSV file is empty")
+    except pd.errors.ParserError:
+        raise ValueError("Error parsing CSV file")
