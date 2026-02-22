@@ -296,3 +296,11 @@ class DataCleaner:
     
     def get_removed_count(self):
         return self.original_shape[0] - self.df.shape[0]
+def remove_duplicates_preserve_order(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
