@@ -738,3 +738,108 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class CSVDataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        self.cleaning_report = {}
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            self.cleaning_report['original_rows'] = len(self.df)
+            self.cleaning_report['original_columns'] = len(self.df.columns)
+            return True
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def handle_missing_values(self, strategy='mean', custom_fill=None):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        missing_before = self.df.isnull().sum().sum()
+        self.cleaning_report['missing_before'] = missing_before
+        
+        if strategy == 'drop':
+            self.df = self.df.dropna()
+        elif strategy == 'mean':
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'custom' and custom_fill is not None:
+            self.df = self.df.fillna(custom_fill)
+        
+        missing_after = self.df.isnull().sum().sum()
+        self.cleaning_report['missing_after'] = missing_after
+        self.cleaning_report['missing_strategy'] = strategy
+    
+    def remove_duplicates(self):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        duplicates_before = self.df.duplicated().sum()
+        self.df = self.df.drop_duplicates()
+        duplicates_after = self.df.duplicated().sum()
+        
+        self.cleaning_report['duplicates_removed'] = duplicates_before
+        self.cleaning_report['remaining_duplicates'] = duplicates_after
+    
+    def normalize_numeric(self, columns=None):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        if columns is None:
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        else:
+            numeric_cols = [col for col in columns if col in self.df.columns]
+        
+        for col in numeric_cols:
+            if self.df[col].std() != 0:
+                self.df[col] = (self.df[col] - self.df[col].mean()) / self.df[col].std()
+        
+        self.cleaning_report['normalized_columns'] = list(numeric_cols)
+    
+    def save_cleaned(self, output_path=None):
+        if self.df is None:
+            print("No data to save. Perform cleaning operations first.")
+            return
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        self.df.to_csv(output_path, index=False)
+        self.cleaning_report['output_path'] = str(output_path)
+        return output_path
+    
+    def get_report(self):
+        if self.cleaning_report:
+            self.cleaning_report['final_rows'] = len(self.df)
+            self.cleaning_report['final_columns'] = len(self.df.columns)
+        return self.cleaning_report
+
+def clean_csv_file(input_file, output_file=None, missing_strategy='mean'):
+    cleaner = CSVDataCleaner(input_file)
+    
+    if not cleaner.load_data():
+        return None
+    
+    cleaner.handle_missing_values(strategy=missing_strategy)
+    cleaner.remove_duplicates()
+    
+    if output_file:
+        result_path = cleaner.save_cleaned(output_file)
+    else:
+        result_path = cleaner.save_cleaned()
+    
+    report = cleaner.get_report()
+    return result_path, report
