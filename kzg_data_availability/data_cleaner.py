@@ -727,3 +727,11 @@ if __name__ == "__main__":
     
     cleaned_data = cleaner.get_cleaned_data()
     print(f"\nFirst 5 rows of cleaned data:\n{cleaned_data.head()}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
