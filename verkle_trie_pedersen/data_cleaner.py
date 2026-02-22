@@ -160,3 +160,11 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
