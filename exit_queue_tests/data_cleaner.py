@@ -142,3 +142,137 @@ def main():
 
 if __name__ == "__main__":
     main()
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(data, numeric_columns=None):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names to process
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            # Remove outliers
+            cleaned_data = remove_outliers_iqr(cleaned_data, col)
+            # Standardize the column
+            cleaned_data[col] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data.reset_index(drop=True)
+
+def validate_data(data, required_columns, numeric_threshold=0.8):
+    """
+    Validate data structure and quality.
+    
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+        numeric_threshold: minimum proportion of numeric values in numeric columns
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'has_required_columns': True,
+        'missing_columns': [],
+        'null_percentages': {},
+        'numeric_quality': {}
+    }
+    
+    # Check required columns
+    for col in required_columns:
+        if col not in data.columns:
+            validation_results['has_required_columns'] = False
+            validation_results['missing_columns'].append(col)
+    
+    # Calculate null percentages
+    for col in data.columns:
+        null_count = data[col].isnull().sum()
+        null_percentage = null_count / len(data)
+        validation_results['null_percentages'][col] = null_percentage
+    
+    # Check numeric columns quality
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        numeric_count = data[col].notnull().sum()
+        numeric_percentage = numeric_count / len(data)
+        validation_results['numeric_quality'][col] = numeric_percentage >= numeric_threshold
+    
+    return validation_results
