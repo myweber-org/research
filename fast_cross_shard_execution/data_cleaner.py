@@ -685,3 +685,88 @@ def validate_dataframe(data, required_columns=None):
             raise ValueError(f"Missing required columns: {missing_cols}")
     
     return True
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (bool): Whether to fill missing values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        
+        categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+        cleaned_df[categorical_cols] = cleaned_df[categorical_cols].fillna('Unknown')
+        
+        print(f"Filled missing values in {len(numeric_cols)} numeric columns and {len(categorical_cols)} categorical columns")
+    
+    return cleaned_df
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame for common data quality issues.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    
+    Returns:
+    dict: Dictionary containing validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': len(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Path to save the cleaned data
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, 35, None, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, None]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nValidation results:")
+    print(validate_dataframe(sample_data))
+    
+    cleaned = clean_dataframe(sample_data)
+    print("\nCleaned data:")
+    print(cleaned)
+    print("\nValidation results after cleaning:")
+    print(validate_dataframe(cleaned))
