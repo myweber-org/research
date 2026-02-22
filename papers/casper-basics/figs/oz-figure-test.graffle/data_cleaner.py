@@ -1139,3 +1139,7 @@ if __name__ == "__main__":
     print(cleaned_df.isnull().sum())
     print("\nCleaning summary:")
     print(cleaner.get_summary())
+def remove_duplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
