@@ -764,3 +764,42 @@ def validate_email_column(df, email_column):
     )
     
     return df
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_data(values):
+    """
+    Clean a list of numeric strings by converting to float,
+    removing NaN values, and returning cleaned list.
+    """
+    cleaned = []
+    for val in values:
+        try:
+            num = float(val)
+            if not math.isnan(num):
+                cleaned.append(num)
+        except (ValueError, TypeError):
+            continue
+    return cleaned
+
+if __name__ == "__main__":
+    import math
+    
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    print("Original:", sample_data)
+    print("Cleaned:", remove_duplicates(sample_data))
+    
+    numeric_strings = ["1.5", "2.3", "invalid", "4.7", "NaN", "3.2"]
+    print("Numeric strings:", numeric_strings)
+    print("Cleaned numeric:", clean_numeric_data(numeric_strings))
