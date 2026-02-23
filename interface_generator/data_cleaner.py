@@ -969,3 +969,84 @@ if __name__ == "__main__":
     print("\n" + "="*50 + "\n")
     
     validate_dataframe(cleaned_df)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing text columns to lowercase.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names containing text data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove rows with any null values
+    cleaned_df = cleaned_df.dropna()
+    
+    # Standardize text columns if specified
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_columns
+        validation_results['all_columns_present'] = len(missing_columns) == 0
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', None, 'Bob Johnson', 'alice brown'],
+        'age': [25, 30, 35, None, 28],
+        'email': ['JOHN@example.com', 'jane@test.com', 'bob@demo.com', None, 'ALICE@sample.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df, text_columns=['name', 'email'])
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate the cleaned dataset
+    validation = validate_dataset(cleaned, required_columns=['name', 'age', 'email'])
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
