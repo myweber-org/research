@@ -91,3 +91,121 @@ if __name__ == "__main__":
     
     stats = calculate_basic_stats(cleaned_data, 'values')
     print("Statistics after cleaning:", stats)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_na_threshold=0.5):
+    """
+    Clean a dataset by handling missing values, removing duplicates,
+    and standardizing column names.
+    """
+    # Create a copy to avoid modifying the original
+    df_clean = df.copy()
+    
+    # Standardize column names if mapping is provided
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    # Convert column names to lowercase and replace spaces with underscores
+    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    initial_rows = len(df_clean)
+    df_clean = df_clean.drop_duplicates()
+    duplicates_removed = initial_rows - len(df_clean)
+    
+    # Calculate missing value percentage for each column
+    missing_percentage = df_clean.isnull().sum() / len(df_clean)
+    
+    # Drop columns with too many missing values
+    columns_to_drop = missing_percentage[missing_percentage > drop_na_threshold].index
+    df_clean = df_clean.drop(columns=columns_to_drop)
+    
+    # Fill missing values for numeric columns with median
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # Fill missing values for categorical columns with mode
+    categorical_cols = df_clean.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_clean[col].isnull().any():
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0])
+    
+    # Remove outliers using IQR method for numeric columns
+    for col in numeric_cols:
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers instead of removing them
+            df_clean[col] = np.where(df_clean[col] < lower_bound, lower_bound, df_clean[col])
+            df_clean[col] = np.where(df_clean[col] > upper_bound, upper_bound, df_clean[col])
+    
+    # Generate cleaning report
+    report = {
+        'original_rows': len(df),
+        'cleaned_rows': len(df_clean),
+        'duplicates_removed': duplicates_removed,
+        'columns_dropped': list(columns_to_drop),
+        'columns_remaining': list(df_clean.columns),
+        'missing_values_before': df.isnull().sum().sum(),
+        'missing_values_after': df_clean.isnull().sum().sum()
+    }
+    
+    return df_clean, report
+
+def validate_dataframe(df, required_columns=None, min_rows=10):
+    """
+    Validate that a dataframe meets basic requirements.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'ID': [1, 2, 3, 4, 5, 5, 6, 7, 8, 9],
+        'Name': ['Alice', 'Bob', 'Charlie', None, 'Eve', 'Eve', 'Frank', 'Grace', None, 'Ivy'],
+        'Age': [25, 30, 35, 40, 45, 45, 50, 55, 60, 200],
+        'Salary': [50000, 60000, None, 80000, 90000, 90000, 100000, 110000, 120000, 130000],
+        'Department': ['HR', 'IT', 'IT', 'Finance', 'Finance', 'Finance', 'HR', 'IT', None, 'IT']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df, report = clean_dataset(df)
+    
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    print("Cleaning Report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
+    
+    # Validate the cleaned data
+    try:
+        validate_dataframe(cleaned_df, min_rows=5)
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
