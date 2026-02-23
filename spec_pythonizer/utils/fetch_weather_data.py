@@ -81,4 +81,31 @@ def main():
         fetcher.save_to_json(all_weather_data, "multi_city_weather.json")
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+import json
+
+def get_weather(city_name, api_key):
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
+    complete_url = f"{base_url}appid={api_key}&q={city_name}&units=metric"
+    response = requests.get(complete_url)
+    data = response.json()
+    
+    if data["cod"] != "404":
+        main = data["main"]
+        weather_desc = data["weather"][0]["description"]
+        temperature = main["temp"]
+        pressure = main["pressure"]
+        humidity = main["humidity"]
+        
+        print(f"Weather in {city_name}:")
+        print(f"Description: {weather_desc}")
+        print(f"Temperature: {temperature}°C")
+        print(f"Pressure: {pressure} hPa")
+        print(f"Humidity: {humidity}%")
+    else:
+        print("City not found.")
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    city = input("Enter city name: ")
+    get_weather(city, API_KEY)
