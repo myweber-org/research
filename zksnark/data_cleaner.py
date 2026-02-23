@@ -216,3 +216,57 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned)
     print(f"\nValidation: {message}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specific column in a DataFrame by removing duplicates,
+    stripping whitespace, and converting to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df = df.drop_duplicates(subset=[column_name], keep='first')
+    df[column_name] = df[column_name].astype(str).str.strip().str.lower()
+    df = df.reset_index(drop=True)
+    
+    return df
+
+def remove_special_characters(df, column_name):
+    """
+    Remove special characters and digits from a string column.
+    """
+    df[column_name] = df[column_name].apply(
+        lambda x: re.sub(r'[^a-zA-Z\s]', '', x)
+    )
+    return df
+
+def normalize_whitespace(df, column_name):
+    """
+    Normalize whitespace in a string column, replacing multiple spaces with a single space.
+    """
+    df[column_name] = df[column_name].apply(
+        lambda x: re.sub(r'\s+', ' ', x).strip()
+    )
+    return df
+
+def main():
+    sample_data = {
+        'name': ['  John Doe  ', 'Jane Smith', 'John Doe', 'ALICE', '  Bob   Fisher  '],
+        'email': ['john@example.com', 'jane@example.com', 'john@example.com', 'alice@example.com', 'bob@example.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    df = clean_dataframe(df, 'name')
+    df = remove_special_characters(df, 'name')
+    df = normalize_whitespace(df, 'name')
+    
+    print("\nCleaned DataFrame:")
+    print(df)
+
+if __name__ == "__main__":
+    main()
