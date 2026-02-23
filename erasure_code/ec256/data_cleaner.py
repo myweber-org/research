@@ -280,3 +280,11 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv')
     cleaned_data.to_csv('cleaned_data.csv', index=False)
     print("Data cleaning completed. Saved to cleaned_data.csv")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
