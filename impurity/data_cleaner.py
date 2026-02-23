@@ -113,3 +113,137 @@ if __name__ == "__main__":
     save_cleaned_data(cleaned_df, output_file)
     
     print(f"Data cleaning completed. Original rows: {len(raw_df)}, Cleaned rows: {len(cleaned_df)}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: multiplier for IQR (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling to range [0, 1].
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        data[f'{column}_normalized'] = 0.5
+    else:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    return data
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        data[f'{column}_standardized'] = 0
+    else:
+        data[f'{column}_standardized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of columns to process (None for all numeric columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    data_processed = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if strategy == 'drop':
+            data_processed = data_processed.dropna(subset=[col])
+        elif strategy == 'mean':
+            data_processed[col].fillna(data_processed[col].mean(), inplace=True)
+        elif strategy == 'median':
+            data_processed[col].fillna(data_processed[col].median(), inplace=True)
+        elif strategy == 'mode':
+            data_processed[col].fillna(data_processed[col].mode()[0], inplace=True)
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return data_processed
+
+def create_data_summary(data):
+    """
+    Create a summary statistics DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+    
+    Returns:
+        DataFrame with summary statistics
+    """
+    summary = pd.DataFrame({
+        'count': data.count(),
+        'mean': data.mean(numeric_only=True),
+        'std': data.std(numeric_only=True),
+        'min': data.min(numeric_only=True),
+        '25%': data.quantile(0.25, numeric_only=True),
+        '50%': data.quantile(0.5, numeric_only=True),
+        '75%': data.quantile(0.75, numeric_only=True),
+        'max': data.max(numeric_only=True),
+        'missing': data.isnull().sum(),
+        'unique': data.nunique()
+    })
+    
+    return summary
