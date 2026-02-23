@@ -161,3 +161,48 @@ def get_data_summary(data):
         }
     
     return summary
+import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file=None, subset=None):
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        
+        if subset:
+            df_cleaned = df.drop_duplicates(subset=subset)
+        else:
+            df_cleaned = df.drop_duplicates()
+        
+        removed_count = initial_count - len(df_cleaned)
+        
+        if output_file is None:
+            output_file = input_file.replace('.csv', '_cleaned.csv')
+        
+        df_cleaned.to_csv(output_file, index=False)
+        
+        print(f"Processed: {input_file}")
+        print(f"Initial rows: {initial_count}")
+        print(f"Removed duplicates: {removed_count}")
+        print(f"Final rows: {len(df_cleaned)}")
+        print(f"Saved to: {output_file}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python data_cleaner.py <input_file> [output_file] [subset_columns]")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    subset = sys.argv[3].split(',') if len(sys.argv) > 3 else None
+    
+    remove_duplicates(input_file, output_file, subset)
