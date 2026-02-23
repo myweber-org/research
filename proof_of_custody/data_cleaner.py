@@ -211,3 +211,102 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, fill_na=True):
+    """
+    Clean a pandas DataFrame by standardizing columns, removing duplicates,
+    and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_na:
+        for col in cleaned_df.select_dtypes(include=[np.number]).columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].fillna('Unknown')
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def standardize_string_columns(df, columns):
+    """
+    Standardize string columns by converting to lowercase and stripping whitespace.
+    """
+    df_copy = df.copy()
+    
+    for col in columns:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col].astype(str).str.lower().str.strip()
+    
+    return df_copy
+
+def validate_dataframe(df, required_columns=None, unique_columns=None):
+    """
+    Validate DataFrame structure and constraints.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if unique_columns:
+        for col in unique_columns:
+            if col in df.columns:
+                if df[col].duplicated().any():
+                    raise ValueError(f"Column '{col}' contains duplicate values")
+    
+    return True
+
+def process_data_file(file_path, output_path=None, **clean_kwargs):
+    """
+    Load, clean, and optionally save a data file.
+    """
+    if file_path.endswith('.csv'):
+        df = pd.read_csv(file_path)
+    elif file_path.endswith('.xlsx'):
+        df = pd.read_excel(file_path)
+    else:
+        raise ValueError("Unsupported file format. Use .csv or .xlsx")
+    
+    cleaned_df = clean_dataframe(df, **clean_kwargs)
+    
+    if output_path:
+        if output_path.endswith('.csv'):
+            cleaned_df.to_csv(output_path, index=False)
+        elif output_path.endswith('.xlsx'):
+            cleaned_df.to_excel(output_path, index=False)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, np.nan],
+        'City': ['New York', 'Los Angeles', 'new york', 'Chicago', 'Boston']
+    })
+    
+    print("Original Data:")
+    print(sample_data)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(sample_data)
+    cleaned = standardize_string_columns(cleaned, ['City'])
+    
+    print("Cleaned Data:")
+    print(cleaned)
+    
+    try:
+        validate_dataframe(cleaned, required_columns=['Name', 'Age'])
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
