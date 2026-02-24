@@ -142,3 +142,11 @@ def validate_data(data, required_columns, numeric_ranges=None):
                     print(f"Warning: Column '{column}' has values outside range [{min_val}, {max_val}]")
     
     return True
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
