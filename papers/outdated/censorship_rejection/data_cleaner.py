@@ -811,3 +811,78 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned_data.shape)
     print("Cleaned data summary:")
     print(cleaned_data['value'].describe())
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file"""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    """Remove outliers using IQR method"""
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns, method='minmax'):
+    """Normalize data using specified method"""
+    df_norm = df.copy()
+    for col in columns:
+        if method == 'minmax':
+            df_norm[col] = (df_norm[col] - df_norm[col].min()) / (df_norm[col].max() - df_norm[col].min())
+        elif method == 'zscore':
+            df_norm[col] = (df_norm[col] - df_norm[col].mean()) / df_norm[col].std()
+    return df_norm
+
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values with specified strategy"""
+    df_filled = df.copy()
+    numeric_cols = df_filled.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+    
+    return df_filled
+
+def clean_dataset(filepath, numeric_columns, outlier_removal=True, normalization=True, missing_strategy='mean'):
+    """Main function to clean dataset"""
+    df = load_dataset(filepath)
+    
+    if outlier_removal:
+        df = remove_outliers_iqr(df, numeric_columns)
+    
+    if missing_strategy:
+        df = handle_missing_values(df, strategy=missing_strategy)
+    
+    if normalization:
+        df = normalize_data(df, numeric_columns, method='minmax')
+    
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_data = clean_dataset(
+        'sample_data.csv',
+        numeric_columns=['age', 'income', 'score'],
+        outlier_removal=True,
+        normalization=True,
+        missing_strategy='mean'
+    )
+    
+    print(f"Dataset shape: {cleaned_data.shape}")
+    print(f"Columns: {list(cleaned_data.columns)}")
+    cleaned_data.to_csv('cleaned_data.csv', index=False)
