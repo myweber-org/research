@@ -266,3 +266,137 @@ def validate_data(df, required_columns):
     if missing_columns:
         raise ValueError(f"Missing required columns: {missing_columns}")
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using Interquartile Range method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_factor=1.5):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    stats_report = {}
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            # Remove outliers
+            cleaned_df, outliers_removed = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+            stats_report[col] = {
+                'outliers_removed': outliers_removed,
+                'original_mean': df[col].mean(),
+                'cleaned_mean': cleaned_df[col].mean(),
+                'original_std': df[col].std(),
+                'cleaned_std': cleaned_df[col].std()
+            }
+    
+    return cleaned_df, stats_report
+
+def validate_data(df, required_columns=None, allow_nan=False):
+    """
+    Validate dataset structure and content
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['is_valid'] = False
+            validation_results['missing_columns'] = missing
+    
+    for col in df.columns:
+        null_count = df[col].isnull().sum()
+        validation_results['null_counts'][col] = null_count
+        validation_results['data_types'][col] = str(df[col].dtype)
+        
+        if not allow_nan and null_count > 0:
+            validation_results['is_valid'] = False
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    # Add some outliers
+    sample_data.loc[10, 'feature_a'] = 500
+    sample_data.loc[20, 'feature_b'] = 1000
+    
+    print("Original dataset shape:", sample_data.shape)
+    
+    # Clean the data
+    cleaned_data, report = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print("Cleaned dataset shape:", cleaned_data.shape)
+    
+    # Validate the cleaned data
+    validation = validate_data(cleaned_data)
+    print("Validation results:", validation['is_valid'])
+    
+    # Normalize a column
+    normalized_feature = normalize_minmax(cleaned_data, 'feature_a')
+    print("Normalized feature statistics:")
+    print(f"  Min: {normalized_feature.min():.3f}")
+    print(f"  Max: {normalized_feature.max():.3f}")
+    print(f"  Mean: {normalized_feature.mean():.3f}")
