@@ -355,4 +355,34 @@ def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', missing
             elif normalize_method == 'zscore':
                 cleaned_data[col] = normalize_zscore(cleaned_data, col)
     
-    return cleaned_data
+    return cleaned_datadef remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(data_list):
+    """
+    Convert string representations of numbers to integers where possible.
+    Non-convertible items remain unchanged.
+    """
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    return cleaned
+
+def filter_by_type(data_list, data_type):
+    """
+    Filter list to include only items of specified type.
+    """
+    return [item for item in data_list if isinstance(item, data_type)]
