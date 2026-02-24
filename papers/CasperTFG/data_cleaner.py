@@ -427,3 +427,27 @@ if __name__ == "__main__":
     input_csv = sys.argv[1]
     output_csv = sys.argv[2] if len(sys.argv) > 2 else None
     remove_duplicates(input_csv, output_csv)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_data(filepath):
+    return pd.read_csv(filepath)
+
+def remove_outliers(df, column, threshold=3):
+    z_scores = np.abs(stats.zscore(df[column]))
+    return df[z_scores < threshold]
+
+def normalize_column(df, column):
+    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
+    return df
+
+def clean_data(input_file, output_file, column_to_clean):
+    df = load_data(input_file)
+    df_clean = remove_outliers(df, column_to_clean)
+    df_normalized = normalize_column(df_clean, column_to_clean)
+    df_normalized.to_csv(output_file, index=False)
+    return df_normalized
+
+if __name__ == "__main__":
+    cleaned_df = clean_data('raw_data.csv', 'cleaned_data.csv', 'value_column')
