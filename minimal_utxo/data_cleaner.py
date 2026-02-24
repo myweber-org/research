@@ -371,3 +371,103 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     clean_dataset(input_file, output_file)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column]
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column]
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_method='zscore', normalize=False):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        # Handle missing values
+        cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        
+        # Remove outliers
+        if outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        elif outlier_method == 'iqr':
+            outliers = detect_outliers_iqr(cleaned_df, col)
+            cleaned_df = cleaned_df[~cleaned_df.index.isin(outliers.index)]
+        
+        # Normalize if requested
+        if normalize:
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[f'{col}_standardized'] = standardize_data(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns, min_rows=10):
+    """
+    Validate dataset structure and content
+    """
+    validation_results = {
+        'has_required_columns': all(col in df.columns for col in required_columns),
+        'row_count': len(df),
+        'has_sufficient_rows': len(df) >= min_rows,
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist()
+    }
+    return validation_results
+
+def export_cleaned_data(df, output_path, format='csv'):
+    """
+    Export cleaned data to file
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    return True
