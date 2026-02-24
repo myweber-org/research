@@ -96,4 +96,49 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error: {e}")
         print("Please ensure you have a valid OpenWeatherMap API key")
-        print("Set it as environment variable: export OPENWEATHER_API_KEY='your_key'")
+        print("Set it as environment variable: export OPENWEATHER_API_KEY='your_key'")import requests
+import json
+import os
+
+def get_weather(city_name, api_key):
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
+    complete_url = f"{base_url}q={city_name}&appid={api_key}&units=metric"
+    
+    response = requests.get(complete_url)
+    data = response.json()
+    
+    if data["cod"] != "404":
+        main = data["main"]
+        weather_desc = data["weather"][0]["description"]
+        temperature = main["temp"]
+        humidity = main["humidity"]
+        
+        result = {
+            "city": city_name,
+            "temperature": temperature,
+            "humidity": humidity,
+            "description": weather_desc
+        }
+        return result
+    else:
+        return {"error": "City not found"}
+
+def main():
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+    if not api_key:
+        print("Error: OPENWEATHER_API_KEY environment variable not set.")
+        return
+    
+    city = input("Enter city name: ")
+    weather_info = get_weather(city, api_key)
+    
+    if "error" in weather_info:
+        print(f"Error: {weather_info['error']}")
+    else:
+        print(f"Weather in {weather_info['city']}:")
+        print(f"  Temperature: {weather_info['temperature']}°C")
+        print(f"  Humidity: {weather_info['humidity']}%")
+        print(f"  Description: {weather_info['description']}")
+
+if __name__ == "__main__":
+    main()
