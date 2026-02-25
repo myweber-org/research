@@ -1146,3 +1146,93 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, ['A', 'B'])
     print("\nCleaned DataFrame:")
     print(cleaned)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data (np.ndarray): Input data array
+        column (int): Index of column to clean
+    
+    Returns:
+        np.ndarray: Data with outliers removed
+    """
+    if data.size == 0:
+        return data
+    
+    column_data = data[:, column]
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    return data[mask]
+
+def clean_dataset(data, columns_to_clean=None):
+    """
+    Clean multiple columns in a dataset by removing outliers.
+    
+    Args:
+        data (np.ndarray): Input dataset
+        columns_to_clean (list): List of column indices to clean
+    
+    Returns:
+        np.ndarray: Cleaned dataset
+    """
+    if columns_to_clean is None:
+        columns_to_clean = list(range(data.shape[1]))
+    
+    cleaned_data = data.copy()
+    for column in columns_to_clean:
+        if column < data.shape[1]:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+    
+    return cleaned_data
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Args:
+        data (np.ndarray): Input data
+    
+    Returns:
+        dict: Dictionary containing mean, median, std, min, max
+    """
+    if data.size == 0:
+        return {}
+    
+    stats = {
+        'mean': np.mean(data, axis=0),
+        'median': np.median(data, axis=0),
+        'std': np.std(data, axis=0),
+        'min': np.min(data, axis=0),
+        'max': np.max(data, axis=0)
+    }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = np.random.randn(100, 3)
+    sample_data[0, 0] = 10  # Add an outlier
+    
+    print("Original data shape:", sample_data.shape)
+    print("First few rows of original data:")
+    print(sample_data[:5])
+    
+    cleaned = clean_dataset(sample_data, columns_to_clean=[0])
+    print("\nCleaned data shape:", cleaned.shape)
+    print("First few rows of cleaned data:")
+    print(cleaned[:5])
+    
+    stats = calculate_statistics(cleaned)
+    print("\nStatistics for cleaned data:")
+    for key, value in stats.items():
+        print(f"{key}: {value}")
