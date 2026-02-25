@@ -1235,4 +1235,139 @@ if __name__ == "__main__":
     stats = calculate_statistics(cleaned)
     print("\nStatistics for cleaned data:")
     for key, value in stats.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop').
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore').
+    columns (list): Specific columns to clean. If None, clean all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].dtype in [np.float64, np.int64]:
+            # Handle missing values
+            if missing_strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif missing_strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif missing_strategy == 'mode':
+                fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else np.nan
+            elif missing_strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+                
+            df_clean[col] = df_clean[col].fillna(fill_value)
+            
+            # Handle outliers
+            if outlier_method == 'iqr':
+                Q1 = df_clean[col].quantile(0.25)
+                Q3 = df_clean[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                df_clean[col] = np.where(
+                    (df_clean[col] < lower_bound) | (df_clean[col] > upper_bound),
+                    df_clean[col].median(),
+                    df_clean[col]
+                )
+                
+            elif outlier_method == 'zscore':
+                mean_val = df_clean[col].mean()
+                std_val = df_clean[col].std()
+                if std_val > 0:
+                    z_scores = np.abs((df_clean[col] - mean_val) / std_val)
+                    df_clean[col] = np.where(
+                        z_scores > 3,
+                        mean_val,
+                        df_clean[col]
+                    )
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate basic data structure and requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): Columns that must be present.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+def sample_usage():
+    """
+    Demonstrate usage of the data cleaning functions.
+    """
+    # Create sample data with missing values and outliers
+    np.random.seed(42)
+    data = {
+        'A': np.random.randn(100),
+        'B': np.random.randn(100),
+        'C': np.random.randn(100)
+    }
+    
+    # Introduce missing values
+    for col in data:
+        mask = np.random.random(100) < 0.1
+        data[col][mask] = np.nan
+    
+    # Introduce outliers
+    data['A'][0] = 100
+    data['B'][1] = -50
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Missing values per column:")
+    print(df.isnull().sum())
+    
+    # Clean the data
+    df_clean = clean_dataset(df, missing_strategy='median', outlier_method='iqr')
+    
+    print("\nCleaned DataFrame shape:", df_clean.shape)
+    print("Missing values after cleaning:")
+    print(df_clean.isnull().sum())
+    
+    # Validate the cleaned data
+    is_valid, message = validate_data(df_clean, min_rows=50)
+    print(f"\nData validation: {is_valid} - {message}")
+    
+    return df_clean
+
+if __name__ == "__main__":
+    cleaned_data = sample_usage()
