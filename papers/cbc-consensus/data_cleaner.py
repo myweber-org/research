@@ -215,3 +215,74 @@ def remove_outliers_iqr(data, column):
     cleaned_data = data[mask]
     
     return cleaned_data
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Cleans a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {original_shape[0] - cleaned_df.shape[0]} duplicate rows.")
+
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fill_missing == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'zero':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+        print(f"Filled missing values in numeric columns using method: {fill_missing}")
+
+    object_cols = cleaned_df.select_dtypes(include=['object']).columns
+    if not object_cols.empty:
+        cleaned_df[object_cols] = cleaned_df[object_cols].fillna('Unknown')
+        print("Filled missing values in object columns with 'Unknown'.")
+
+    print(f"Data cleaning complete. Original shape: {original_shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validates a DataFrame for required columns and basic integrity.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+
+    if df.empty:
+        print("Warning: DataFrame is empty.")
+
+    null_counts = df.isnull().sum()
+    if null_counts.any():
+        print("Warning: DataFrame contains missing values.")
+        print(null_counts[null_counts > 0])
+
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, np.nan, 5],
+        'B': [10.5, np.nan, 10.5, 13.2, 15.0],
+        'C': ['x', 'y', 'x', np.nan, 'z'],
+        'D': [100, 200, 100, 300, np.nan]
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+
+    cleaned = clean_dataframe(df, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+
+    try:
+        validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+        print("Data validation passed.")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
