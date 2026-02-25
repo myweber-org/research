@@ -1465,3 +1465,113 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask].reset_index(drop=True)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a dataset using the Interquartile Range method.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    column (int): Column index to check for outliers
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    q1 = np.percentile(data[:, column], 25)
+    q3 = np.percentile(data[:, column], 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (data[:, column] >= lower_bound) & (data[:, column] <= upper_bound)
+    return data[mask]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for each column in the dataset.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    
+    Returns:
+    dict: Dictionary containing mean, median, std for each column
+    """
+    stats = {
+        'mean': np.mean(data, axis=0),
+        'median': np.median(data, axis=0),
+        'std': np.std(data, axis=0),
+        'min': np.min(data, axis=0),
+        'max': np.max(data, axis=0)
+    }
+    return stats
+
+def normalize_data(data, method='minmax'):
+    """
+    Normalize data using specified method.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    numpy.ndarray: Normalized data
+    """
+    if method == 'minmax':
+        data_min = np.min(data, axis=0)
+        data_max = np.max(data, axis=0)
+        return (data - data_min) / (data_max - data_min + 1e-8)
+    
+    elif method == 'zscore':
+        mean = np.mean(data, axis=0)
+        std = np.std(data, axis=0)
+        return (data - mean) / (std + 1e-8)
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+
+def validate_data(data):
+    """
+    Validate data for common issues.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    
+    Returns:
+    dict: Validation results
+    """
+    validation = {
+        'has_nan': np.any(np.isnan(data)),
+        'has_inf': np.any(np.isinf(data)),
+        'shape': data.shape,
+        'dtype': str(data.dtype)
+    }
+    
+    if validation['has_nan']:
+        print("Warning: Data contains NaN values")
+    if validation['has_inf']:
+        print("Warning: Data contains infinite values")
+    
+    return validation
+
+if __name__ == "__main__":
+    sample_data = np.random.randn(100, 3)
+    sample_data[5, 1] = 100
+    
+    print("Original shape:", sample_data.shape)
+    cleaned_data = remove_outliers_iqr(sample_data, 1)
+    print("Cleaned shape:", cleaned_data.shape)
+    
+    stats = calculate_statistics(cleaned_data)
+    print("Statistics:", stats)
+    
+    normalized = normalize_data(cleaned_data, method='zscore')
+    validation = validate_data(normalized)
+    print("Validation:", validation)
