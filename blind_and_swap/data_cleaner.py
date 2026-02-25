@@ -512,3 +512,61 @@ def validate_dataframe(df):
         if not check(df):
             raise ValueError(message)
     return True
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        Q1 = cleaned_df[col].quantile(0.25)
+        Q3 = cleaned_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_data(df, columns, method='zscore'):
+    normalized_df = df.copy()
+    for col in columns:
+        if method == 'zscore':
+            normalized_df[col] = stats.zscore(normalized_df[col])
+        elif method == 'minmax':
+            normalized_df[col] = (normalized_df[col] - normalized_df[col].min()) / (normalized_df[col].max() - normalized_df[col].min())
+    return normalized_df
+
+def handle_missing_values(df, strategy='mean'):
+    processed_df = df.copy()
+    for col in processed_df.columns:
+        if processed_df[col].isnull().any():
+            if strategy == 'mean':
+                processed_df[col].fillna(processed_df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                processed_df[col].fillna(processed_df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                processed_df[col].fillna(processed_df[col].mode()[0], inplace=True)
+    return processed_df
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+
+def main():
+    input_file = 'raw_data.csv'
+    output_file = 'cleaned_data.csv'
+    
+    df = load_dataset(input_file)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df = handle_missing_values(df, strategy='median')
+    df = remove_outliers_iqr(df, numeric_cols)
+    df = normalize_data(df, numeric_cols, method='zscore')
+    
+    save_cleaned_data(df, output_file)
+    print(f"Data cleaning completed. Saved to {output_file}")
+
+if __name__ == "__main__":
+    main()
