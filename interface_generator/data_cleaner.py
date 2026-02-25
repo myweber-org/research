@@ -1481,3 +1481,139 @@ if __name__ == "__main__":
     print(f"\nClean data shape: {clean_data.shape}")
     print("First 5 rows of cleaned data:")
     print(clean_data.head())
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_method='zscore', normalize=False):
+    """
+    Main function to clean dataset
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        # Handle missing values
+        if cleaned_df[col].isna().any():
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        
+        # Remove outliers
+        if outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        elif outlier_method == 'iqr':
+            outliers, _, _ = detect_outliers_iqr(cleaned_df, col)
+            cleaned_df = cleaned_df[~cleaned_df.index.isin(outliers.index)]
+        
+        # Normalize if requested
+        if normalize:
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[f'{col}_standardized'] = standardize_data(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data_quality(df, numeric_columns=None):
+    """
+    Validate data quality metrics
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    quality_report = {}
+    
+    for col in numeric_columns:
+        if col not in df.columns:
+            continue
+            
+        col_data = df[col].dropna()
+        if len(col_data) == 0:
+            continue
+            
+        quality_report[col] = {
+            'missing_count': df[col].isna().sum(),
+            'missing_percentage': (df[col].isna().sum() / len(df)) * 100,
+            'mean': col_data.mean(),
+            'std': col_data.std(),
+            'min': col_data.min(),
+            'max': col_data.max(),
+            'median': col_data.median(),
+            'skewness': col_data.skew(),
+            'kurtosis': col_data.kurtosis()
+        }
+    
+    return pd.DataFrame(quality_report).T
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000)
+    })
+    
+    # Add some outliers
+    sample_data.loc[1000:1005, 'feature_a'] = [500, -200, 300, 400, -150, 600]
+    sample_data.loc[1000:1005, 'feature_b'] = [1000, 1200, 800, 900, 1100, 1300]
+    
+    # Clean the data
+    cleaned_data = clean_dataset(
+        sample_data, 
+        numeric_columns=['feature_a', 'feature_b', 'feature_c'],
+        outlier_method='zscore',
+        normalize=True
+    )
+    
+    # Validate quality
+    quality_report = validate_data_quality(cleaned_data)
+    print("Data Quality Report:")
+    print(quality_report)
+    print(f"\nOriginal shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
