@@ -190,3 +190,91 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData is valid: {is_valid}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            z_scores = np.abs(stats.zscore(cleaned_df[col]))
+            cleaned_df = cleaned_df[z_scores < threshold]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val > min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def normalize_zscore(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            mean_val = normalized_df[col].mean()
+            std_val = normalized_df[col].std()
+            if std_val > 0:
+                normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+    return normalized_df
+
+def handle_missing_values(df, strategy='mean'):
+    handled_df = df.copy()
+    numeric_cols = handled_df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            handled_df[col].fillna(handled_df[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            handled_df[col].fillna(handled_df[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            handled_df[col].fillna(handled_df[col].mode()[0], inplace=True)
+    elif strategy == 'drop':
+        handled_df.dropna(subset=numeric_cols, inplace=True)
+    
+    return handled_df
+
+def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_method='minmax', missing_strategy='mean'):
+    df = load_dataset(input_file)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if outlier_method == 'iqr':
+        df = remove_outliers_iqr(df, numeric_columns)
+    elif outlier_method == 'zscore':
+        df = remove_outliers_zscore(df, numeric_columns)
+    
+    df = handle_missing_values(df, strategy=missing_strategy)
+    
+    if normalize_method == 'minmax':
+        df = normalize_minmax(df, numeric_columns)
+    elif normalize_method == 'zscore':
+        df = normalize_zscore(df, numeric_columns)
+    
+    df.to_csv(output_file, index=False)
+    return df
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    print(f"Dataset cleaned. Shape: {cleaned_data.shape}")
