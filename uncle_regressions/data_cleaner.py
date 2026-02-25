@@ -239,3 +239,47 @@ if __name__ == "__main__":
     print("\nStatistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Remove duplicate rows and normalize text in specified column.
+    """
+    # Remove duplicates
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase, remove extra spaces, special characters
+    def normalize_text(text):
+        if pd.isna(text):
+            return text
+        text = str(text).lower()
+        text = re.sub(r'[^\w\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+    
+    df_clean[text_column] = df_clean[text_column].apply(normalize_text)
+    
+    return df_clean
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    target_column = "description"
+    
+    try:
+        raw_df = pd.read_csv(input_file)
+        cleaned_df = clean_dataframe(raw_df, target_column)
+        save_cleaned_data(cleaned_df, output_file)
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
