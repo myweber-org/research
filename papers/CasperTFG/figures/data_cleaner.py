@@ -1309,3 +1309,152 @@ if __name__ == "__main__":
     cleaned_dicts = clean_data_with_key(data_dicts, key_func=lambda x: x["id"])
     print(f"\nOriginal dicts: {data_dicts}")
     print(f"Cleaned dicts: {cleaned_dicts}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].isnull().any():
+                if cleaned_df[column].dtype in ['int64', 'float64']:
+                    if fill_strategy == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif fill_strategy == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif fill_strategy == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    elif fill_strategy == 'zero':
+                        fill_value = 0
+                    else:
+                        raise ValueError("Invalid fill_strategy. Choose from 'mean', 'median', 'mode', or 'zero'.")
+                    
+                    cleaned_df[column].fillna(fill_value, inplace=True)
+                    print(f"Filled missing values in column '{column}' with {fill_strategy}: {fill_value}")
+                else:
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+                    print(f"Filled missing values in column '{column}' with mode.")
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Method for outlier detection ('iqr' or 'zscore').
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+    
+    data = df[column].copy()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (data >= lower_bound) & (data <= upper_bound)
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = np.abs((data - mean) / std)
+        mask = z_scores <= threshold
+    else:
+        raise ValueError("Invalid method. Choose 'iqr' or 'zscore'.")
+    
+    filtered_df = df[mask].copy()
+    removed_count = len(df) - len(filtered_df)
+    print(f"Removed {removed_count} outliers from column '{column}' using {method} method.")
+    
+    return filtered_df
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize values in a specific column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to normalize.
+    method (str): Normalization method ('minmax' or 'zscore').
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+    
+    normalized_df = df.copy()
+    data = normalized_df[column]
+    
+    if method == 'minmax':
+        min_val = data.min()
+        max_val = data.max()
+        if max_val != min_val:
+            normalized_df[column] = (data - min_val) / (max_val - min_val)
+        else:
+            normalized_df[column] = 0
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        if std != 0:
+            normalized_df[column] = (data - mean) / std
+        else:
+            normalized_df[column] = 0
+    else:
+        raise ValueError("Invalid method. Choose 'minmax' or 'zscore'.")
+    
+    print(f"Normalized column '{column}' using {method} method.")
+    return normalized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None, 7, 8, 9, 100],
+        'B': [10, 20, 20, 40, 50, 60, 70, 80, 90, 1000],
+        'C': ['a', 'b', 'b', 'c', None, 'd', 'e', 'f', 'g', 'h']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, fill_strategy='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    no_outliers = remove_outliers(cleaned, 'B', method='iqr')
+    print("\nDataFrame after outlier removal:")
+    print(no_outliers)
+    print("\n" + "="*50 + "\n")
+    
+    normalized = normalize_column(no_outliers, 'A', method='minmax')
+    print("\nDataFrame after normalization:")
+    print(normalized)
