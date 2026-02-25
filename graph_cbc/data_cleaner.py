@@ -94,3 +94,32 @@ def sample_data_cleaning():
 
 if __name__ == "__main__":
     cleaned_df, validated_df = sample_data_cleaning()
+def filter_valid_entries(data_list, required_keys):
+    """
+    Returns a new list containing only dictionaries that have all specified keys
+    and where none of the required key values are None or empty strings.
+    """
+    if not isinstance(data_list, list):
+        raise TypeError("Input must be a list")
+    if not isinstance(required_keys, list):
+        raise TypeError("Required keys must be a list")
+
+    filtered_data = []
+    for entry in data_list:
+        if not isinstance(entry, dict):
+            continue
+
+        is_valid = True
+        for key in required_keys:
+            if key not in entry:
+                is_valid = False
+                break
+            value = entry.get(key)
+            if value is None or (isinstance(value, str) and value.strip() == ""):
+                is_valid = False
+                break
+
+        if is_valid:
+            filtered_data.append(entry)
+
+    return filtered_data
