@@ -421,3 +421,11 @@ def clean_dataset(df, outlier_threshold=3, normalize=True):
         cleaner.normalize_numeric(method='minmax')
     
     return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
