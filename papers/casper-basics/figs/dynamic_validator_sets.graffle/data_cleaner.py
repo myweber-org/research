@@ -94,3 +94,87 @@ if __name__ == "__main__":
     cleaned = remove_duplicates_preserve_order(sample_data)
     print(f"Original: {sample_data}")
     print(f"Cleaned: {cleaned}")
+import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+        subset: Column label or sequence of labels to consider for duplicates
+        keep: Determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if dataframe.empty:
+        return dataframe
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
+    
+    return cleaned_df
+
+def clean_numeric_columns(dataframe, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+        columns: List of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    for column in columns:
+        if column in dataframe.columns:
+            dataframe[column] = pd.to_numeric(dataframe[column], errors='coerce')
+    
+    return dataframe
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+        required_columns: List of required column names
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if dataframe.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def get_data_summary(dataframe):
+    """
+    Generate summary statistics for the DataFrame.
+    
+    Args:
+        dataframe: Input pandas DataFrame
+    
+    Returns:
+        Dictionary containing summary statistics
+    """
+    summary = {
+        'total_rows': len(dataframe),
+        'total_columns': len(dataframe.columns),
+        'column_names': list(dataframe.columns),
+        'data_types': dataframe.dtypes.to_dict(),
+        'missing_values': dataframe.isnull().sum().to_dict()
+    }
+    
+    return summary
