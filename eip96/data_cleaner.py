@@ -208,4 +208,103 @@ if __name__ == "__main__":
         validate_dataframe(cleaned_df, min_rows=5)
         print("\nData validation passed!")
     except ValueError as e:
-        print(f"\nData validation failed: {e}")
+        print(f"\nData validation failed: {e}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | (df[col].isna())]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df_norm[col] = 0
+    return df_norm
+
+def normalize_zscore(df, columns):
+    """
+    Normalize specified columns using Z-score standardization.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val != 0:
+                df_norm[col] = (df[col] - mean_val) / std_val
+            else:
+                df_norm[col] = 0
+    return df_norm
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col in df.columns and df[col].isna().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'drop':
+                df_filled = df_filled.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            df_filled[col] = df_filled[col].fillna(fill_value)
+    
+    return df_filled
+
+def get_data_summary(df):
+    """
+    Generate a summary statistics dataframe.
+    """
+    summary = pd.DataFrame({
+        'mean': df.mean(),
+        'median': df.median(),
+        'std': df.std(),
+        'min': df.min(),
+        'max': df.max(),
+        'missing': df.isna().sum(),
+        'missing_pct': (df.isna().sum() / len(df)) * 100
+    })
+    return summary
