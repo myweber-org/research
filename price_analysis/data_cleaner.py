@@ -359,3 +359,43 @@ def validate_dataframe(df):
         if not check_func(df):
             raise ValueError(error_msg)
     return True
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, columns):
+    cleaned_df = dataframe.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(dataframe, columns):
+    normalized_df = dataframe.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val != min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def clean_dataset(input_path, output_path):
+    try:
+        df = pd.read_csv(input_path)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        if len(numeric_cols) > 0:
+            df_cleaned = remove_outliers_iqr(df, numeric_cols)
+            df_normalized = normalize_minmax(df_cleaned, numeric_cols)
+            df_normalized.to_csv(output_path, index=False)
+            return True, f"Cleaned data saved to {output_path}"
+        else:
+            return False, "No numeric columns found for processing"
+    except Exception as e:
+        return False, f"Error processing file: {str(e)}"
