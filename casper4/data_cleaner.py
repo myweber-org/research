@@ -273,3 +273,106 @@ class DataCleaner:
         
     def get_removed_count(self):
         return self.original_shape[0] - self.df.shape[0]
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'drop',
+    fill_value: Optional[float] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        input_path: Path to input CSV file
+        output_path: Path to save cleaned CSV file
+        missing_strategy: Strategy for handling missing values ('drop', 'fill', 'interpolate')
+        fill_value: Value to fill missing entries when using 'fill' strategy
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Handle missing values
+        if missing_strategy == 'drop':
+            df = df.dropna()
+        elif missing_strategy == 'fill':
+            if fill_value is not None:
+                df = df.fillna(fill_value)
+            else:
+                df = df.fillna(df.mean(numeric_only=True))
+        elif missing_strategy == 'interpolate':
+            df = df.interpolate(method='linear', limit_direction='forward')
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        
+        print(f"Data cleaning completed. Cleaned data saved to {output_path}")
+        print(f"Original shape: {len(df)} rows, {len(df.columns)} columns")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        raise
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        raise
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate DataFrame for common data quality issues.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        Boolean indicating if data passes validation
+    """
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    # Check for infinite values
+    if np.any(np.isinf(df.select_dtypes(include=[np.number]))):
+        print("Validation warning: DataFrame contains infinite values")
+    
+    # Check column names for spaces
+    problematic_columns = [col for col in df.columns if ' ' in str(col)]
+    if problematic_columns:
+        print(f"Validation warning: Columns with spaces: {problematic_columns}")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [5, np.nan, np.nan, 8, 9],
+        'C': [10, 11, 12, 13, 14]
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data(
+        input_path='sample_data.csv',
+        output_path='cleaned_data.csv',
+        missing_strategy='fill',
+        fill_value=0
+    )
+    
+    if validate_dataframe(cleaned_df):
+        print("Data validation passed")
+    else:
+        print("Data validation failed")
