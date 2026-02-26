@@ -304,4 +304,127 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     print("\nFirst 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    print(cleaned_df.head())import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame using specified strategy.
+    
+    Args:
+        df: pandas DataFrame containing data with potential missing values
+        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns: List of columns to apply cleaning to, None applies to all columns
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if df_clean[col].isnull().sum() == 0:
+            continue
+        
+        if strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+        
+        elif strategy == 'mean':
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+        
+        elif strategy == 'median':
+            if pd.api.types.is_numeric_dtype(df_clean[col]):
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+        
+        elif strategy == 'mode':
+            mode_value = df_clean[col].mode()
+            if not mode_value.empty:
+                df_clean[col].fillna(mode_value[0], inplace=True)
+    
+    return df_clean
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to check for outliers
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        Boolean mask indicating outliers
+    """
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return pd.Series([False] * len(df), index=df.index)
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    return outliers
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        Series with normalized values
+    """
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        return df[column]
+    
+    if method == 'minmax':
+        col_min = df[column].min()
+        col_max = df[column].max()
+        
+        if col_max == col_min:
+            return pd.Series([0.5] * len(df), index=df.index)
+        
+        normalized = (df[column] - col_min) / (col_max - col_min)
+        return normalized
+    
+    elif method == 'zscore':
+        col_mean = df[column].mean()
+        col_std = df[column].std()
+        
+        if col_std == 0:
+            return pd.Series([0] * len(df), index=df.index)
+        
+        normalized = (df[column] - col_mean) / col_std
+        return normalized
+    
+    return df[column]
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': ['a', 'b', 'c', 'd', 'e']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_values(df, strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
