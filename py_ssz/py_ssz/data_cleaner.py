@@ -1,117 +1,118 @@
-
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def remove_outliers_iqr(data, column):
     """
-    Remove outliers using IQR method
+    Remove outliers from a pandas Series using the IQR method.
+    Returns a cleaned Series and the indices of outliers removed.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    outlier_mask = (data < lower_bound) | (data > upper_bound)
+    cleaned_data = data[~outlier_mask].copy()
+    
+    return cleaned_data, data.index[outlier_mask].tolist()
 
-def remove_outliers_zscore(data, column, threshold=3):
+def normalize_minmax(data):
     """
-    Remove outliers using Z-score method
+    Normalize data to [0, 1] range using min-max scaling.
+    Handles NaN values by ignoring them in calculation.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    data_array = np.array(data, dtype=float)
+    valid_mask = ~np.isnan(data_array)
     
-    z_scores = np.abs(stats.zscore(data[column]))
-    filtered_data = data[z_scores < threshold]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not np.any(valid_mask):
+        return np.full_like(data_array, np.nan)
     
-    min_val = data[column].min()
-    max_val = data[column].max()
+    valid_data = data_array[valid_mask]
+    data_min = np.min(valid_data)
+    data_max = np.max(valid_data)
     
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
+    if data_max == data_min:
+        normalized = np.zeros_like(data_array)
+    else:
+        normalized = (data_array - data_min) / (data_max - data_min)
     
-    normalized = (data[column] - min_val) / (max_val - min_val)
+    normalized[~valid_mask] = np.nan
     return normalized
 
-def normalize_zscore(data, column):
+def winsorize_data(data, limits=(0.05, 0.05)):
     """
-    Normalize data using Z-score standardization
+    Apply winsorization to limit extreme values.
+    Returns winsorized data preserving original shape.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
+    try:
+        winsorized = stats.mstats.winsorize(data, limits=limits)
+        return winsorized.data if hasattr(winsorized, 'data') else winsorized
+    except Exception as e:
+        print(f"Winsorization failed: {e}")
+        return data
 
-def handle_missing_values(data, strategy='mean', columns=None):
+def clean_dataframe(df, numeric_columns=None, method='iqr'):
     """
-    Handle missing values in specified columns
+    Clean a DataFrame by handling outliers in numeric columns.
+    Supports 'iqr' or 'winsorize' methods.
+    Returns cleaned DataFrame and outlier report.
     """
-    if columns is None:
-        columns = data.columns
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    data_filled = data.copy()
+    cleaned_df = df.copy()
+    outlier_report = {}
     
-    for column in columns:
-        if column not in data.columns:
+    for col in numeric_columns:
+        if col not in df.columns:
             continue
             
-        if data[column].isnull().any():
-            if strategy == 'mean':
-                fill_value = data[column].mean()
-            elif strategy == 'median':
-                fill_value = data[column].median()
-            elif strategy == 'mode':
-                fill_value = data[column].mode()[0]
-            elif strategy == 'constant':
-                fill_value = 0
-            else:
-                raise ValueError(f"Unknown strategy: {strategy}")
-            
-            data_filled[column] = data[column].fillna(fill_value)
+        original_data = df[col]
+        
+        if method == 'iqr':
+            cleaned_series, outliers = remove_outliers_iqr(original_data, col)
+            cleaned_df.loc[cleaned_series.index, col] = cleaned_series
+            outlier_report[col] = {
+                'method': 'iqr',
+                'outlier_count': len(outliers),
+                'outlier_indices': outliers
+            }
+        elif method == 'winsorize':
+            winsorized = winsorize_data(original_data.values)
+            cleaned_df[col] = winsorized
+            outlier_report[col] = {
+                'method': 'winsorize',
+                'limits': (0.05, 0.05)
+            }
+        else:
+            raise ValueError(f"Unknown method: {method}. Use 'iqr' or 'winsorize'")
     
-    return data_filled
+    return cleaned_df, outlier_report
 
-def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    cleaned_data = data.copy()
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 50),
+        'B': np.random.exponential(2, 50),
+        'C': np.random.uniform(0, 1, 50)
+    })
     
-    numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns
+    # Add some outliers
+    sample_data.loc[5, 'A'] = 500
+    sample_data.loc[10, 'B'] = 50
     
-    for column in numeric_columns:
-        if outlier_method == 'iqr':
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-        elif outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, column)
+    print("Original data shape:", sample_data.shape)
+    print("Original data summary:")
+    print(sample_data.describe())
     
-    for column in numeric_columns:
-        if column in cleaned_data.columns:
-            if normalize_method == 'minmax':
-                cleaned_data[f"{column}_normalized"] = normalize_minmax(cleaned_data, column)
-            elif normalize_method == 'zscore':
-                cleaned_data[f"{column}_standardized"] = normalize_zscore(cleaned_data, column)
+    cleaned, report = clean_dataframe(sample_data, method='iqr')
+    print("\nCleaned data shape:", cleaned.shape)
+    print("Outlier report:", report)
     
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
-    
-    return cleaned_data
+    normalized_col = normalize_minmax(sample_data['A'])
+    print(f"\nNormalized column 'A' range: [{np.nanmin(normalized_col):.3f}, {np.nanmax(normalized_col):.3f}]")
