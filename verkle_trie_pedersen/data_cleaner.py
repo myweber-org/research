@@ -408,3 +408,127 @@ if __name__ == "__main__":
     print("\nValidation Report:")
     for col, stats in report.items():
         print(f"{col}: {stats}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from specified column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    cleaned_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return cleaned_data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    normalized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            min_val = data[col].min()
+            max_val = data[col].max()
+            if max_val > min_val:
+                normalized_data[col] = (data[col] - min_val) / (max_val - min_val)
+    
+    return normalized_data
+
+def standardize_zscore(data, columns=None):
+    """
+    Standardize data using Z-score normalization
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    standardized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            mean_val = data[col].mean()
+            std_val = data[col].std()
+            if std_val > 0:
+                standardized_data[col] = (data[col] - mean_val) / std_val
+    
+    return standardized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    processed_data = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0] if not data[col].mode().empty else 0
+            elif strategy == 'drop':
+                processed_data = processed_data.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            processed_data[col] = data[col].fillna(fill_value)
+    
+    return processed_data
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': data.shape,
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'numeric_stats': {}
+    }
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': data[col].mean(),
+            'median': data[col].median(),
+            'std': data[col].std(),
+            'min': data[col].min(),
+            'max': data[col].max(),
+            'skewness': data[col].skew(),
+            'kurtosis': data[col].kurtosis()
+        }
+    
+    return summary
