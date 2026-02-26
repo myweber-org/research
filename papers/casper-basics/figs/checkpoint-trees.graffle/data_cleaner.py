@@ -147,3 +147,97 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+import pandas as pd
+import numpy as np
+from typing import Optional, Dict, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            if strategy == 'mean':
+                fill_value = self.df[col].mean()
+            elif strategy == 'median':
+                fill_value = self.df[col].median()
+            elif strategy == 'mode':
+                fill_value = self.df[col].mode()[0] if not self.df[col].mode().empty else np.nan
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unsupported strategy: {strategy}")
+                
+            self.df[col].fillna(fill_value, inplace=True)
+            
+        return self
+    
+    def convert_dtypes(self, type_map: Dict[str, str]) -> 'DataCleaner':
+        for col, dtype in type_map.items():
+            if col in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[col] = pd.to_datetime(self.df[col])
+                    else:
+                        self.df[col] = self.df[col].astype(dtype)
+                except Exception as e:
+                    print(f"Warning: Could not convert {col} to {dtype}: {e}")
+        
+        return self
+    
+    def remove_outliers(self, columns: List[str], method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            if method == 'iqr':
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                
+                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
+                self.df = self.df[mask]
+            elif method == 'zscore':
+                from scipy import stats
+                z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                mask = z_scores < threshold
+                self.df = self.df[mask]
+        
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_cleaning_report(self) -> Dict:
+        report = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1],
+            'missing_values_before': self.df.isnull().sum().sum(),
+            'missing_values_after': self.df.isnull().sum().sum()
+        }
+        return report
+
+def load_and_clean_csv(filepath: str, cleaning_steps: Optional[Dict] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if cleaning_steps:
+        if 'missing_values' in cleaning_steps:
+            cleaner.handle_missing_values(**cleaning_steps['missing_values'])
+        if 'convert_dtypes' in cleaning_steps:
+            cleaner.convert_dtypes(cleaning_steps['convert_dtypes'])
+        if 'remove_outliers' in cleaning_steps:
+            cleaner.remove_outliers(**cleaning_steps['remove_outliers'])
+    
+    return cleaner.get_cleaned_data()
