@@ -873,4 +873,127 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary Statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns cleaned Series and outlier indices.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (data[column] >= lower_bound) & (data[column] <= upper_bound)
+    cleaned_data = data[mask].copy()
+    outlier_indices = data[~mask].index.tolist()
+    
+    return cleaned_data, outlier_indices
+
+def normalize_minmax(data, column):
+    """
+    Apply min-max normalization to a column.
+    Returns Series with normalized values.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Apply z-score standardization to a column.
+    Returns Series with standardized values.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, method='zscore', remove_outliers=True):
+    """
+    Main cleaning function for datasets.
+    Supports 'minmax' or 'zscore' normalization methods.
+    """
+    cleaned_df = df.copy()
+    
+    if remove_outliers:
+        outlier_report = {}
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                cleaned_df, outliers = remove_outliers_iqr(cleaned_df, col)
+                outlier_report[col] = len(outliers)
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            if method == 'minmax':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif method == 'zscore':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def generate_cleaning_report(original_df, cleaned_df, numeric_columns):
+    """
+    Generate a report comparing original and cleaned data.
+    """
+    report = {
+        'original_shape': original_df.shape,
+        'cleaned_shape': cleaned_df.shape,
+        'removed_rows': original_df.shape[0] - cleaned_df.shape[0],
+        'column_stats': {}
+    }
+    
+    for col in numeric_columns:
+        if col in original_df.columns and col in cleaned_df.columns:
+            report['column_stats'][col] = {
+                'original_mean': original_df[col].mean(),
+                'cleaned_mean': cleaned_df[col].mean(),
+                'original_std': original_df[col].std(),
+                'cleaned_std': cleaned_df[col].std(),
+                'original_range': (original_df[col].min(), original_df[col].max()),
+                'cleaned_range': (cleaned_df[col].min(), cleaned_df[col].max())
+            }
+    
+    return report
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'feature1': [1, 2, 3, 4, 5, 100],
+        'feature2': [10, 20, 30, 40, 50, 200],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature1', 'feature2']
+    
+    cleaned = clean_dataset(df, numeric_cols, method='zscore', remove_outliers=True)
+    report = generate_cleaning_report(df, cleaned, numeric_cols)
+    
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nCleaning Report:")
+    for key, value in report.items():
+        if key != 'column_stats':
+            print(f"{key}: {value}")
+    
+    print("\nColumn Statistics:")
+    for col, stats in report['column_stats'].items():
+        print(f"\n{col}:")
+        for stat_name, stat_value in stats.items():
+            print(f"  {stat_name}: {stat_value}")
