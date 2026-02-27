@@ -1705,3 +1705,11 @@ def clean_dataset(df, numeric_columns):
             cleaned_df = handle_missing_mean(cleaned_df, col)
             cleaned_df = normalize_minmax(cleaned_df, col)
     return cleaned_df
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
