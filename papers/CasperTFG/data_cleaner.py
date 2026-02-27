@@ -619,3 +619,166 @@ def get_summary_statistics(data, numeric_columns=None):
         summary = pd.concat([summary, pd.DataFrame([stats_dict])], ignore_index=True)
     
     return summary
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from specified column using IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize (None for all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
+            col_min = dataframe[col].min()
+            col_max = dataframe[col].max()
+            
+            if col_max > col_min:
+                normalized_df[col] = (dataframe[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def standardize_zscore(dataframe, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to standardize (None for all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    standardized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
+            mean_val = dataframe[col].mean()
+            std_val = dataframe[col].std()
+            
+            if std_val > 0:
+                standardized_df[col] = (dataframe[col] - mean_val) / std_val
+            else:
+                standardized_df[col] = 0
+    
+    return standardized_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process (None for all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns.tolist()
+    
+    processed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            continue
+            
+        if processed_df[col].isnull().any():
+            if strategy == 'drop':
+                processed_df = processed_df.dropna(subset=[col])
+            elif strategy == 'mean' and pd.api.types.is_numeric_dtype(processed_df[col]):
+                processed_df[col] = processed_df[col].fillna(processed_df[col].mean())
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(processed_df[col]):
+                processed_df[col] = processed_df[col].fillna(processed_df[col].median())
+            elif strategy == 'mode':
+                mode_val = processed_df[col].mode()
+                if not mode_val.empty:
+                    processed_df[col] = processed_df[col].fillna(mode_val.iloc[0])
+            else:
+                processed_df[col] = processed_df[col].fillna(0)
+    
+    return processed_df
+
+def get_data_summary(dataframe):
+    """
+    Generate comprehensive summary statistics for DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame
+    
+    Returns:
+        Dictionary with summary statistics
+    """
+    summary = {
+        'shape': dataframe.shape,
+        'dtypes': dataframe.dtypes.to_dict(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'numeric_summary': {},
+        'categorical_summary': {}
+    }
+    
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_summary'][col] = {
+            'mean': dataframe[col].mean(),
+            'median': dataframe[col].median(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max(),
+            'skewness': dataframe[col].skew(),
+            'kurtosis': dataframe[col].kurtosis()
+        }
+    
+    categorical_cols = dataframe.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        summary['categorical_summary'][col] = {
+            'unique_count': dataframe[col].nunique(),
+            'top_value': dataframe[col].mode().iloc[0] if not dataframe[col].mode().empty else None,
+            'top_count': (dataframe[col] == dataframe[col].mode().iloc[0]).sum() if not dataframe[col].mode().empty else 0
+        }
+    
+    return summary
