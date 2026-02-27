@@ -466,3 +466,139 @@ def validate_data(df, required_columns, min_rows=1):
         raise ValueError(f"DataFrame must have at least {min_rows} rows")
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def zscore_normalize(data, column):
+    """
+    Normalize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column added as '{column}_normalized'
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    normalized_col = f"{column}_normalized"
+    data[normalized_col] = stats.zscore(data[column])
+    return data
+
+def minmax_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        feature_range: desired range of transformed data
+    
+    Returns:
+        DataFrame with normalized column added as '{column}_scaled'
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        scaled_values = np.zeros(len(data))
+    else:
+        scaled_values = (data[column] - min_val) / (max_val - min_val)
+        scaled_values = scaled_values * (feature_range[1] - feature_range[0]) + feature_range[0]
+    
+    scaled_col = f"{column}_scaled"
+    data[scaled_col] = scaled_values
+    return data
+
+def clean_dataset(data, numeric_columns, outlier_multiplier=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names to process
+        outlier_multiplier: IQR multiplier for outlier detection
+        normalize_method: 'zscore' or 'minmax' normalization
+    
+    Returns:
+        Cleaned DataFrame with outliers removed and normalized columns
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            
+            if normalize_method == 'zscore':
+                cleaned_data = zscore_normalize(cleaned_data, column)
+            elif normalize_method == 'minmax':
+                cleaned_data = minmax_normalize(cleaned_data, column)
+            else:
+                raise ValueError("normalize_method must be 'zscore' or 'minmax'")
+    
+    return cleaned_data
+
+def generate_sample_data(n_samples=100):
+    """
+    Generate sample data for testing.
+    
+    Args:
+        n_samples: number of samples to generate
+    
+    Returns:
+        DataFrame with sample data
+    """
+    np.random.seed(42)
+    
+    data = {
+        'feature_a': np.random.normal(100, 15, n_samples),
+        'feature_b': np.random.exponential(50, n_samples),
+        'feature_c': np.random.uniform(0, 200, n_samples),
+        'category': np.random.choice(['A', 'B', 'C'], n_samples)
+    }
+    
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    sample_data = generate_sample_data(200)
+    print("Original data shape:", sample_data.shape)
+    
+    numeric_cols = ['feature_a', 'feature_b', 'feature_c']
+    cleaned = clean_dataset(sample_data, numeric_cols, normalize_method='minmax')
+    
+    print("Cleaned data shape:", cleaned.shape)
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned.head())
+    
+    print("\nSummary statistics:")
+    print(cleaned[numeric_cols].describe())
