@@ -1700,3 +1700,147 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, threshold=0.5):
+    """
+    Remove rows with missing values exceeding threshold percentage.
+    
+    Args:
+        df: pandas DataFrame
+        threshold: float between 0 and 1
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    missing_per_row = df.isnull().mean(axis=1)
+    return df[missing_per_row <= threshold].reset_index(drop=True)
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+    
+    Returns:
+        DataFrame with filled values
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns:
+            median_val = df[col].median()
+            df_filled[col].fillna(median_val, inplace=True)
+    
+    return df_filled
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    df_standardized = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
+    
+    return df_standardized
+
+def clean_dataset(df, missing_threshold=0.3, outlier_multiplier=1.5, standardize=True):
+    """
+    Complete data cleaning pipeline.
+    
+    Args:
+        df: pandas DataFrame
+        missing_threshold: threshold for removing rows with missing values
+        outlier_multiplier: IQR multiplier for outlier detection
+        standardize: whether to standardize numeric columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    # Step 1: Handle missing values
+    df_clean = remove_missing_rows(df, threshold=missing_threshold)
+    df_clean = fill_missing_with_median(df_clean)
+    
+    # Step 2: Remove outliers
+    df_clean = remove_outliers_iqr(df_clean, multiplier=outlier_multiplier)
+    
+    # Step 3: Standardize if requested
+    if standardize:
+        df_clean = standardize_columns(df_clean)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        tuple: (is_valid, message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
