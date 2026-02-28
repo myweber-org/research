@@ -1583,3 +1583,177 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: List of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_min = dataframe[col].min()
+            col_max = dataframe[col].max()
+            
+            if col_max - col_min > 0:
+                normalized_df[col] = (dataframe[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def standardize_zscore(dataframe, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: List of column names to standardize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    standardized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_mean = dataframe[col].mean()
+            col_std = dataframe[col].std()
+            
+            if col_std > 0:
+                standardized_df[col] = (dataframe[col] - col_mean) / col_std
+            else:
+                standardized_df[col] = 0
+    
+    return standardized_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: List of column names to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns.tolist()
+    
+    processed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            continue
+            
+        if processed_df[col].isnull().any():
+            if strategy == 'drop':
+                processed_df = processed_df.dropna(subset=[col])
+            elif strategy == 'mean' and np.issubdtype(processed_df[col].dtype, np.number):
+                processed_df[col] = processed_df[col].fillna(processed_df[col].mean())
+            elif strategy == 'median' and np.issubdtype(processed_df[col].dtype, np.number):
+                processed_df[col] = processed_df[col].fillna(processed_df[col].median())
+            elif strategy == 'mode':
+                processed_df[col] = processed_df[col].fillna(processed_df[col].mode()[0])
+    
+    return processed_df
+
+def create_cleaning_pipeline(dataframe, operations):
+    """
+    Apply multiple cleaning operations in sequence.
+    
+    Args:
+        dataframe: pandas DataFrame
+        operations: List of tuples (function_name, kwargs)
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = dataframe.copy()
+    
+    for func_name, kwargs in operations:
+        if func_name == 'remove_outliers':
+            cleaned_df = remove_outliers_iqr(cleaned_df, **kwargs)
+        elif func_name == 'normalize':
+            cleaned_df = normalize_minmax(cleaned_df, **kwargs)
+        elif func_name == 'standardize':
+            cleaned_df = standardize_zscore(cleaned_df, **kwargs)
+        elif func_name == 'handle_missing':
+            cleaned_df = handle_missing_values(cleaned_df, **kwargs)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'feature1': [1, 2, 3, 100, 5, 6, 7, 8, 9, 10],
+        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    
+    # Remove outliers from feature1
+    cleaned = remove_outliers_iqr(sample_data, 'feature1')
+    print("\nAfter outlier removal:")
+    print(cleaned)
+    
+    # Normalize numeric columns
+    normalized = normalize_minmax(cleaned)
+    print("\nAfter normalization:")
+    print(normalized)
+    
+    # Create a pipeline
+    pipeline_ops = [
+        ('remove_outliers', {'column': 'feature1'}),
+        ('normalize', {'columns': ['feature1', 'feature2']})
+    ]
+    
+    result = create_cleaning_pipeline(sample_data, pipeline_ops)
+    print("\nPipeline result:")
+    print(result)
