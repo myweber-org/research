@@ -404,3 +404,96 @@ def clean_dataset(df, numeric_columns):
         cleaned_df = normalize_minmax(cleaned_df, col)
         cleaned_df = standardize_zscore(cleaned_df, col)
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_na=True):
+    """
+    Clean a pandas DataFrame by standardizing columns, removing duplicates,
+    and handling missing values.
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if fill_na:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].mean())
+        
+        categorical_cols = df_clean.select_dtypes(include=['object']).columns
+        df_clean[categorical_cols] = df_clean[categorical_cols].fillna('Unknown')
+    
+    df_clean = df_clean.reset_index(drop=True)
+    return df_clean
+
+def validate_data(df, required_columns=None, unique_constraints=None):
+    """
+    Validate data integrity by checking required columns and unique constraints.
+    """
+    validation_results = {}
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_cols
+    
+    if unique_constraints:
+        duplicate_counts = {}
+        for constraint in unique_constraints:
+            if isinstance(constraint, str):
+                constraint = [constraint]
+            
+            duplicates = df[df.duplicated(subset=constraint, keep=False)]
+            duplicate_counts[tuple(constraint)] = len(duplicates)
+        
+        validation_results['duplicate_counts'] = duplicate_counts
+    
+    return validation_results
+
+def standardize_text_columns(df, columns=None):
+    """
+    Standardize text columns by converting to lowercase and stripping whitespace.
+    """
+    df_std = df.copy()
+    
+    if columns is None:
+        text_cols = df_std.select_dtypes(include=['object']).columns
+    else:
+        text_cols = [col for col in columns if col in df_std.columns]
+    
+    for col in text_cols:
+        df_std[col] = df_std[col].astype(str).str.lower().str.strip()
+    
+    return df_std
+
+if __name__ == "__main__":
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, 40],
+        'City': ['New York', 'Los Angeles', 'new york', 'Chicago', None],
+        'Score': [85.5, 92.0, 85.5, 78.5, 90.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    validation = validate_data(cleaned_df, 
+                              required_columns=['Name', 'Age', 'City'],
+                              unique_constraints=[['Name', 'Age']])
+    print("Validation Results:")
+    print(validation)
+    print("\n")
+    
+    standardized_df = standardize_text_columns(cleaned_df, columns=['City'])
+    print("Standardized DataFrame:")
+    print(standardized_df)
