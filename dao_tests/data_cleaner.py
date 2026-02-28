@@ -100,3 +100,32 @@ def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='s
             cleaned_df = normalize_standard(cleaned_df, col)
     
     return cleaned_df
+import pandas as pd
+
+def clean_dataset(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing text columns to lowercase.
+    """
+    df_clean = df.dropna()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
