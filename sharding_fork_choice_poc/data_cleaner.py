@@ -254,3 +254,121 @@ def process_data(file_path, output_path=None):
     except Exception as e:
         print(f"Error processing data: {str(e)}")
         raise
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for detecting outliers ('iqr', 'zscore')
+    columns (list): Specific columns to clean, if None clean all numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    else:
+        numeric_cols = [col for col in columns if col in df_clean.columns]
+    
+    # Handle missing values
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            if missing_strategy == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif missing_strategy == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif missing_strategy == 'mode':
+                df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+            elif missing_strategy == 'drop':
+                df_clean.dropna(subset=[col], inplace=True)
+    
+    # Handle outliers
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            df_clean[col] = np.where(df_clean[col] < lower_bound, lower_bound, df_clean[col])
+            df_clean[col] = np.where(df_clean[col] > upper_bound, upper_bound, df_clean[col])
+            
+        elif outlier_method == 'zscore':
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            z_scores = (df_clean[col] - mean_val) / std_val
+            
+            # Remove rows with |z-score| > 3
+            df_clean = df_clean[abs(z_scores) <= 3]
+    
+    return df_clean
+
+def validate_dataframe(df, check_types=True, check_ranges=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    check_types (bool): Check column data types
+    check_ranges (dict): Dictionary of column: (min, max) ranges to validate
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'issues': []
+    }
+    
+    # Check for empty DataFrame
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['issues'].append('DataFrame is empty')
+    
+    # Check data types
+    if check_types:
+        for col in df.columns:
+            if df[col].dtype == object:
+                validation_results['issues'].append(f'Column {col} has object dtype')
+    
+    # Check value ranges
+    if check_ranges:
+        for col, (min_val, max_val) in check_ranges.items():
+            if col in df.columns:
+                if df[col].min() < min_val or df[col].max() > max_val:
+                    validation_results['is_valid'] = False
+                    validation_results['issues'].append(f'Column {col} has values outside range [{min_val}, {max_val}]')
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': [10, 11, 12, 13, 14]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean the data
+    cleaned_df = clean_dataframe(df, missing_strategy='mean', outlier_method='iqr')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned_df, check_ranges={'A': (0, 50), 'B': (0, 20)})
+    print("\nValidation Results:")
+    print(validation)
