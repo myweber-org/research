@@ -497,3 +497,78 @@ if __name__ == "__main__":
     standardized_df = standardize_text_columns(cleaned_df, columns=['City'])
     print("Standardized DataFrame:")
     print(standardized_df)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+        
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in df_clean.columns:
+                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+                mask = z_scores < threshold
+                df_clean = df_clean[mask | df_clean[col].isna()]
+        return df_clean.reset_index(drop=True)
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_normalized = self.df.copy()
+        for col in columns:
+            if col in df_normalized.columns:
+                col_min = df_normalized[col].min()
+                col_max = df_normalized[col].max()
+                if col_max > col_min:
+                    df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+        return df_normalized
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_filled = self.df.copy()
+        for col in columns:
+            if col in df_filled.columns:
+                median_val = df_filled[col].median()
+                df_filled[col] = df_filled[col].fillna(median_val)
+        return df_filled
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': self.df.shape,
+            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist(),
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def process_dataset(filepath, output_path=None):
+    try:
+        df = pd.read_csv(filepath)
+        cleaner = DataCleaner(df)
+        
+        summary = cleaner.get_summary()
+        print(f"Dataset loaded: {summary['original_shape']}")
+        
+        df_clean = cleaner.remove_outliers_zscore()
+        df_clean = cleaner.fill_missing_median()
+        df_normalized = cleaner.normalize_minmax()
+        
+        if output_path:
+            df_normalized.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df_normalized
+        
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
