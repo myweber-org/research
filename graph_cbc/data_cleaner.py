@@ -350,3 +350,11 @@ def validate_data(data, required_columns, allow_nan=False):
             raise ValueError(f"NaN values found in columns: {nan_counts[nan_counts > 0].to_dict()}")
     
     return True
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
