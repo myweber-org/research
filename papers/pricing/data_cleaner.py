@@ -173,3 +173,11 @@ def validate_dataframe(df, required_columns=None):
 #     # Validate
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
 #     print(f"\nValidation: {is_valid}, Message: {message}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
