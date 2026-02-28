@@ -882,4 +882,14 @@ def validate_data(df, required_columns):
     missing_cols = [col for col in required_columns if col not in df.columns]
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
-    return True
+    return Truedef remove_duplicates(input_list):
+    """
+    Removes duplicate elements from a list while preserving the original order.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
