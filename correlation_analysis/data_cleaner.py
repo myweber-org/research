@@ -1575,3 +1575,11 @@ if __name__ == "__main__":
     normalized = normalize_data(cleaned_data, method='zscore')
     validation = validate_data(normalized)
     print("Validation:", validation)
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
