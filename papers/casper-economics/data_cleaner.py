@@ -127,3 +127,28 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, outlier_removal=True, standardization=True)
     print("Cleaned DataFrame:")
     print(cleaned)
+import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    df = pd.read_csv(input_file)
+    
+    df = df.dropna()
+    
+    df = df.drop_duplicates()
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_columns:
+        q1 = df[col].quantile(0.25)
+        q3 = df[col].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
+
+if __name__ == "__main__":
+    clean_data("raw_data.csv", "cleaned_data.csv")
