@@ -151,4 +151,62 @@ def clean_data(input_file, output_file):
     print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
 
 if __name__ == "__main__":
-    clean_data("raw_data.csv", "cleaned_data.csv")
+    clean_data("raw_data.csv", "cleaned_data.csv")import csv
+import sys
+
+def clean_csv(input_file, output_file, key_column):
+    """
+    Remove duplicate rows based on a key column and convert numeric columns.
+    """
+    seen = set()
+    cleaned_rows = []
+    
+    try:
+        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+            reader = csv.DictReader(infile)
+            fieldnames = reader.fieldnames
+            
+            for row in reader:
+                key = row.get(key_column)
+                if key is None:
+                    continue
+                
+                if key not in seen:
+                    seen.add(key)
+                    processed_row = {}
+                    for field in fieldnames:
+                        value = row[field]
+                        if value.replace('.', '', 1).isdigit():
+                            if '.' in value:
+                                processed_row[field] = float(value)
+                            else:
+                                processed_row[field] = int(value)
+                        else:
+                            processed_row[field] = value
+                    cleaned_rows.append(processed_row)
+        
+        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(cleaned_rows)
+            
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Removed {len(seen) - len(cleaned_rows)} duplicate rows")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python data_cleaner.py <input.csv> <output.csv> <key_column>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    key_column = sys.argv[3]
+    
+    clean_csv(input_file, output_file, key_column)
