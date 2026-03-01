@@ -120,4 +120,122 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid, message = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {message}")import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr'):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif missing_strategy == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                mode_val = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None
+                cleaned_df[col] = cleaned_df[col].fillna(mode_val)
+    
+    # Handle outliers for numeric columns
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    if outlier_method == 'iqr':
+        for col in numeric_cols:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            cleaned_df[col] = cleaned_df[col].clip(lower=lower_bound, upper=upper_bound)
+    
+    elif outlier_method == 'zscore':
+        for col in numeric_cols:
+            z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / cleaned_df[col].std())
+            mask = z_scores > 3
+            if mask.any():
+                # Replace outliers with median
+                median_val = cleaned_df[col].median()
+                cleaned_df.loc[mask, col] = median_val
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage function
+def demonstrate_cleaning():
+    """Demonstrate the data cleaning functionality."""
+    # Create sample data with missing values and outliers
+    np.random.seed(42)
+    data = {
+        'A': np.random.randn(100),
+        'B': np.random.randn(100),
+        'C': ['cat', 'dog', 'bird'] * 33 + ['cat']
+    }
+    
+    # Add some missing values
+    for col in ['A', 'B']:
+        data[col].iloc[np.random.choice(100, 10)] = np.nan
+    
+    # Add some outliers
+    data['A'].iloc[0] = 100  # Extreme outlier
+    data['B'].iloc[1] = -50  # Extreme outlier
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Missing values:\n", df.isnull().sum())
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='median', outlier_method='iqr')
+    
+    print("\nCleaned DataFrame shape:", cleaned.shape)
+    print("Missing values after cleaning:\n", cleaned.isnull().sum())
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'], min_rows=50)
     print(f"\nValidation: {message}")
+    
+    return cleaned
+
+if __name__ == "__main__":
+    cleaned_data = demonstrate_cleaning()
+    print("\nData cleaning demonstration completed.")
