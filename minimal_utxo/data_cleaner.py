@@ -163,3 +163,104 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
         validation_report['duplicate_rows'] = duplicate_count
     
     return validation_report
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_strategy='mean'):
+    """
+    Load a CSV file, clean missing values, and optionally save cleaned data.
+    
+    Args:
+        file_path (str): Path to input CSV file.
+        output_path (str, optional): Path to save cleaned CSV. If None, returns DataFrame.
+        fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero').
+    
+    Returns:
+        pd.DataFrame or None: Cleaned DataFrame if output_path is None, else None.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        missing_counts = df.isnull().sum()
+        if missing_counts.any():
+            print("Missing values per column:")
+            print(missing_counts[missing_counts > 0])
+            
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+            
+            for col in df.columns:
+                if df[col].isnull().any():
+                    if col in numeric_cols:
+                        if fill_strategy == 'mean':
+                            fill_value = df[col].mean()
+                        elif fill_strategy == 'median':
+                            fill_value = df[col].median()
+                        elif fill_strategy == 'zero':
+                            fill_value = 0
+                        else:
+                            fill_value = df[col].mean()
+                        df[col].fillna(fill_value, inplace=True)
+                        print(f"Filled missing values in '{col}' with {fill_strategy}: {fill_value:.2f}")
+                    elif col in categorical_cols:
+                        mode_value = df[col].mode()[0] if not df[col].mode().empty else 'Unknown'
+                        df[col].fillna(mode_value, inplace=True)
+                        print(f"Filled missing values in '{col}' with mode: {mode_value}")
+        else:
+            print("No missing values found.")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+            return None
+        else:
+            return df
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if df is None or df.empty:
+        print("Validation failed: DataFrame is empty or None.")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing required columns: {missing_cols}")
+            return False
+    
+    print(f"Validation passed: DataFrame has {len(df)} rows and {len(df.columns)} columns.")
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10.5, np.nan, 30.2, 40.1, 50.0],
+        'C': ['X', 'Y', np.nan, 'Z', 'X']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    print("Created sample CSV file: sample_data.csv")
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='median')
+    
+    if cleaned_df is not None:
+        validation_result = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+        if validation_result:
+            print("Data cleaning and validation completed successfully.")
