@@ -2003,3 +2003,54 @@ def clean_dataset(df, outlier_threshold=1.5, normalize=True, fill_missing=True):
         cleaner.normalize_minmax()
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase, removing extra whitespace,
+    and stripping special characters (except alphanumeric and spaces).
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^a-z0-9\s]', '', x))
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].str.replace(r'\s+', ' ', regex=True)
+    
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_dataset(df, text_columns=None, deduplicate=True):
+    """
+    Main function to clean dataset by processing text columns and removing duplicates.
+    """
+    if text_columns:
+        for col in text_columns:
+            df = clean_text_column(df, col)
+    
+    if deduplicate:
+        df = remove_duplicates(df)
+    
+    return df.reset_index(drop=True)
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'name': ['  John DOE  ', 'Jane Smith', 'JOHN DOE', 'Alice', '  bob  '],
+        'email': ['john@email.com', 'jane@email.com', 'JOHN@EMAIL.COM', 'alice@email.com', 'bob@email.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, text_columns=['name', 'email'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
