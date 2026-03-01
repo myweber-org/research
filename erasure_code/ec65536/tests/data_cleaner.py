@@ -188,3 +188,20 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=2)
     print(f"\nData validation passed: {is_valid}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def test_remove_duplicates():
+    sample_list = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned_list = remove_duplicates_preserve_order(sample_list)
+    print(f"Original list: {sample_list}")
+    print(f"Cleaned list: {cleaned_list}")
+
+if __name__ == "__main__":
+    test_remove_duplicates()
