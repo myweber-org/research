@@ -204,3 +204,91 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, convert_types=True):
+    """
+    Clean a pandas DataFrame by removing duplicates, filling missing values,
+    and converting data types where appropriate.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].median())
+                print(f"Filled missing values in numeric column '{column}' with median")
+        
+        for column in cleaned_df.select_dtypes(include=['object']).columns:
+            if cleaned_df[column].isnull().any():
+                cleaned_df[column] = cleaned_df[column].fillna('Unknown')
+                print(f"Filled missing values in text column '{column}' with 'Unknown'")
+    
+    if convert_types:
+        for column in cleaned_df.select_dtypes(include=['object']).columns:
+            try:
+                cleaned_df[column] = pd.to_datetime(cleaned_df[column], errors='ignore')
+                if cleaned_df[column].dtype != 'object':
+                    print(f"Converted column '{column}' to datetime")
+            except:
+                pass
+        
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].apply(float.is_integer).all():
+                cleaned_df[column] = cleaned_df[column].astype(int)
+                print(f"Converted column '{column}' to integer")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, unique_constraints=None):
+    """
+    Validate dataset structure and constraints.
+    """
+    if required_columns:
+        missing = set(required_columns) - set(df.columns)
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+    
+    if unique_constraints:
+        for constraint in unique_constraints:
+            if df[constraint].duplicated().any():
+                raise ValueError(f"Duplicate values found in unique constraint column: {constraint}")
+    
+    return True
+
+def sample_data_processing():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.0],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-02', '2023-01-03', '2023-01-04', '2023-01-05']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df)
+    print("\nCleaned dataset:")
+    print(cleaned)
+    
+    try:
+        validate_dataset(cleaned, required_columns=['id', 'name'], unique_constraints=['id'])
+        print("\nDataset validation passed")
+    except ValueError as e:
+        print(f"\nDataset validation failed: {e}")
+
+if __name__ == "__main__":
+    sample_data_processing()
