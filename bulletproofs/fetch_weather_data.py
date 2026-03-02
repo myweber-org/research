@@ -152,4 +152,41 @@ def main():
         fetcher.display_weather(weather)
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+import json
+
+def get_weather(api_key, city):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": api_key,
+        "units": "metric"
+    }
+    
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        weather_info = {
+            "city": data["name"],
+            "temperature": data["main"]["temp"],
+            "humidity": data["main"]["humidity"],
+            "description": data["weather"][0]["description"],
+            "wind_speed": data["wind"]["speed"]
+        }
+        return weather_info
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+    except KeyError as e:
+        print(f"Unexpected API response format: {e}")
+        return None
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    CITY = "London"
+    
+    weather = get_weather(API_KEY, CITY)
+    if weather:
+        print(json.dumps(weather, indent=2))
