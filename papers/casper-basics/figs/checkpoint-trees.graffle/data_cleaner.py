@@ -581,4 +581,75 @@ if __name__ == "__main__":
     report = get_cleaning_report(df, cleaned_df)
     print("Cleaning Report:")
     for key, value in report.items():
-        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return (data < lower_bound) | (data > upper_bound)
+
+def remove_outliers(df, columns, threshold=1.5):
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            outliers = detect_outliers_iqr(df[col], threshold)
+            df_clean = df_clean[~outliers]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(data):
+    min_val = np.min(data)
+    max_val = np.max(data)
+    if max_val == min_val:
+        return np.zeros_like(data)
+    return (data - min_val) / (max_val - min_val)
+
+def standardize_zscore(data):
+    mean_val = np.mean(data)
+    std_val = np.std(data)
+    if std_val == 0:
+        return np.zeros_like(data)
+    return (data - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns, outlier_threshold=1.5, normalization_method='zscore'):
+    df_clean = remove_outliers(df, numeric_columns, outlier_threshold)
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            if normalization_method == 'minmax':
+                df_clean[col] = normalize_minmax(df_clean[col])
+            elif normalization_method == 'zscore':
+                df_clean[col] = standardize_zscore(df_clean[col])
+    
+    return df_clean
+
+def validate_data(df, required_columns, numeric_columns):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            if not np.issubdtype(df[col].dtype, np.number):
+                raise TypeError(f"Column {col} must be numeric")
+    
+    return True
+
+def get_data_summary(df, numeric_columns):
+    summary = {}
+    for col in numeric_columns:
+        if col in df.columns:
+            summary[col] = {
+                'mean': np.mean(df[col]),
+                'median': np.median(df[col]),
+                'std': np.std(df[col]),
+                'min': np.min(df[col]),
+                'max': np.max(df[col]),
+                'count': len(df[col]),
+                'missing': df[col].isnull().sum()
+            }
+    return summary
