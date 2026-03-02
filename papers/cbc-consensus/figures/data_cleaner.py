@@ -844,4 +844,93 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    If subset is provided, only consider specified columns for duplicates.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in DataFrame.
+    Strategies: 'mean', 'median', 'mode', or 'constant' (fill with 0).
+    If columns is None, apply to all numeric columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def normalize_columns(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    Methods: 'minmax' (0-1 scaling) or 'zscore' (standardization).
+    If columns is None, normalize all numeric columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            if method == 'minmax':
+                min_val = df[col].min()
+                max_val = df[col].max()
+                if max_val > min_val:
+                    df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = df[col].mean()
+                std_val = df[col].std()
+                if std_val > 0:
+                    df_normalized[col] = (df[col] - mean_val) / std_val
+            else:
+                raise ValueError(f"Unknown method: {method}")
+    
+    return df_normalized
+
+def clean_dataframe(df, remove_dups=True, fill_na=True, normalize=True):
+    """
+    Apply a complete cleaning pipeline to DataFrame.
+    Returns cleaned DataFrame and dictionary of applied operations.
+    """
+    operations = {}
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        initial_rows = len(cleaned_df)
+        cleaned_df = remove_duplicates(cleaned_df)
+        operations['duplicates_removed'] = initial_rows - len(cleaned_df)
+    
+    if fill_na:
+        na_before = cleaned_df.isnull().sum().sum()
+        cleaned_df = fill_missing_values(cleaned_df, strategy='mean')
+        na_after = cleaned_df.isnull().sum().sum()
+        operations['missing_values_filled'] = na_before - na_after
+    
+    if normalize:
+        cleaned_df = normalize_columns(cleaned_df, method='minmax')
+        operations['normalization_applied'] = True
+    
+    return cleaned_df, operations
