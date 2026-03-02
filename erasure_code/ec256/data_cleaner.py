@@ -1,64 +1,47 @@
 
+import numpy as np
 import pandas as pd
-import re
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        column_mapping (dict): Optional mapping to rename columns
-        drop_duplicates (bool): Whether to remove duplicate rows
-        normalize_text (bool): Whether to normalize text columns
-    
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
     """
-    cleaned_df = df.copy()
-    
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
-    
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
-    
-    if normalize_text:
-        for col in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
-    
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    return cleaned_df
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
 
-def _normalize_string(text):
-    """Normalize a string by converting to lowercase and removing extra whitespace."""
-    if pd.isna(text):
-        return text
-    
-    normalized = str(text).lower().strip()
-    normalized = re.sub(r'\s+', ' ', normalized)
-    return normalized
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate a DataFrame for required columns and non-empty status.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.concatenate([
+            np.random.normal(50, 5, 90),
+            np.random.normal(150, 10, 10)
+        ])
+    }
+    df = pd.DataFrame(data)
+    print(f"Original shape: {df.shape}")
+    print(f"Original stats:\n{df['value'].describe()}")
+
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    print(f"\nCleaned shape: {cleaned_df.shape}")
+    print(f"Cleaned stats:\n{cleaned_df['value'].describe()}")
+
+if __name__ == "__main__":
+    example_usage()
