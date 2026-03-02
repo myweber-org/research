@@ -208,3 +208,82 @@ def clean_dataset(df, remove_outliers=True, normalize=True):
         cleaner.normalize_data(method='standard')
     
     return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing string columns.
+    """
+    df_clean = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean = df_clean.drop_duplicates()
+    removed_duplicates = initial_rows - df_clean.shape[0]
+    
+    # Normalize string columns
+    if columns_to_clean is None:
+        # Automatically detect object (string) columns
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].apply(normalize_string)
+    
+    return df_clean, removed_duplicates
+
+def normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
+    
+    # Convert to string if not already
+    text = str(text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Remove special characters (keep alphanumeric and basic punctuation)
+    text = re.sub(r'[^\w\s.,!?-]', '', text)
+    
+    return text
+
+def validate_email(email):
+    """
+    Validate email format using a simple regex pattern.
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def clean_column_names(df):
+    """
+    Clean column names by converting to lowercase and replacing spaces with underscores.
+    """
+    df_clean = df.copy()
+    df_clean.columns = [col.lower().replace(' ', '_') for col in df_clean.columns]
+    return df_clean
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = {
+#         'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
+#         'Email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.net'],
+#         'Age': [25, 30, 25, 35]
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     cleaned_df, duplicates_removed = clean_dataframe(df)
+#     
+#     print(f"Removed {duplicates_removed} duplicate rows")
+#     print("Cleaned DataFrame:")
+#     print(cleaned_df)
