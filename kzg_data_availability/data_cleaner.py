@@ -1243,4 +1243,63 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    print(calculate_summary_statistics(cleaned_df, 'A'))import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Column labels to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
+    
+    return cleaned_df
+
+def clean_numeric_column(df, column_name, fill_method='mean'):
+    """
+    Clean numeric column by handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column_name (str): Name of column to clean
+        fill_method (str): Method to fill missing values ('mean', 'median', 'zero')
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column_name]):
+        raise ValueError(f"Column '{column_name}' is not numeric")
+    
+    df_clean = df.copy()
+    
+    if fill_method == 'mean':
+        fill_value = df_clean[column_name].mean()
+    elif fill_method == 'median':
+        fill_value = df_clean[column_name].median()
+    elif fill_method == 'zero':
+        fill_value = 0
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', or 'zero'")
+    
+    missing_count = df_clean[column_name].isna().sum()
+    if missing_count > 0:
+        df_clean[column_name] = df_clean[column_name].fillna(fill_value)
+        print(f"Filled {missing_count} missing value(s) in '{column_name}' with {fill_method}")
+    
+    return df_clean
