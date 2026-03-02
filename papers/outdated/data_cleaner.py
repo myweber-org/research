@@ -537,3 +537,26 @@ if __name__ == "__main__":
     print(f"\nCleaned data shape: {cleaned_data.shape}")
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_data.head())
+import pandas as pd
+
+def clean_dataset(df, columns=None, drop_duplicates=True):
+    """
+    Clean a pandas DataFrame by removing rows with null values and optionally removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    columns (list, optional): List of column names to check for nulls. If None, checks all columns.
+    drop_duplicates (bool): If True, remove duplicate rows after null removal.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.dropna(subset=columns)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    return df_clean.reset_index(drop=True)
