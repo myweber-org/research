@@ -98,3 +98,126 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
     print(f"Removed {len(sample_data) - len(cleaned_data)} outliers")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to drop duplicate rows
+    handle_nulls (str): Strategy for handling nulls - 'drop', 'fill', or 'ignore'
+    fill_value: Value to use when filling nulls (if handle_nulls='fill')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_nulls == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} rows with null values")
+    elif handle_nulls == 'fill':
+        cleaned_df = cleaned_df.fillna(fill_value)
+        print(f"Filled null values with {fill_value}")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate that DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of column names that must be present
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if len(df) < min_rows:
+        print(f"DataFrame has only {len(df)} rows, minimum required is {min_rows}")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Dictionary containing statistics for each numeric column
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    stats = {}
+    for col in numeric_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'null_count': df[col].isnull().sum()
+        }
+    
+    return stats
+
+def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
+    """
+    Remove outliers from specified columns using IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process, None for all numeric columns
+    method (str): Method for outlier detection - 'iqr' or 'zscore'
+    threshold (float): Threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    filtered_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if method == 'iqr':
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        else:
+            z_scores = np.abs((df[col] - df[col].mean()) / df[col].std())
+            mask = z_scores < threshold
+        
+        initial_count = len(filtered_df)
+        filtered_df = filtered_df[mask]
+        removed = initial_count - len(filtered_df)
+        print(f"Removed {removed} outliers from column '{col}'")
+    
+    return filtered_df
