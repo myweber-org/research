@@ -303,3 +303,11 @@ if __name__ == "__main__":
     if cleaned is not None:
         validation_passed = validate_dataframe(cleaned, ['A', 'B', 'C'])
         print(f"Data validation passed: {validation_passed}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
