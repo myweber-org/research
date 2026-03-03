@@ -84,3 +84,74 @@ def get_data_summary(df):
     }
     
     return summary
+import pandas as pd
+import numpy as np
+import re
+
+def clean_column_names(df):
+    df.columns = [re.sub(r'\s+', '_', col.strip().lower()) for col in df.columns]
+    return df
+
+def remove_duplicates(df, subset=None):
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_copy = df.copy()
+    for col in columns:
+        if strategy == 'mean' and df_copy[col].dtype in [np.float64, np.int64]:
+            df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+        elif strategy == 'median' and df_copy[col].dtype in [np.float64, np.int64]:
+            df_copy[col].fillna(df_copy[col].median(), inplace=True)
+        elif strategy == 'mode':
+            df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+        elif strategy == 'drop':
+            df_copy = df_copy.dropna(subset=[col])
+        else:
+            df_copy[col].fillna('', inplace=True)
+    return df_copy
+
+def normalize_text(df, columns):
+    df_copy = df.copy()
+    for col in columns:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col].astype(str).str.lower().str.strip()
+    return df_copy
+
+def validate_data(df, rules):
+    errors = []
+    for rule in rules:
+        column, condition = rule
+        if column in df.columns:
+            invalid_rows = df[~condition(df[column])]
+            if not invalid_rows.empty:
+                errors.append(f"Rule violation in column '{column}': {len(invalid_rows)} rows")
+    return errors
+
+def process_csv(input_path, output_path, cleaning_steps=None):
+    try:
+        df = pd.read_csv(input_path)
+        
+        if cleaning_steps is None:
+            cleaning_steps = [
+                ('clean_column_names', {}),
+                ('remove_duplicates', {'subset': None}),
+                ('handle_missing_values', {'strategy': 'mean'}),
+            ]
+        
+        for step_name, kwargs in cleaning_steps:
+            if hasattr(__name__, step_name):
+                func = globals()[step_name]
+                df = func(df, **kwargs)
+        
+        df.to_csv(output_path, index=False)
+        return True, f"Data cleaned successfully. Output saved to {output_path}"
+    
+    except Exception as e:
+        return False, f"Error processing file: {str(e)}"
+
+if __name__ == "__main__":
+    result, message = process_csv('input.csv', 'cleaned_output.csv')
+    print(message)
