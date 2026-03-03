@@ -276,4 +276,111 @@ if __name__ == "__main__":
     print(cleaned_df.head())
     
     test_file.unlink()
-    Path(output_file).unlink()
+    Path(output_file).unlink()import csv
+import os
+from typing import List, Dict, Any
+
+def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
+    """Read a CSV file and return its contents as a list of dictionaries."""
+    data = []
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+    return data
+
+def clean_numeric_fields(data: List[Dict[str, Any]], fields: List[str]) -> List[Dict[str, Any]]:
+    """Clean specified numeric fields by removing non-numeric characters and converting to float."""
+    cleaned_data = []
+    for row in data:
+        cleaned_row = row.copy()
+        for field in fields:
+            if field in cleaned_row:
+                value = cleaned_row[field]
+                if isinstance(value, str):
+                    cleaned_value = ''.join(char for char in value if char.isdigit() or char == '.')
+                    try:
+                        cleaned_row[field] = float(cleaned_value) if cleaned_value else 0.0
+                    except ValueError:
+                        cleaned_row[field] = 0.0
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def remove_empty_rows(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove rows where all values are empty strings or None."""
+    filtered_data = []
+    for row in data:
+        if any(value not in [None, ''] for value in row.values()):
+            filtered_data.append(row)
+    return filtered_data
+
+def write_csv_file(data: List[Dict[str, Any]], file_path: str) -> bool:
+    """Write data to a CSV file."""
+    if not data:
+        print("No data to write.")
+        return False
+    
+    try:
+        fieldnames = data[0].keys()
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV file: {e}")
+        return False
+
+def process_csv(input_path: str, output_path: str, numeric_fields: List[str] = None) -> None:
+    """Main function to process a CSV file: read, clean, and write."""
+    if numeric_fields is None:
+        numeric_fields = []
+    
+    print(f"Processing file: {input_path}")
+    data = read_csv_file(input_path)
+    
+    if not data:
+        print("No data loaded. Exiting.")
+        return
+    
+    print(f"Loaded {len(data)} rows.")
+    
+    cleaned_data = clean_numeric_fields(data, numeric_fields)
+    cleaned_data = remove_empty_rows(cleaned_data)
+    
+    print(f"After cleaning: {len(cleaned_data)} rows.")
+    
+    if write_csv_file(cleaned_data, output_path):
+        print(f"Cleaned data saved to: {output_path}")
+    else:
+        print("Failed to save cleaned data.")
+
+if __name__ == "__main__":
+    input_file = "input_data.csv"
+    output_file = "cleaned_data.csv"
+    numeric_columns = ["price", "quantity", "rating"]
+    
+    if os.path.exists(input_file):
+        process_csv(input_file, output_file, numeric_columns)
+    else:
+        print(f"Input file '{input_file}' does not exist. Creating sample data for testing.")
+        sample_data = [
+            {"id": "1", "name": "Product A", "price": "$19.99", "quantity": "10", "rating": "4.5"},
+            {"id": "2", "name": "Product B", "price": "29.50", "quantity": "", "rating": "3.8"},
+            {"id": "3", "name": "", "price": "invalid", "quantity": "5", "rating": "4.0"},
+            {"id": "4", "name": "Product D", "price": "15.00", "quantity": "7", "rating": ""},
+            {"id": "", "name": "", "price": "", "quantity": "", "rating": ""}
+        ]
+        
+        with open(input_file, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=["id", "name", "price", "quantity", "rating"])
+            writer.writeheader()
+            writer.writerows(sample_data)
+        
+        print(f"Sample data created in '{input_file}'. Now processing...")
+        process_csv(input_file, output_file, numeric_columns)
