@@ -169,3 +169,113 @@ if __name__ == "__main__":
     
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("Cleaned statistics:", stats)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    return stats
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean a dataset by removing outliers from multiple numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of removal statistics for each column
+    """
+    original_shape = df.shape
+    removal_stats = {}
+    
+    for column in numeric_columns:
+        if column in df.columns and pd.api.types.is_numeric_dtype(df[column]):
+            original_count = df.shape[0]
+            df = remove_outliers_iqr(df, column)
+            removed_count = original_count - df.shape[0]
+            removal_stats[column] = {
+                'removed': removed_count,
+                'percentage': (removed_count / original_count) * 100
+            }
+    
+    final_shape = df.shape
+    removal_stats['total_removed'] = original_shape[0] - final_shape[0]
+    removal_stats['original_shape'] = original_shape
+    removal_stats['final_shape'] = final_shape
+    
+    return df, removal_stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': range(1, 101),
+        'value': np.concatenate([
+            np.random.normal(100, 10, 90),
+            np.random.normal(300, 50, 10)
+        ]),
+        'score': np.concatenate([
+            np.random.normal(50, 5, 95),
+            np.random.normal(200, 30, 5)
+        ])
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics for 'value':")
+    print(calculate_statistics(df, 'value'))
+    
+    cleaned_df, stats = clean_dataset(df, ['value', 'score'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nRemoval statistics:")
+    for col, col_stats in stats.items():
+        if col not in ['total_removed', 'original_shape', 'final_shape']:
+            print(f"{col}: {col_stats['removed']} outliers removed ({col_stats['percentage']:.2f}%)")
+    
+    print(f"\nTotal rows removed: {stats['total_removed']}")
+    print(f"Original shape: {stats['original_shape']}")
+    print(f"Final shape: {stats['final_shape']}")
