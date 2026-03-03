@@ -221,3 +221,85 @@ def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
         print(f"Removed {removed} outliers from column '{col}'")
     
     return filtered_df
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path, missing_strategy='mean'):
+    """
+    Load a CSV file, clean missing values, and save cleaned data.
+    
+    Args:
+        input_path: Path to input CSV file
+        output_path: Path to save cleaned CSV file
+        missing_strategy: Strategy for handling missing values ('mean', 'median', 'drop')
+    """
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        missing_count = df.isnull().sum().sum()
+        print(f"Total missing values: {missing_count}")
+        
+        if missing_strategy == 'mean':
+            df_cleaned = df.fillna(df.mean(numeric_only=True))
+        elif missing_strategy == 'median':
+            df_cleaned = df.fillna(df.median(numeric_only=True))
+        elif missing_strategy == 'drop':
+            df_cleaned = df.dropna()
+        else:
+            raise ValueError("Invalid strategy. Use 'mean', 'median', or 'drop'")
+        
+        df_cleaned.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Final shape: {df_cleaned.shape}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of required column names
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) == 0:
+        print("Warning: No numeric columns found")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 2, 3, 4, 5]
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned = clean_csv_data('sample_data.csv', 'cleaned_sample.csv', 'mean')
+    
+    if cleaned is not None:
+        validation_passed = validate_dataframe(cleaned, ['A', 'B', 'C'])
+        print(f"Data validation passed: {validation_passed}")
