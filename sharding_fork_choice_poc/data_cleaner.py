@@ -70,3 +70,121 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset(sample_data, ['feature1', 'feature2'])
     print("Cleaned dataset shape:", cleaned_data.shape)
     print("Cleaned data columns:", cleaned_data.columns.tolist())
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_method='mean', drop_threshold=0.5):
+    """
+    Clean CSV data by handling missing values and removing invalid columns.
+    
+    Args:
+        filepath (str): Path to the CSV file
+        fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+        drop_threshold (float): Threshold for dropping columns with too many missing values (0-1)
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(filepath)
+        
+        # Calculate missing percentage per column
+        missing_percent = df.isnull().sum() / len(df)
+        
+        # Drop columns with missing values above threshold
+        columns_to_drop = missing_percent[missing_percent > drop_threshold].index
+        df = df.drop(columns=columns_to_drop)
+        
+        # Fill remaining missing values
+        for column in df.columns:
+            if df[column].dtype in ['int64', 'float64']:
+                if fill_method == 'mean':
+                    fill_value = df[column].mean()
+                elif fill_method == 'median':
+                    fill_value = df[column].median()
+                elif fill_method == 'mode':
+                    fill_value = df[column].mode()[0] if not df[column].mode().empty else 0
+                elif fill_method == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = df[column].mean()
+                
+                df[column] = df[column].fillna(fill_value)
+            else:
+                # For non-numeric columns, fill with most frequent value
+                most_frequent = df[column].mode()[0] if not df[column].mode().empty else 'Unknown'
+                df[column] = df[column].fillna(most_frequent)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df is None or df.empty:
+        return False, "DataFrame is empty or None"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.any(np.isinf(df[col])):
+            return False, f"Column '{col}' contains infinite values"
+    
+    return True, "DataFrame is valid"
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Args:
+        df (pandas.DataFrame): Cleaned DataFrame
+        output_path (str): Path to save the cleaned data
+        format (str): Output format ('csv', 'parquet', 'json')
+    """
+    if df is None or df.empty:
+        print("Cannot save empty DataFrame")
+        return
+    
+    try:
+        if format == 'csv':
+            df.to_csv(output_path, index=False)
+        elif format == 'parquet':
+            df.to_parquet(output_path, index=False)
+        elif format == 'json':
+            df.to_json(output_path, orient='records', indent=2)
+        else:
+            print(f"Unsupported format: {format}")
+            return
+        
+        print(f"Cleaned data saved to {output_path}")
+        
+    except Exception as e:
+        print(f"Error saving data: {str(e)}")
