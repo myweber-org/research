@@ -411,3 +411,125 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', threshold=1.5):
+    """
+    Clean dataset by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    threshold (float): Threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif missing_strategy == 'mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    
+    # Handle outliers for numeric columns only
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    if outlier_method == 'iqr':
+        for col in numeric_cols:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            # Cap outliers
+            cleaned_df[col] = cleaned_df[col].clip(lower=lower_bound, upper=upper_bound)
+    
+    elif outlier_method == 'zscore':
+        for col in numeric_cols:
+            z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / cleaned_df[col].std())
+            
+            # Cap values beyond threshold
+            mask = z_scores > threshold
+            if mask.any():
+                # Replace outliers with nearest bound
+                median = cleaned_df[col].median()
+                std = cleaned_df[col].std()
+                cleaned_df.loc[mask, col] = np.sign(cleaned_df.loc[mask, col] - median) * threshold * std + median
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"Dataframe has less than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataframe is valid"
+
+# Example usage function
+def demonstrate_cleaning():
+    """Demonstrate the data cleaning functionality."""
+    # Create sample data with missing values and outliers
+    np.random.seed(42)
+    data = {
+        'A': np.random.randn(100),
+        'B': np.random.randn(100),
+        'C': np.random.randn(100)
+    }
+    
+    # Introduce missing values
+    for col in data:
+        mask = np.random.random(100) < 0.1
+        data[col][mask] = np.nan
+    
+    # Introduce outliers
+    data['B'][0] = 100  # Extreme outlier
+    
+    df = pd.DataFrame(data)
+    
+    print("Original dataframe shape:", df.shape)
+    print("Missing values per column:")
+    print(df.isnull().sum())
+    
+    # Clean the data
+    cleaned = clean_dataset(df, missing_strategy='mean', outlier_method='iqr')
+    
+    print("\nCleaned dataframe shape:", cleaned.shape)
+    print("Missing values after cleaning:")
+    print(cleaned.isnull().sum())
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned, min_rows=50)
+    print(f"\nValidation: {message}")
+    
+    return cleaned
+
+if __name__ == "__main__":
+    result = demonstrate_cleaning()
+    print("\nData cleaning demonstration completed.")
