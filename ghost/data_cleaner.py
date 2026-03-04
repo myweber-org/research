@@ -1,90 +1,66 @@
-
 import pandas as pd
-import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataframe(df):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean a pandas DataFrame by removing null values and duplicates.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+        df (pd.DataFrame): Input DataFrame to be cleaned.
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+        pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    cleaned_df = df.copy()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    cleaned_df = cleaned_df.dropna()
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    cleaned_df = cleaned_df.drop_duplicates()
     
-    return filtered_df
-
-def calculate_summary_stats(df, column):
-    """
-    Calculate summary statistics for a column.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
-    
-    Returns:
-        dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
-
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    data = {
-        'values': np.concatenate([
-            np.random.normal(100, 10, 95),
-            np.random.normal(200, 10, 5)
-        ])
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("Original summary statistics:")
-    original_stats = calculate_summary_stats(df, 'values')
-    for key, value in original_stats.items():
-        print(f"  {key}: {value:.2f}")
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned summary statistics:")
-    cleaned_stats = calculate_summary_stats(cleaned_df, 'values')
-    for key, value in cleaned_stats.items():
-        print(f"  {key}: {value:.2f}")
-    
-    outliers_removed = df.shape[0] - cleaned_df.shape[0]
-    print(f"\nNumber of outliers removed: {outliers_removed}")
+    cleaned_df = cleaned_df.reset_index(drop=True)
     
     return cleaned_df
 
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    sample_data = {
+        'A': [1, 2, None, 4, 2],
+        'B': [5, 6, 7, None, 6],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataframe(df)
+    print(cleaned)
+    
+    is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nDataFrame validation: {is_valid}")
