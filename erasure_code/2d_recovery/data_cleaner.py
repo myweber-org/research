@@ -242,4 +242,109 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
+    return True, "DataFrame is valid"import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    subset (list, optional): Columns to consider for duplicates.
+    keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_column(df, column_name, fill_method='mean'):
+    """
+    Clean numeric column by filling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column_name (str): Name of column to clean.
+    fill_method (str): Method to fill missing values.
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned column.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    if df[column_name].dtype not in ['int64', 'float64']:
+        raise ValueError(f"Column '{column_name}' is not numeric")
+    
+    df_clean = df.copy()
+    
+    if fill_method == 'mean':
+        fill_value = df[column_name].mean()
+    elif fill_method == 'median':
+        fill_value = df[column_name].median()
+    elif fill_method == 'mode':
+        fill_value = df[column_name].mode()[0]
+    else:
+        fill_value = 0
+    
+    df_clean[column_name] = df_clean[column_name].fillna(fill_value)
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list, optional): List of required columns.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
     return True, "DataFrame is valid"
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 3, 4, 4, 5],
+        'value': [10.5, None, 15.2, 20.1, 20.1, None],
+        'category': ['A', 'B', 'A', 'C', 'C', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    df_no_dups = remove_duplicates(df, subset=['id'], keep='first')
+    print("DataFrame after removing duplicate IDs:")
+    print(df_no_dups)
+    print()
+    
+    df_clean = clean_numeric_column(df_no_dups, 'value', fill_method='mean')
+    print("DataFrame after cleaning numeric column:")
+    print(df_clean)
+    print()
+    
+    is_valid, message = validate_dataframe(df_clean, required_columns=['id', 'value'])
+    print(f"DataFrame validation: {is_valid} - {message}")
+
+if __name__ == "__main__":
+    main()
