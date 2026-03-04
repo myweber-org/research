@@ -154,3 +154,11 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     clean_dataset(input_file, output_file)
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
