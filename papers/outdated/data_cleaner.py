@@ -676,4 +676,103 @@ def main():
         print(f"{key}: {value:.2f}")
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_na_threshold=0.8):
+    """
+    Clean a pandas DataFrame by handling duplicates, missing values,
+    and standardizing column names.
+    """
+    # Create a copy to avoid modifying the original
+    df_clean = df.copy()
+    
+    # Standardize column names if mapping is provided
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    # Convert column names to lowercase and replace spaces with underscores
+    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    initial_rows = len(df_clean)
+    df_clean = df_clean.drop_duplicates()
+    duplicates_removed = initial_rows - len(df_clean)
+    
+    # Handle missing values
+    # Drop columns with too many missing values
+    missing_cols = df_clean.columns[df_clean.isnull().mean() > drop_na_threshold]
+    df_clean = df_clean.drop(columns=missing_cols)
+    
+    # For numeric columns, fill missing values with median
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # For categorical columns, fill missing values with mode
+    categorical_cols = df_clean.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_clean[col].isnull().any():
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 'unknown')
+    
+    # Remove outliers using IQR method for numeric columns
+    for col in numeric_cols:
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    # Print cleaning summary
+    print(f"Original dataset shape: {df.shape}")
+    print(f"Cleaned dataset shape: {df_clean.shape}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    print(f"Columns dropped due to missing values: {list(missing_cols)}")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate the structure and content of a DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'Customer ID': [1, 2, 2, 3, 4, 5, None, 6],
+        'Name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve', 'Frank', 'Grace'],
+        'Age': [25, 30, 30, 35, 40, 45, 50, 22],
+        'Salary': [50000, 60000, 60000, None, 80000, 90000, 100000, 120000],
+        'Department': ['Sales', 'IT', 'IT', 'HR', 'Sales', None, 'IT', 'HR']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df)
+    
+    # Validate the cleaned dataset
+    try:
+        validate_dataframe(cleaned_df, required_columns=['name', 'age', 'salary'])
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
