@@ -89,3 +89,128 @@ if __name__ == "__main__":
     print("Validation Results:")
     print(f"Is Valid: {validation['is_valid']}")
     print(f"Messages: {validation['messages']}")
+import pandas as pd
+import numpy as np
+from typing import List, Union
+
+def remove_duplicates(df: pd.DataFrame, subset: List[str] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, 
+                         column_types: dict) -> pd.DataFrame:
+    """
+    Convert columns to specified data types.
+    
+    Args:
+        df: Input DataFrame
+        column_types: Dictionary mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_converted = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_converted.columns:
+            try:
+                df_converted[column] = df_converted[column].astype(dtype)
+            except (ValueError, TypeError):
+                print(f"Warning: Could not convert column '{column}' to {dtype}")
+    return df_converted
+
+def handle_missing_values(df: pd.DataFrame, 
+                          strategy: str = 'drop',
+                          fill_value: Union[int, float, str] = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill' and fill_value is not None:
+        return df.fillna(fill_value)
+    else:
+        return df
+
+def normalize_column(df: pd.DataFrame, 
+                     column: str,
+                     method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df: Input DataFrame
+        column: Column name to normalize
+        method: 'minmax' or 'zscore'
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in df.columns:
+        return df
+    
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        col_min = df_normalized[column].min()
+        col_max = df_normalized[column].max()
+        if col_max != col_min:
+            df_normalized[column] = (df_normalized[column] - col_min) / (col_max - col_min)
+    
+    elif method == 'zscore':
+        col_mean = df_normalized[column].mean()
+        col_std = df_normalized[column].std()
+        if col_std > 0:
+            df_normalized[column] = (df_normalized[column] - col_mean) / col_std
+    
+    return df_normalized
+
+def clean_dataframe(df: pd.DataFrame,
+                    deduplicate: bool = True,
+                    type_conversions: dict = None,
+                    missing_strategy: str = 'drop',
+                    normalize_columns: List[str] = None) -> pd.DataFrame:
+    """
+    Apply multiple cleaning operations to DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Dictionary of column type conversions
+        missing_strategy: Strategy for handling missing values
+        normalize_columns: List of columns to normalize
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    if normalize_columns:
+        for column in normalize_columns:
+            cleaned_df = normalize_column(cleaned_df, column)
+    
+    return cleaned_df
