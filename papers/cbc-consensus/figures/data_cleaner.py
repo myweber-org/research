@@ -934,3 +934,17 @@ def clean_dataframe(df, remove_dups=True, fill_na=True, normalize=True):
         operations['normalization_applied'] = True
     
     return cleaned_df, operations
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_data = [3, 1, 2, 1, 4, 3, 5, 2]
+    cleaned = remove_duplicates_preserve_order(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
