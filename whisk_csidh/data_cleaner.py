@@ -428,3 +428,131 @@ def get_data_summary(df):
         }
     
     return summary
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to remove duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing and cleaned_df.isnull().sum().any():
+        if fill_strategy == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_strategy == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_strategy == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+                else:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+        elif fill_strategy == 'zero':
+            cleaned_df = cleaned_df.fillna(0)
+        else:
+            raise ValueError("Invalid fill_strategy. Choose from 'mean', 'median', 'mode', or 'zero'.")
+        
+        print(f"Filled missing values using {fill_strategy} strategy.")
+    
+    return cleaned_df
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers from specified columns using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to process. If None, process all numeric columns.
+    multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    cleaned_df = df.copy()
+    initial_rows = len(cleaned_df)
+    
+    for col in columns:
+        if col in cleaned_df.columns and cleaned_df[col].dtype in [np.float64, np.int64]:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            mask = (cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)
+            cleaned_df = cleaned_df[mask]
+    
+    removed = initial_rows - len(cleaned_df)
+    print(f"Removed {removed} outlier rows.")
+    
+    return cleaned_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to standardize. If None, standardize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    standardized_df = df.copy()
+    
+    for col in columns:
+        if col in standardized_df.columns and standardized_df[col].dtype in [np.float64, np.int64]:
+            mean = standardized_df[col].mean()
+            std = standardized_df[col].std()
+            if std > 0:
+                standardized_df[col] = (standardized_df[col] - mean) / std
+    
+    print(f"Standardized {len(columns)} columns.")
+    
+    return standardized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan, 7, 8, 9, 100],
+        'B': [10, 20, 20, 40, 50, 60, 70, 80, 90, 1000],
+        'C': ['a', 'b', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaning dataset...")
+    
+    cleaned = clean_dataset(df, fill_strategy='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    no_outliers = remove_outliers_iqr(cleaned, columns=['A', 'B'])
+    print("\nDataFrame after outlier removal:")
+    print(no_outliers)
+    
+    standardized = standardize_columns(no_outliers, columns=['A', 'B'])
+    print("\nStandardized DataFrame:")
+    print(standardized)
