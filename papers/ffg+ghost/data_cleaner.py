@@ -363,3 +363,118 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset('raw_data.csv', ['age', 'income', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
     print(f"Data cleaning complete. Remaining records: {len(cleaned_data)}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. 
+                        Options: 'mean', 'median', 'mode', 'zero', or 'drop'.
+                        Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Dropped rows with missing values.")
+    elif fill_missing in ['mean', 'median', 'mode']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[col].median()
+                elif fill_missing == 'mode':
+                    fill_value = cleaned_df[col].mode()[0]
+                
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                print(f"Filled missing values in column '{col}' with {fill_missing}: {fill_value:.2f}")
+    elif fill_missing == 'zero':
+        cleaned_df = cleaned_df.fillna(0)
+        print("Filled missing values with zeros.")
+    
+    return cleaned_df
+
+def validate_dataset(df, check_duplicates=True, check_missing=True):
+    """
+    Validate a DataFrame for common data quality issues.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    check_duplicates (bool): Check for duplicate rows.
+    check_missing (bool): Check for missing values.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_duplicates:
+        duplicates = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicates
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        missing_total = missing_counts.sum()
+        validation_results['missing_values'] = missing_total
+        validation_results['missing_by_column'] = missing_counts[missing_counts > 0].to_dict()
+    
+    return validation_results
+
+def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
+    """
+    Remove outliers from specified columns using IQR or Z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to check for outliers.
+                    If None, uses all numeric columns.
+    method (str): Method to detect outliers. Options: 'iqr' or 'zscore'.
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    initial_rows = len(df_clean)
+    
+    for col in columns:
+        if col not in df_clean.columns or not np.issubdtype(df_clean[col].dtype, np.number):
+            continue
+        
+        if method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+        elif method == 'zscore':
+            z_scores = np.abs((df_clean[col] - df_clean[col].mean()) / df_clean[col].std())
+            mask = z_scores <= threshold
+        
+        df_clean = df_clean[mask]
+    
+    removed = initial_rows - len(df_clean)
+    print(f"Removed {removed} rows containing outliers.")
+    
+    return df_clean
