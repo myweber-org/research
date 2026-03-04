@@ -313,3 +313,43 @@ if __name__ == "__main__":
     print("\nSummary statistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+            self.df = self.df[(z_scores < threshold) | (self.df[col].isna())]
+        return self
+    
+    def normalize_minmax(self):
+        for col in self.numeric_columns:
+            min_val = self.df[col].min()
+            max_val = self.df[col].max()
+            if max_val > min_val:
+                self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        return self
+    
+    def fill_missing_median(self):
+        for col in self.numeric_columns:
+            self.df[col] = self.df[col].fillna(self.df[col].median())
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+
+def process_dataset(filepath):
+    raw_data = pd.read_csv(filepath)
+    cleaner = DataCleaner(raw_data)
+    cleaned = (cleaner
+               .remove_outliers_zscore()
+               .fill_missing_median()
+               .normalize_minmax()
+               .get_cleaned_data())
+    return cleaned
