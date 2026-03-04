@@ -1552,3 +1552,79 @@ if __name__ == "__main__":
     # Validate the cleaned DataFrame
     is_valid = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
     print(f"\nDataFrame validation: {'Passed' if is_valid else 'Failed'}")
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, perform data cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Remove rows where all values are NaN
+        df = df.dropna(how='all')
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned data saved to {output_file}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+def validate_data(df):
+    """
+    Perform basic data validation checks.
+    """
+    if df is None or df.empty:
+        print("DataFrame is empty or None.")
+        return False
+    
+    # Check for remaining NaN values
+    nan_count = df.isna().sum().sum()
+    if nan_count > 0:
+        print(f"Warning: {nan_count} NaN values still present in the data.")
+    
+    # Check for negative values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if (df[col] < 0).any():
+            print(f"Warning: Negative values found in column '{col}'.")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        is_valid = validate_data(cleaned_df)
+        if is_valid:
+            print("Data validation passed.")
+        else:
+            print("Data validation failed.")
