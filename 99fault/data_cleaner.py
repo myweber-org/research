@@ -293,4 +293,59 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(df, ['values'])
     print("\nCleaned Data:")
-    print(cleaned)
+    print(cleaned)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Normalize data using min-max scaling
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def clean_dataset(df, numeric_columns):
+    """
+    Main cleaning pipeline
+    """
+    if df.empty:
+        return df
+    
+    df_cleaned = df.copy()
+    
+    df_cleaned = remove_outliers_iqr(df_cleaned, numeric_columns)
+    df_cleaned = normalize_minmax(df_cleaned, numeric_columns)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+    
+    return True
