@@ -63,3 +63,11 @@ if __name__ == "__main__":
     cleaned_df = remove_outliers_iqr(df, 'values')
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'values'))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
