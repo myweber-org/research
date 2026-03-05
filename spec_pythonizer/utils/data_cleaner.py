@@ -1098,4 +1098,129 @@ if __name__ == "__main__":
     for col, col_stats in stats.items():
         print(f"\n{col}:")
         for stat_name, stat_value in col_stats.items():
-            print(f"  {stat_name}: {stat_value:.2f}")
+            print(f"  {stat_name}: {stat_value:.2f}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_indices = np.where(z_scores < threshold)[0]
+    
+    filtered_data = data.iloc[filtered_indices].reset_index(drop=True)
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, method='iqr', normalize=False):
+    """
+    Main function to clean dataset by removing outliers and optionally normalizing
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        elif method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        else:
+            raise ValueError("Method must be either 'iqr' or 'zscore'")
+    
+    if normalize:
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 1, 1000)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    print("Original data statistics:")
+    print(sample_data.describe())
+    
+    cleaned_data = clean_dataset(sample_data, numeric_columns=['A', 'B'], method='iqr', normalize=True)
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned data statistics:")
+    print(cleaned_data.describe())
