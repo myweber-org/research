@@ -481,3 +481,79 @@ if __name__ == "__main__":
     
     threshold_data = [10, 5, 20, 5, 15, 10]
     print("\nData with threshold 12:", clean_data_with_threshold(threshold_data, 12))
+import pandas as pd
+
+def clean_dataframe(df, id_column=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        id_column (str, optional): Column name to use for identifying duplicates.
+                                   If None, uses all columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    cleaned_df.columns = (
+        cleaned_df.columns
+        .str.lower()
+        .str.replace(' ', '_')
+        .str.replace(r'[^\w_]', '', regex=True)
+    )
+    
+    # Remove duplicate rows
+    if id_column and id_column in cleaned_df.columns:
+        cleaned_df = cleaned_df.drop_duplicates(subset=[id_column])
+    else:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def sample_dataframe(df, n=5, random_state=42):
+    """
+    Return a random sample from the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        n (int): Number of samples to return.
+        random_state (int): Random seed for reproducibility.
+    
+    Returns:
+        pd.DataFrame: Sampled DataFrame.
+    """
+    if len(df) <= n:
+        return df
+    
+    return df.sample(n=n, random_state=random_state)
