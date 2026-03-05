@@ -340,3 +340,11 @@ def calculate_missing_percentage(df: pd.DataFrame) -> pd.Series:
     total_rows = len(df)
     missing_percentage = (missing_counts / total_rows) * 100
     return missing_percentage.round(2)
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
