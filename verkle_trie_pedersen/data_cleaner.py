@@ -115,3 +115,103 @@ def clean_dataset(df, numeric_columns, outlier_removal=True, normalization='minm
             cleaned_df = standardize_zscore(cleaned_df, col)
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_standard(data, column):
+    """
+    Normalize data using Standard scaling
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def clean_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with different strategies
+    """
+    cleaned_data = data.copy()
+    
+    for column in cleaned_data.columns:
+        if cleaned_data[column].isnull().any():
+            if strategy == 'mean':
+                cleaned_data[column].fillna(cleaned_data[column].mean(), inplace=True)
+            elif strategy == 'median':
+                cleaned_data[column].fillna(cleaned_data[column].median(), inplace=True)
+            elif strategy == 'mode':
+                cleaned_data[column].fillna(cleaned_data[column].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                cleaned_data.dropna(subset=[column], inplace=True)
+    
+    return cleaned_data
+
+def validate_dataframe(data):
+    """
+    Validate dataframe structure and content
+    """
+    validation_results = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'missing_values': data.isnull().sum().sum(),
+        'duplicate_rows': data.duplicated().sum(),
+        'data_types': data.dtypes.to_dict()
+    }
+    return validation_results
+
+def process_data_pipeline(data, config):
+    """
+    Complete data processing pipeline
+    """
+    processed_data = data.copy()
+    
+    # Clean missing values
+    if 'missing_strategy' in config:
+        processed_data = clean_missing_values(processed_data, config['missing_strategy'])
+    
+    # Handle outliers
+    if 'outlier_columns' in config:
+        for column in config['outlier_columns']:
+            if column in processed_data.columns:
+                processed_data = remove_outliers_zscore(processed_data, column)
+    
+    # Normalize data
+    if 'normalize_columns' in config:
+        for column, method in config['normalize_columns'].items():
+            if column in processed_data.columns:
+                if method == 'minmax':
+                    processed_data[column] = normalize_minmax(processed_data, column)
+                elif method == 'standard':
+                    processed_data[column] = normalize_standard(processed_data, column)
+    
+    return processed_data
