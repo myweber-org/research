@@ -614,3 +614,116 @@ def clean_dataset(input_file, output_file):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names containing text data
+    fill_strategy (str): Strategy for filling numeric missing values ('mean', 'median', 'mode')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values for numeric columns
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            if fill_strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif fill_strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif fill_strategy == 'mode':
+                fill_value = df_clean[col].mode()[0]
+            else:
+                fill_value = 0
+            df_clean[col].fillna(fill_value, inplace=True)
+    
+    # Standardize text columns
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                # Convert to string, strip whitespace, and convert to lowercase
+                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+                # Replace empty strings with NaN then fill with 'unknown'
+                df_clean[col] = df_clean[col].replace(['', 'nan', 'none'], np.nan)
+                df_clean[col].fillna('unknown', inplace=True)
+    
+    # Remove duplicate rows
+    df_clean = df_clean.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_clean.reset_index(drop=True, inplace=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Dictionary containing validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    # Check required columns
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    # Count null values
+    for col in df.columns:
+        null_count = df[col].isnull().sum()
+        if null_count > 0:
+            validation_results['null_counts'][col] = null_count
+    
+    # Record data types
+    for col in df.columns:
+        validation_results['data_types'][col] = str(df[col].dtype)
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'name': ['John', 'Jane', None, 'Bob', 'Alice'],
+        'age': [25, 30, None, 35, 40],
+        'score': [85.5, 92.0, 78.5, None, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, text_columns=['name'], fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
