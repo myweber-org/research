@@ -1911,3 +1911,48 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid}, Message: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        df_clean = self.df.copy()
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            df_clean = df_clean[z_scores < threshold]
+        self.df = df_clean.reset_index(drop=True)
+        return self
+        
+    def normalize_minmax(self):
+        for col in self.numeric_columns:
+            min_val = self.df[col].min()
+            max_val = self.df[col].max()
+            if max_val > min_val:
+                self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        return self
+        
+    def fill_missing_median(self):
+        for col in self.numeric_columns:
+            self.df[col] = self.df[col].fillna(self.df[col].median())
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df.copy()
+        
+    def summary(self):
+        print(f"Original shape: {self.df.shape}")
+        print(f"Numeric columns: {list(self.numeric_columns)}")
+        print(f"Missing values:")
+        print(self.df[self.numeric_columns].isnull().sum())
+
+def process_dataset(filepath):
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    cleaner.summary()
+    cleaner.fill_missing_median().remove_outliers_zscore().normalize_minmax()
+    return cleaner.get_cleaned_data()
