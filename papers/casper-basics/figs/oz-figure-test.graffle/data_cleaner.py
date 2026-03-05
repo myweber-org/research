@@ -1,90 +1,97 @@
-
-def clean_data(data):
-    """
-    Remove duplicate entries from a list and sort the remaining items.
-    
-    Args:
-        data (list): A list of comparable items (e.g., numbers or strings).
-    
-    Returns:
-        list: A new list with duplicates removed and sorted.
-    """
-    if not isinstance(data, list):
-        raise TypeError("Input must be a list")
-    
-    unique_data = list(set(data))
-    unique_data.sort()
-    return unique_data
+import pandas as pd
 import numpy as np
+from typing import Optional, Dict, List
 
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a pandas DataFrame column using the IQR method.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def calculate_summary_statistics(data, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if data.empty:
-        return {}
-    
-    stats = {
-        'mean': np.mean(data[column]),
-        'median': np.median(data[column]),
-        'std': np.std(data[column]),
-        'min': np.min(data[column]),
-        'max': np.max(data[column]),
-        'count': len(data[column])
-    }
-    return stats
-
-def clean_dataset(data, columns_to_clean):
-    """
-    Clean multiple columns in a dataset by removing outliers.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
-    """
-    cleaned_data = data.copy()
-    statistics = {}
-    
-    for column in columns_to_clean:
-        if column in cleaned_data.columns:
-            original_count = len(cleaned_data)
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-            removed_count = original_count - len(cleaned_data)
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.columns
             
-            stats = calculate_summary_statistics(cleaned_data, column)
-            stats['outliers_removed'] = removed_count
-            statistics[column] = stats
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df.dropna(subset=[col], inplace=True)
+                else:
+                    self.df[col].fillna(0, inplace=True)
+        return self
     
-    return cleaned_data, statistics
+    def convert_types(self, type_map: Dict[str, str]) -> 'DataCleaner':
+        for col, dtype in type_map.items():
+            if col in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[col] = pd.to_datetime(self.df[col])
+                    elif dtype == 'numeric':
+                        self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+                    elif dtype == 'category':
+                        self.df[col] = self.df[col].astype('category')
+                    else:
+                        self.df[col] = self.df[col].astype(dtype)
+                except Exception as e:
+                    print(f"Error converting column {col} to {dtype}: {e}")
+        return self
+    
+    def remove_outliers(self, column: str, method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        if column not in self.df.columns:
+            return self
+            
+        if method == 'iqr':
+            Q1 = self.df[column].quantile(0.25)
+            Q3 = self.df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_summary(self) -> Dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+
+def clean_csv_file(input_path: str, output_path: str, cleaning_steps: Optional[Dict] = None) -> Dict:
+    try:
+        df = pd.read_csv(input_path)
+        cleaner = DataCleaner(df)
+        
+        if cleaning_steps:
+            if 'missing_values' in cleaning_steps:
+                cleaner.handle_missing_values(**cleaning_steps['missing_values'])
+            if 'type_conversion' in cleaning_steps:
+                cleaner.convert_types(cleaning_steps['type_conversion'])
+            if 'outlier_removal' in cleaning_steps:
+                for outlier_config in cleaning_steps['outlier_removal']:
+                    cleaner.remove_outliers(**outlier_config)
+        
+        cleaned_df = cleaner.get_cleaned_data()
+        cleaned_df.to_csv(output_path, index=False)
+        
+        return {
+            'success': True,
+            'summary': cleaner.get_summary(),
+            'output_file': output_path
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
