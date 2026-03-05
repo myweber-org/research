@@ -265,3 +265,78 @@ def validate_dataframe(df):
     if df.empty:
         raise ValueError("DataFrame is empty")
     return True
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def clean_dataframe(df: pd.DataFrame, 
+                    drop_duplicates: bool = True,
+                    columns_to_standardize: Optional[List[str]] = None,
+                    date_columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by removing duplicates, standardizing text columns,
+    and parsing date columns.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows")
+    
+    if columns_to_standardize:
+        for col in columns_to_standardize:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+                df_clean[col] = df_clean[col].replace('nan', np.nan)
+                df_clean[col] = df_clean[col].replace('none', np.nan)
+    
+    if date_columns:
+        for col in date_columns:
+            if col in df_clean.columns:
+                df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
+    
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+    
+    df_clean = df_clean.reset_index(drop=True)
+    return df_clean
+
+def validate_email(email_series: pd.Series) -> pd.Series:
+    """
+    Validate email addresses in a pandas Series.
+    Returns a boolean Series indicating valid emails.
+    """
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return email_series.astype(str).str.match(pattern)
+
+def remove_outliers_iqr(df: pd.DataFrame, 
+                       column: str, 
+                       multiplier: float = 1.5) -> pd.DataFrame:
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    return df[mask].copy()
+
+def calculate_missing_percentage(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate the percentage of missing values for each column.
+    """
+    missing_counts = df.isnull().sum()
+    total_rows = len(df)
+    missing_percentage = (missing_counts / total_rows) * 100
+    return missing_percentage.round(2)
