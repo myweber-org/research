@@ -1,10 +1,5 @@
-
-import pandas as pd
 import numpy as np
-from scipy import stats
-
-def load_data(filepath):
-    return pd.read_csv(filepath)
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     Q1 = df[column].quantile(0.25)
@@ -14,28 +9,42 @@ def remove_outliers_iqr(df, column):
     upper_bound = Q3 + 1.5 * IQR
     return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def normalize_column(df, column):
-    mean = df[column].mean()
-    std = df[column].std()
-    df[column] = (df[column] - mean) / std
-    return df
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        return df[column].apply(lambda x: 0.0)
+    return (df[column] - min_val) / (max_val - min_val)
 
-def clean_dataset(input_file, output_file):
-    df = load_data(input_file)
-    
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
     for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df):
+    required_checks = [
+        (lambda x: isinstance(x, pd.DataFrame), "Input must be a pandas DataFrame"),
+        (lambda x: not x.empty, "DataFrame cannot be empty"),
+        (lambda x: x.isnull().sum().sum() == 0, "DataFrame contains null values")
+    ]
     
-    for col in numeric_columns:
-        df = normalize_column(df, col)
-    
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    return df
+    for check_func, error_msg in required_checks:
+        if not check_func(df):
+            raise ValueError(error_msg)
+    return True
 
 if __name__ == "__main__":
-    input_path = "raw_data.csv"
-    output_path = "cleaned_data.csv"
-    cleaned_df = clean_dataset(input_path, output_path)
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 50),
+        'feature_b': np.random.exponential(2.0, 50),
+        'category': np.random.choice(['X', 'Y', 'Z'], 50)
+    })
+    
+    print("Original shape:", sample_data.shape)
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print("Cleaned shape:", cleaned.shape)
+    print("Sample cleaned data:")
+    print(cleaned.head())
