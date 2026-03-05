@@ -726,4 +726,86 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
     print("Validation Results:")
     for key, value in validation.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[list] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset)
+        return self
+        
+    def fill_missing_numeric(self, strategy: str = 'mean', fill_value: float = 0) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'constant':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+            
+        return self
+        
+    def fill_missing_categorical(self, strategy: str = 'mode', fill_value: str = 'Unknown') -> 'DataCleaner':
+        categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns
+        
+        if strategy == 'mode':
+            for col in categorical_cols:
+                mode_value = self.df[col].mode()
+                if not mode_value.empty:
+                    self.df[col] = self.df[col].fillna(mode_value[0])
+        elif strategy == 'constant':
+            self.df[categorical_cols] = self.df[categorical_cols].fillna(fill_value)
+            
+        return self
+        
+    def remove_columns_with_high_missing(self, threshold: float = 0.5) -> 'DataCleaner':
+        missing_ratio = self.df.isnull().sum() / len(self.df)
+        cols_to_drop = missing_ratio[missing_ratio > threshold].index
+        self.df = self.df.drop(columns=cols_to_drop)
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_cleaning_report(self) -> dict:
+        report = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1],
+            'missing_values_before': self.df.isnull().sum().sum(),
+            'missing_values_after': self.df.isnull().sum().sum()
+        }
+        return report
+
+def load_and_clean_csv(filepath: str, **kwargs) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if 'remove_duplicates' in kwargs and kwargs['remove_duplicates']:
+        cleaner.remove_duplicates(kwargs.get('duplicate_subset'))
+    
+    if 'fill_numeric' in kwargs:
+        cleaner.fill_missing_numeric(
+            strategy=kwargs.get('numeric_strategy', 'mean'),
+            fill_value=kwargs.get('numeric_fill_value', 0)
+        )
+    
+    if 'fill_categorical' in kwargs:
+        cleaner.fill_missing_categorical(
+            strategy=kwargs.get('categorical_strategy', 'mode'),
+            fill_value=kwargs.get('categorical_fill_value', 'Unknown')
+        )
+    
+    if 'remove_high_missing' in kwargs and kwargs['remove_high_missing']:
+        cleaner.remove_columns_with_high_missing(
+            threshold=kwargs.get('missing_threshold', 0.5)
+        )
+    
+    return cleaner.get_cleaned_data()
