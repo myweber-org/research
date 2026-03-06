@@ -1,77 +1,107 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
     """
-    if column not in df.columns:
+    if column not in dataframe.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
 
-def calculate_summary_statistics(df, column):
+def normalize_minmax(dataframe, columns=None):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Normalize specified columns using min-max scaling.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
     
     Returns:
-    dict: Dictionary containing summary statistics
+    pd.DataFrame: DataFrame with normalized columns
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column])
-    }
+    normalized_df = dataframe.copy()
+    for col in columns:
+        if col not in normalized_df.columns:
+            continue
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        if col_max != col_min:
+            normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_df[col] = 0
     
-    return stats
+    return normalized_df
 
-def example_usage():
+def detect_skewed_columns(dataframe, threshold=0.5):
     """
-    Example demonstrating the usage of data cleaning functions.
+    Detect columns with significant skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    threshold (float): Absolute skewness threshold
+    
+    Returns:
+    dict: Dictionary with column names and their skewness values
     """
-    np.random.seed(42)
-    data = {
-        'values': np.random.normal(100, 15, 1000).tolist() + [500, -200, 1000]
-    }
+    skewed_cols = {}
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
     
-    df = pd.DataFrame(data)
+    for col in numeric_cols:
+        skewness = stats.skew(dataframe[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
     
-    print("Original data shape:", df.shape)
-    print("Original statistics:", calculate_summary_statistics(df, 'values'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'values'))
-    
-    return cleaned_df
+    return skewed_cols
 
-if __name__ == "__main__":
-    cleaned_data = example_usage()
+def clean_dataset(dataframe, outlier_columns=None, normalize=True, skew_threshold=0.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    outlier_columns (list): Columns to check for outliers. If None, check all numeric columns.
+    normalize (bool): Whether to normalize numeric columns
+    skew_threshold (float): Skewness detection threshold
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = dataframe.copy()
+    
+    if outlier_columns is None:
+        outlier_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in outlier_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    if normalize:
+        cleaned_df = normalize_minmax(cleaned_df)
+    
+    skewed_info = detect_skewed_columns(cleaned_df, skew_threshold)
+    
+    return cleaned_df, skewed_info
