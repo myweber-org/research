@@ -130,3 +130,121 @@ if __name__ == "__main__":
     
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_threshold=0.5, fill_strategy='median'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_threshold (float): Threshold for dropping columns with too many nulls
+    fill_strategy (str): Strategy for filling missing values ('median', 'mean', 'mode')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    cleaned_df.columns = cleaned_df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Identify columns with excessive missing values
+    null_percentage = cleaned_df.isnull().mean()
+    columns_to_drop = null_percentage[null_percentage > drop_threshold].index.tolist()
+    
+    if columns_to_drop:
+        print(f"Dropping columns with >{drop_threshold*100}% nulls: {columns_to_drop}")
+        cleaned_df = cleaned_df.drop(columns=columns_to_drop)
+    
+    # Handle remaining missing values
+    for column in cleaned_df.columns:
+        if cleaned_df[column].isnull().any():
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                if fill_strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                else:
+                    fill_value = cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 0
+                cleaned_df[column].fillna(fill_value, inplace=True)
+            else:
+                # For categorical/text columns, fill with mode or 'unknown'
+                mode_values = cleaned_df[column].mode()
+                fill_value = mode_values[0] if not mode_values.empty else 'unknown'
+                cleaned_df[column].fillna(fill_value, inplace=True)
+    
+    # Remove duplicate rows
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates()
+    duplicates_removed = initial_rows - len(cleaned_df)
+    
+    if duplicates_removed > 0:
+        print(f"Removed {duplicates_removed} duplicate rows")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of columns that must be present
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append("Input is not a pandas DataFrame")
+        return validation_results
+    
+    if df.empty:
+        validation_results['warnings'].append("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing required columns: {missing_columns}")
+    
+    # Check for completely empty columns
+    empty_columns = df.columns[df.isnull().all()].tolist()
+    if empty_columns:
+        validation_results['warnings'].append(f"Completely empty columns: {empty_columns}")
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Customer ID': [1, 2, 3, 4, 5],
+        'Order Value': [100.0, 200.0, np.nan, 400.0, 500.0],
+        'Product Category': ['A', 'B', 'A', np.nan, 'C'],
+        'Empty Column': [np.nan, np.nan, np.nan, np.nan, np.nan]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, drop_threshold=0.3, fill_strategy='median')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    validation = validate_dataframe(cleaned, required_columns=['customer_id', 'order_value'])
+    print("\nValidation Results:")
+    print(validation)
