@@ -234,3 +234,115 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
     print("Cleaned shape:", cleaned.shape)
     print("Data validation passed:", validate_dataframe(cleaned))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)].copy()
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    mask = z_scores < threshold
+    valid_indices = data[column].dropna().index[mask]
+    
+    return data.loc[valid_indices].copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    min_val = data_copy[column].min()
+    max_val = data_copy[column].max()
+    
+    if max_val - min_val == 0:
+        data_copy[column] = 0.5
+    else:
+        data_copy[column] = (data_copy[column] - min_val) / (max_val - min_val)
+    
+    return data_copy
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data_copy = data.copy()
+    mean_val = data_copy[column].mean()
+    std_val = data_copy[column].std()
+    
+    if std_val == 0:
+        data_copy[column] = 0
+    else:
+        data_copy[column] = (data_copy[column] - mean_val) / std_val
+    
+    return data_copy
+
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Main function to clean dataset by removing outliers and normalizing numeric columns
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, column)
+        
+        if normalize_method == 'minmax':
+            cleaned_df = normalize_minmax(cleaned_df, column)
+        elif normalize_method == 'zscore':
+            cleaned_df = normalize_zscore(cleaned_df, column)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, check_missing=True, check_duplicates=True):
+    """
+    Validate data quality
+    """
+    validation_results = {}
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_columns
+    
+    if check_missing:
+        missing_values = df.isnull().sum().sum()
+        validation_results['total_missing_values'] = missing_values
+    
+    if check_duplicates:
+        duplicate_rows = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_rows
+    
+    return validation_results
