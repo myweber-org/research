@@ -451,3 +451,11 @@ if __name__ == "__main__":
     print(f"\nCleaned shape: {cleaned_df.shape}")
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+def remove_duplicates_preserve_order(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
