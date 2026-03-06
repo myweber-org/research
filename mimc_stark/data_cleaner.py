@@ -907,3 +907,7 @@ def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
             cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_multiplier)
     
     return cleaned_data
+def remove_duplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
