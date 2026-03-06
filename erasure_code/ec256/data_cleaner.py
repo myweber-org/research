@@ -213,4 +213,157 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    print(calculate_summary_statistics(cleaned_df, 'A'))import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Parameters:
+    file_path (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values.
+                         Options: 'mean', 'median', 'mode', 'zero'.
+    drop_threshold (float): Drop columns with missing ratio above this threshold.
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame.
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    except Exception as e:
+        raise Exception(f"Error reading file: {e}")
+    
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    
+    missing_percent = (df.isnull().sum() / len(df)) * 100
+    columns_to_drop = missing_percent[missing_percent > drop_threshold * 100].index
+    df = df.drop(columns=columns_to_drop)
+    
+    if len(columns_to_drop) > 0:
+        print(f"Dropped columns with >{drop_threshold*100}% missing values: {list(columns_to_drop)}")
+    
+    for column in df.columns:
+        if df[column].dtype in ['int64', 'float64']:
+            if fill_strategy == 'mean':
+                fill_value = df[column].mean()
+            elif fill_strategy == 'median':
+                fill_value = df[column].median()
+            elif fill_strategy == 'mode':
+                fill_value = df[column].mode()[0]
+            elif fill_strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown fill strategy: {fill_strategy}")
+            
+            df[column].fillna(fill_value, inplace=True)
+        else:
+            df[column].fillna(df[column].mode()[0], inplace=True)
+    
+    print(f"Cleaned data shape: {df.shape}")
+    print(f"Removed {original_shape[1] - df.shape[1]} columns")
+    print(f"Total missing values after cleaning: {df.isnull().sum().sum()}")
+    
+    return df
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    column (str): Column name to check for outliers.
+    threshold (float): IQR multiplier threshold.
+    
+    Returns:
+    tuple: (lower_bound, upper_bound, outlier_indices)
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outlier_mask = (df[column] < lower_bound) | (df[column] > upper_bound)
+    outlier_indices = df[outlier_mask].index.tolist()
+    
+    return lower_bound, upper_bound, outlier_indices
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Parameters:
+    df (pandas.DataFrame): Input DataFrame.
+    column (str): Column name to normalize.
+    method (str): Normalization method ('minmax' or 'zscore').
+    
+    Returns:
+    pandas.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric")
+    
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+        else:
+            df_copy[column] = 0
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+        else:
+            df_copy[column] = 0
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
+    
+    return df_copy
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, np.nan, np.nan, 4, 5],
+        'C': [10, 20, 30, 40, 50],
+        'D': [100, 200, 300, np.nan, 500]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', fill_strategy='mean', drop_threshold=0.5)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    lower, upper, outliers = detect_outliers_iqr(cleaned_df, 'C')
+    print(f"\nOutlier detection for column 'C':")
+    print(f"Lower bound: {lower}, Upper bound: {upper}")
+    print(f"Outlier indices: {outliers}")
+    
+    normalized_df = normalize_column(cleaned_df, 'C', method='minmax')
+    print(f"\nNormalized column 'C':")
+    print(normalized_df['C'].tolist())
+    
+    import os
+    os.remove('test_data.csv')
