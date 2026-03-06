@@ -859,4 +859,151 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def z_score_normalization(data, column):
+    """
+    Apply z-score normalization to a column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def min_max_normalization(data, column, feature_range=(0, 1)):
+    """
+    Apply min-max normalization to a column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        min_target, max_target = feature_range
+        normalized = normalized * (max_target - min_target) + min_target
+    
+    return normalized
+
+def detect_missing_patterns(data, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values
+    """
+    missing_percentage = data.isnull().sum() / len(data)
+    high_missing_cols = missing_percentage[missing_percentage > threshold].index.tolist()
+    
+    return {
+        'missing_percentage': missing_percentage,
+        'high_missing_columns': high_missing_cols,
+        'total_missing': data.isnull().sum().sum()
+    }
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
+                  normalization_method='zscore', missing_threshold=0.3):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    report = {
+        'original_shape': data.shape,
+        'cleaning_steps': []
+    }
+    
+    missing_info = detect_missing_patterns(cleaned_data, missing_threshold)
+    report['missing_info'] = missing_info
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                original_len = len(cleaned_data)
+                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+                removed_count = original_len - len(cleaned_data)
+                report['cleaning_steps'].append(f"Removed {removed_count} outliers from {col}")
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in cleaned_data.columns:
+                if normalization_method == 'zscore':
+                    cleaned_data[f'{col}_normalized'] = z_score_normalization(cleaned_data, col)
+                elif normalization_method == 'minmax':
+                    cleaned_data[f'{col}_normalized'] = min_max_normalization(cleaned_data, col)
+                report['cleaning_steps'].append(f"Normalized {col} using {normalization_method}")
+    
+    report['final_shape'] = cleaned_data.shape
+    report['rows_removed'] = data.shape[0] - cleaned_data.shape[0]
+    report['columns_added'] = cleaned_data.shape[1] - data.shape[1]
+    
+    return cleaned_data, report
+
+def validate_data_types(data, expected_types):
+    """
+    Validate column data types against expected types
+    """
+    validation_results = {}
+    
+    for col, expected_type in expected_types.items():
+        if col in data.columns:
+            actual_type = str(data[col].dtype)
+            is_valid = actual_type == expected_type
+            validation_results[col] = {
+                'expected': expected_type,
+                'actual': actual_type,
+                'valid': is_valid
+            }
+    
+    return validation_results
+
+def save_cleaning_report(report, filepath):
+    """
+    Save cleaning report to a text file
+    """
+    with open(filepath, 'w') as f:
+        f.write("Data Cleaning Report\n")
+        f.write("=" * 50 + "\n\n")
+        
+        f.write(f"Original dataset shape: {report['original_shape']}\n")
+        f.write(f"Final dataset shape: {report['final_shape']}\n")
+        f.write(f"Rows removed: {report['rows_removed']}\n")
+        f.write(f"Columns added: {report['columns_added']}\n\n")
+        
+        f.write("Missing Values Analysis:\n")
+        f.write(f"Total missing values: {report['missing_info']['total_missing']}\n")
+        f.write("Columns with high missing percentage:\n")
+        for col in report['missing_info']['high_missing_columns']:
+            f.write(f"  - {col}\n")
+        
+        f.write("\nCleaning Steps Performed:\n")
+        for step in report['cleaning_steps']:
+            f.write(f"  - {step}\n")
