@@ -299,3 +299,33 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def fill_missing_with_mean(df, column):
+    mean_value = df[column].mean()
+    df[column] = df[column].fillna(mean_value)
+    return df
+
+def standardize_column(df, column):
+    mean = df[column].mean()
+    std = df[column].std()
+    df[column] = (df[column] - mean) / std
+    return df
+
+def detect_skewed_columns(df, threshold=0.5):
+    skewed_cols = []
+    for col in df.select_dtypes(include=[np.number]).columns:
+        skewness = stats.skew(df[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_cols.append((col, skewness))
+    return skewed_cols
