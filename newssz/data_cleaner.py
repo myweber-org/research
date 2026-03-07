@@ -283,3 +283,55 @@ if __name__ == "__main__":
     
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def normalize_column(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column].apply(lambda x: 0.0)
+    return (dataframe[column] - min_val) / (max_val - min_val)
+
+def clean_dataset(dataframe, numeric_columns):
+    cleaned_df = dataframe.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_column(cleaned_df, col)
+    return cleaned_df.reset_index(drop=True)
+
+def generate_summary(dataframe):
+    summary = {}
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        summary[col] = {
+            'mean': dataframe[col].mean(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max()
+        }
+    return summary
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 200),
+        'B': np.random.exponential(50, 200),
+        'C': np.random.uniform(0, 1, 200)
+    })
+    
+    cleaned_data = clean_dataset(sample_data, ['A', 'B', 'C'])
+    stats = generate_summary(cleaned_data)
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    print("\nStatistical summary:")
+    for col, values in stats.items():
+        print(f"{col}: {values}")
