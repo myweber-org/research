@@ -1,72 +1,65 @@
 
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, column_mapping=None, drop_duplicates=True):
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a pandas DataFrame by standardizing column names and removing duplicates.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        column_mapping (dict, optional): Dictionary mapping original column names 
-                                         to standardized names. Defaults to None.
-        drop_duplicates (bool, optional): Whether to remove duplicate rows. 
-                                          Defaults to True.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     """
+    original_shape = df.shape
     cleaned_df = df.copy()
-    
-    if column_mapping:
-        cleaned_df.rename(columns=column_mapping, inplace=True)
-    
+
     if drop_duplicates:
-        cleaned_df.drop_duplicates(inplace=True)
-    
-    cleaned_df.reset_index(drop=True, inplace=True)
-    
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Dropped {original_shape[0] - cleaned_df.shape[0]} duplicate rows.")
+
+    if fill_missing:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fill_missing == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'zero':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+        print(f"Filled missing values in numeric columns using '{fill_missing}' strategy.")
+
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    cleaned_df[categorical_cols] = cleaned_df[categorical_cols].fillna('Unknown')
+    print("Filled missing values in categorical columns with 'Unknown'.")
+
+    print(f"Original shape: {original_shape}, Cleaned shape: {cleaned_df.shape}")
     return cleaned_df
 
 def validate_dataframe(df, required_columns=None):
     """
-    Validate that a DataFrame meets basic requirements.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list, optional): List of column names that must be present.
-    
-    Returns:
-        tuple: (is_valid, error_message)
+    Validate the DataFrame for required columns and data types.
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
     if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+
+    if df.empty:
+        raise ValueError("DataFrame is empty.")
+
+    print("DataFrame validation passed.")
+    return True
 
 if __name__ == "__main__":
     sample_data = {
-        'Name': ['Alice', 'Bob', 'Alice', 'Charlie'],
-        'Age': [25, 30, 25, 35],
-        'City': ['NYC', 'LA', 'NYC', 'Chicago']
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, np.nan, 15.0, 20.0, np.nan, 30.0],
+        'category': ['A', 'B', 'B', None, 'C', 'A']
     }
-    
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    
-    column_mapping = {'Name': 'full_name', 'Age': 'age', 'City': 'city'}
-    cleaned_df = clean_dataset(df, column_mapping=column_mapping)
-    
+
+    cleaned_df = clean_dataframe(df, fill_missing='median')
     print("\nCleaned DataFrame:")
     print(cleaned_df)
-    
-    is_valid, message = validate_dataframe(cleaned_df, required_columns=['full_name', 'age'])
-    print(f"\nValidation: {message}")
+
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'value'])
+    except ValueError as e:
+        print(f"Validation error: {e}")
