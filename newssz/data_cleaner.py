@@ -180,3 +180,106 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_file = clean_dataset('raw_data.csv')
     print(f"Cleaned data saved to: {cleaned_file}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        filtered = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        removed_count = len(self.df) - len(filtered)
+        self.df = filtered
+        return removed_count
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        filtered = self.df[z_scores < threshold]
+        removed_count = len(self.df) - len(filtered)
+        self.df = filtered
+        return removed_count
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val != min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val > 0:
+                self.df[column] = (self.df[column] - mean_val) / std_val
+        return self.df[column]
+    
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = 0
+            
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self.df[column]
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_removed_stats(self):
+        current_rows = len(self.df)
+        removed_rows = self.original_shape[0] - current_rows
+        return {
+            'original_rows': self.original_shape[0],
+            'current_rows': current_rows,
+            'removed_rows': removed_rows,
+            'removed_percentage': (removed_rows / self.original_shape[0]) * 100 if self.original_shape[0] > 0 else 0
+        }
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'age': np.random.normal(35, 10, 100),
+        'income': np.random.normal(50000, 15000, 100),
+        'score': np.random.uniform(0, 100, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'income'] = np.nan
+    df.loc[5, 'age'] = 150
+    df.loc[6, 'age'] = -10
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Original data shape:", cleaner.original_shape)
+    print("\nMissing values before cleaning:")
+    print(sample_df.isnull().sum())
+    
+    removed_iqr = cleaner.remove_outliers_iqr('age')
+    print(f"\nRemoved {removed_iqr} outliers from 'age' using IQR")
+    
+    cleaner.fill_missing('income', strategy='mean')
+    cleaner.normalize_column('score', method='minmax')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    stats = cleaner.get_removed_stats()
+    
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("\nCleaning statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+    
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_df.head())
