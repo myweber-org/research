@@ -398,4 +398,113 @@ def handle_missing_values(df, column, strategy='mean'):
         raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
     
     df_copy[column] = df_copy[column].fillna(fill_value)
-    return df_copy
+    return df_copyimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    """
+    if not isinstance(data, pd.Series):
+        series = pd.Series(data)
+    else:
+        series = data.copy()
+    
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_series = series[(series >= lower_bound) & (series <= upper_bound)]
+    return filtered_series
+
+def normalize_minmax(data):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    """
+    data_array = np.array(data)
+    if len(data_array) == 0:
+        return data_array
+    
+    min_val = np.min(data_array)
+    max_val = np.max(data_array)
+    
+    if max_val == min_val:
+        return np.zeros_like(data_array)
+    
+    normalized = (data_array - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data):
+    """
+    Standardize data to have zero mean and unit variance.
+    """
+    data_array = np.array(data)
+    if len(data_array) == 0:
+        return data_array
+    
+    mean_val = np.mean(data_array)
+    std_val = np.std(data_array)
+    
+    if std_val == 0:
+        return np.zeros_like(data_array)
+    
+    standardized = (data_array - mean_val) / std_val
+    return standardized
+
+def clean_dataframe(df, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Clean a DataFrame by removing outliers and normalizing numeric columns.
+    """
+    cleaned_df = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            original_data = df[col].dropna()
+            if len(original_data) > 0:
+                # Remove outliers
+                cleaned_series = remove_outliers_iqr(original_data, col, outlier_threshold)
+                # Normalize the cleaned data
+                normalized_data = normalize_minmax(cleaned_series)
+                
+                # Create a new column with cleaned and normalized data
+                cleaned_df[f'{col}_cleaned'] = np.nan
+                cleaned_df.loc[cleaned_series.index, f'{col}_cleaned'] = normalized_data
+    
+    return cleaned_df
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for a dataset.
+    """
+    data_array = np.array(data)
+    stats_dict = {
+        'mean': np.mean(data_array),
+        'median': np.median(data_array),
+        'std': np.std(data_array),
+        'min': np.min(data_array),
+        'max': np.max(data_array),
+        'count': len(data_array)
+    }
+    return stats_dict
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.random.normal(50, 15, 1000)
+    sample_data_with_outliers = np.append(sample_data, [200, -100, 300])
+    
+    print("Original data statistics:")
+    print(calculate_statistics(sample_data_with_outliers))
+    
+    cleaned = remove_outliers_iqr(sample_data_with_outliers, 'sample', threshold=1.5)
+    print("\nCleaned data statistics:")
+    print(calculate_statistics(cleaned))
+    
+    normalized = normalize_minmax(cleaned)
+    print("\nNormalized data sample (first 10 values):")
+    print(normalized[:10])
