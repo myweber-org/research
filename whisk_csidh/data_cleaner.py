@@ -814,3 +814,82 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nData validation passed: {is_valid}")
+import pandas as pd
+
+def clean_dataset(df, strategy='mean', remove_duplicates=True):
+    """
+    Clean a pandas DataFrame by handling missing values and removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    strategy (str): Strategy for filling missing values. Options: 'mean', 'median', 'mode', 'drop'.
+    remove_duplicates (bool): Whether to remove duplicate rows.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif strategy in ['mean', 'median', 'mode']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if strategy == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+    
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df.reset_index(drop=True, inplace=True)
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, None, 4, 1],
+        'B': [5, None, 7, 8, 5],
+        'C': [9, 10, 11, 12, 9]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned = clean_dataset(df, strategy='mean', remove_duplicates=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print()
+    
+    is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=1)
+    print(f"Validation: {is_valid}")
+    print(f"Message: {message}")
