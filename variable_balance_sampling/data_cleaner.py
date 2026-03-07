@@ -521,3 +521,100 @@ if __name__ == "__main__":
     print("\nSummary Statistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns=None, outlier_factor=1.5):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    removal_stats = {}
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            cleaned_df, removed = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+            removal_stats[col] = removed
+            
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+            cleaned_df[f'{col}_standardized'] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df, removal_stats
+
+def validate_data(df, required_columns, numeric_threshold=0.8):
+    """
+    Validate data quality and completeness
+    """
+    validation_results = {
+        'missing_columns': [],
+        'high_missing': [],
+        'constant_columns': []
+    }
+    
+    for col in required_columns:
+        if col not in df.columns:
+            validation_results['missing_columns'].append(col)
+        else:
+            missing_ratio = df[col].isna().sum() / len(df)
+            if missing_ratio > numeric_threshold:
+                validation_results['high_missing'].append((col, missing_ratio))
+            
+            if df[col].nunique() == 1:
+                validation_results['constant_columns'].append(col)
+    
+    return validation_results
