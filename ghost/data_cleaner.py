@@ -181,4 +181,11 @@ if __name__ == "__main__":
         save_cleaned_data(cleaned_df, output_file)
         print("Data cleaning completed successfully")
     else:
-        print("Data cleaning failed")
+        print("Data cleaning failed")def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
