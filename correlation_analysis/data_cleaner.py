@@ -2089,3 +2089,133 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "Data validation passed"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def z_score_normalization(dataframe, column):
+    """
+    Apply z-score normalization to specified column
+    """
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val > 0:
+        dataframe[column + '_normalized'] = (dataframe[column] - mean_val) / std_val
+    else:
+        dataframe[column + '_normalized'] = 0
+    
+    return dataframe
+
+def min_max_scaling(dataframe, column, feature_range=(0, 1)):
+    """
+    Apply min-max scaling to specified column
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val > min_val:
+        scaled = (dataframe[column] - min_val) / (max_val - min_val)
+        scaled = scaled * (feature_range[1] - feature_range[0]) + feature_range[0]
+    else:
+        scaled = feature_range[0]
+    
+    dataframe[column + '_scaled'] = scaled
+    return dataframe
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    df_copy = dataframe.copy()
+    
+    if columns is None:
+        columns = df_copy.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_copy[col].mean()
+            elif strategy == 'median':
+                fill_value = df_copy[col].median()
+            elif strategy == 'mode':
+                fill_value = df_copy[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_copy[col].fillna(fill_value, inplace=True)
+    
+    return df_copy
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness
+    """
+    skewed_cols = []
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > threshold:
+            skewed_cols.append((col, skewness))
+    
+    return skewed_cols
+
+def log_transform_skewed(dataframe, columns):
+    """
+    Apply log transformation to reduce skewness
+    """
+    df_copy = dataframe.copy()
+    
+    for col in columns:
+        if col in df_copy.columns:
+            min_val = df_copy[col].min()
+            if min_val <= 0:
+                df_copy[col + '_log'] = np.log(df_copy[col] - min_val + 1)
+            else:
+                df_copy[col + '_log'] = np.log(df_copy[col])
+    
+    return df_copy
+
+def clean_dataset(dataframe, outlier_columns=None, normalize_columns=None, 
+                  missing_strategy='mean', skew_threshold=0.5):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    df_clean = dataframe.copy()
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in df_clean.columns:
+                df_clean = remove_outliers_iqr(df_clean, col)
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in df_clean.columns:
+                df_clean = z_score_normalization(df_clean, col)
+    
+    skewed = detect_skewed_columns(df_clean, threshold=skew_threshold)
+    skewed_cols = [col for col, _ in skewed]
+    
+    if skewed_cols:
+        df_clean = log_transform_skewed(df_clean, skewed_cols)
+    
+    return df_clean
