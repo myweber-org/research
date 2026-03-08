@@ -1,60 +1,60 @@
-
 import pandas as pd
-import re
 
-def clean_dataframe(df, columns_to_clean=None):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
     """
-    df_clean = df.copy()
+    cleaned_df = df.copy()
     
-    # Remove duplicate rows
-    initial_rows = df_clean.shape[0]
-    df_clean = df_clean.drop_duplicates()
-    removed_duplicates = initial_rows - df_clean.shape[0]
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    # If specific columns are provided, clean only those; otherwise clean all object columns
-    if columns_to_clean is None:
-        columns_to_clean = df_clean.select_dtypes(include=['object']).columns
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                mode_val = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None
+                cleaned_df[col].fillna(mode_val, inplace=True)
     
-    for col in columns_to_clean:
-        if col in df_clean.columns and df_clean[col].dtype == 'object':
-            df_clean[col] = df_clean[col].apply(_normalize_string)
-    
-    return df_clean, removed_duplicates
+    return cleaned_df
 
-def _normalize_string(text):
+def validate_data(df, required_columns=None, min_rows=1):
     """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
+    Validate the DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (bool, str) indicating success and message.
     """
-    if pd.isna(text):
-        return text
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    # Convert to string if not already
-    text = str(text)
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
     
-    # Convert to lowercase
-    text = text.lower()
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
-    # Remove extra whitespace
-    text = re.sub(r'\s+', ' ', text).strip()
-    
-    # Remove special characters (keep alphanumeric and basic punctuation)
-    text = re.sub(r'[^\w\s.,!?-]', '', text)
-    
-    return text
-
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a specified column.
-    """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    valid_emails = df[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
-    )
-    
-    return valid_emails
+    return True, "Data validation passed"
