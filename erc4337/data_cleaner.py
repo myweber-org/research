@@ -1043,3 +1043,41 @@ if __name__ == "__main__":
     print(f"Data cleaning complete. Original shape: {pd.read_csv(input_file).shape}")
     print(f"Cleaned data shape: {cleaned_df.shape}")
     print(f"Saved to: {output_file}")
+import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file, subset=None):
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+        final_count = len(df_cleaned)
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Removed {initial_count - final_count} duplicate rows.")
+        print(f"Cleaned data saved to {output_file}")
+        return df_cleaned
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        sys.exit(1)
+    except pd.errors.EmptyDataError:
+        print(f"Error: File '{input_file}' is empty.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python data_cleaner.py <input_csv> <output_csv> [subset_columns]")
+        print("Example: python data_cleaner.py raw_data.csv cleaned_data.csv")
+        print("Example with subset: python data_cleaner.py raw_data.csv cleaned_data.csv 'id,name'")
+        sys.exit(1)
+
+    input_csv = sys.argv[1]
+    output_csv = sys.argv[2]
+    subset_cols = None
+
+    if len(sys.argv) > 3:
+        subset_cols = sys.argv[3].split(',')
+
+    remove_duplicates(input_csv, output_csv, subset_cols)
