@@ -1,96 +1,79 @@
 
 import pandas as pd
-import numpy as np
+import re
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
-        self.categorical_columns = df.select_dtypes(include=['object']).columns
-
-    def handle_missing_values(self, strategy='mean', fill_value=None):
-        if strategy == 'mean':
-            for col in self.numeric_columns:
-                self.df[col].fillna(self.df[col].mean(), inplace=True)
-        elif strategy == 'median':
-            for col in self.numeric_columns:
-                self.df[col].fillna(self.df[col].median(), inplace=True)
-        elif strategy == 'mode':
-            for col in self.df.columns:
-                self.df[col].fillna(self.df[col].mode()[0], inplace=True)
-        elif strategy == 'constant':
-            if fill_value is not None:
-                self.df.fillna(fill_value, inplace=True)
-            else:
-                raise ValueError("fill_value must be provided for constant strategy")
-        else:
-            raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'constant'")
-        return self
-
-    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
-        if columns is None:
-            columns = self.numeric_columns
-        
-        for col in columns:
-            if col in self.numeric_columns:
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - multiplier * IQR
-                upper_bound = Q3 + multiplier * IQR
-                
-                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
-        return self
-
-    def standardize_data(self, columns=None):
-        if columns is None:
-            columns = self.numeric_columns
-        
-        for col in columns:
-            if col in self.numeric_columns:
-                mean = self.df[col].mean()
-                std = self.df[col].std()
-                if std > 0:
-                    self.df[col] = (self.df[col] - mean) / std
-        return self
-
-    def normalize_data(self, columns=None):
-        if columns is None:
-            columns = self.numeric_columns
-        
-        for col in columns:
-            if col in self.numeric_columns:
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
-        return self
-
-    def get_cleaned_data(self):
-        return self.df
-
-    def get_summary(self):
-        summary = {
-            'original_shape': self.df.shape,
-            'missing_values': self.df.isnull().sum().sum(),
-            'numeric_columns': list(self.numeric_columns),
-            'categorical_columns': list(self.categorical_columns)
-        }
-        return summary
-
-def load_and_clean_data(filepath, cleaning_steps=None):
-    df = pd.read_csv(filepath)
-    cleaner = DataCleaner(df)
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
-    if cleaning_steps:
-        for step in cleaning_steps:
-            if step['method'] == 'handle_missing_values':
-                cleaner.handle_missing_values(**step.get('params', {}))
-            elif step['method'] == 'remove_outliers':
-                cleaner.remove_outliers_iqr(**step.get('params', {}))
-            elif step['method'] == 'standardize':
-                cleaner.standardize_data(**step.get('params', {}))
-            elif step['method'] == 'normalize':
-                cleaner.normalize_data(**step.get('params', {}))
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_mapping (dict): Optional dictionary to rename columns
+    drop_duplicates (bool): Whether to remove duplicate rows
+    normalize_text (bool): Whether to normalize text columns
     
-    return cleaner.get_cleaned_data(), cleaner.get_summary()
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+        print(f"Normalized {len(text_columns)} text columns")
+    
+    return cleaned_df
+
+def _normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    text = text.strip()
+    text = re.sub(r'[^\w\s-]', '', text)
+    
+    return text
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    email_column (str): Name of the column containing email addresses
+    
+    Returns:
+    pd.DataFrame: DataFrame with validation results
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validation_results = df.copy()
+    validation_results['email_valid'] = validation_results[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
+    )
+    
+    valid_count = validation_results['email_valid'].sum()
+    total_count = len(validation_results)
+    
+    print(f"Email validation: {valid_count}/{total_count} valid emails ({valid_count/total_count*100:.1f}%)")
+    
+    return validation_results
