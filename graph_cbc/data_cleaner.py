@@ -1,57 +1,47 @@
 
 import pandas as pd
-import sys
 
-def remove_duplicates(input_file, output_file=None, subset=None):
+def clean_dataset(df, id_column='id'):
     """
-    Remove duplicate rows from a CSV file.
-    
-    Args:
-        input_file (str): Path to input CSV file
-        output_file (str): Path to output CSV file. If None, overwrites input file
-        subset (list): List of column names to consider for duplicates
-    
-    Returns:
-        int: Number of duplicates removed
+    Remove duplicate rows based on ID column and standardize column names.
     """
-    try:
-        df = pd.read_csv(input_file)
-        initial_count = len(df)
-        
-        df_clean = df.drop_duplicates(subset=subset, keep='first')
-        final_count = len(df_clean)
-        
-        duplicates_removed = initial_count - final_count
-        
-        if output_file is None:
-            output_file = input_file
-        
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original rows: {initial_count}")
-        print(f"Clean rows: {final_count}")
-        print(f"Output saved to: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty")
-        return -1
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return -1
+    if df.empty:
+        return df
+    
+    # Remove duplicates
+    if id_column in df.columns:
+        df = df.drop_duplicates(subset=[id_column], keep='first')
+    
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    return df
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        print("Example: python data_cleaner.py data.csv cleaned_data.csv")
-        sys.exit(1)
+def validate_dataframe(df, required_columns):
+    """
+    Validate that required columns exist in the dataframe.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
     
-    remove_duplicates(input_file, output_file)
+    return True
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
