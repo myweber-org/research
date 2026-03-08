@@ -187,3 +187,60 @@ def example_usage():
 if __name__ == "__main__":
     result_df = example_usage()
     print(f"\nSample of cleaned data:\n{result_df.head()}")
+import pandas as pd
+
+def clean_dataset(df, sort_column=None):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and optionally sorting.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        sort_column (str, optional): Column name to sort by. Defaults to None.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with duplicates removed.
+    """
+    cleaned_df = df.drop_duplicates().reset_index(drop=True)
+    
+    if sort_column and sort_column in cleaned_df.columns:
+        cleaned_df = cleaned_df.sort_values(by=sort_column).reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David'],
+        'score': [85, 92, 92, 78, 95]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, sort_column='score')
+    print("\nCleaned DataFrame (sorted by score):")
+    print(cleaned_df)
+    
+    required_cols = ['id', 'name', 'score']
+    is_valid = validate_data(cleaned_df, required_cols)
+    print(f"\nData validation passed: {is_valid}")
