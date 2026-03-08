@@ -1,55 +1,42 @@
-import pandas as pd
 
-def clean_dataset(df, subset=None, fill_method='mean'):
+import numpy as np
+
+def remove_outliers_iqr(data, column):
     """
-    Clean a pandas DataFrame by removing duplicate rows and handling missing values.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        subset (list, optional): Column labels to consider for identifying duplicates.
-                                 If None, all columns are used.
-        fill_method (str): Method to fill missing values.
-                           Options: 'mean', 'median', 'mode', or 'drop'.
-                           Default is 'mean'.
-
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): The DataFrame containing the data.
+    column (str): The column name to process.
+    
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
     """
-    cleaned_df = df.copy()
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-    # Remove duplicate rows
-    cleaned_df = cleaned_df.drop_duplicates(subset=subset, keep='first')
-
-    # Handle missing values
-    if fill_method == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    else:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if cleaned_df[col].isnull().any():
-                if fill_method == 'mean':
-                    fill_value = cleaned_df[col].mean()
-                elif fill_method == 'median':
-                    fill_value = cleaned_df[col].median()
-                elif fill_method == 'mode':
-                    fill_value = cleaned_df[col].mode()[0]
-                else:
-                    raise ValueError(f"Unsupported fill_method: {fill_method}")
-                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
-
-        # For non-numeric columns, fill with mode or drop if mode not applicable
-        non_numeric_cols = cleaned_df.select_dtypes(exclude=['number']).columns
-        for col in non_numeric_cols:
-            if cleaned_df[col].isnull().any():
-                if fill_method == 'drop':
-                    cleaned_df = cleaned_df.dropna(subset=[col])
-                else:
-                    # For categorical columns, fill with mode
-                    if not cleaned_df[col].mode().empty:
-                        fill_value = cleaned_df[col].mode()[0]
-                        cleaned_df[col] = cleaned_df[col].fillna(fill_value)
-                    else:
-                        # If mode is empty (e.g., all NaN), drop the column
-                        cleaned_df = cleaned_df.drop(columns=[col])
-
-    return cleaned_df
+def calculate_summary_statistics(data, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    data (pd.DataFrame): The DataFrame containing the data.
+    column (str): The column name to analyze.
+    
+    Returns:
+    dict: Dictionary containing count, mean, std, min, and max.
+    """
+    stats = {
+        'count': data[column].count(),
+        'mean': data[column].mean(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max()
+    }
+    return stats
