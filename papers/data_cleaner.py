@@ -130,3 +130,108 @@ if __name__ == "__main__":
     print("\nNormalizing data...")
     normalized = cleaner.normalize_minmax()
     print(f"Normalized data sample:\n{normalized.head()}")
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataframe(df, date_column='date', id_column='id'):
+    """
+    Clean dataframe by removing duplicates, standardizing dates,
+    and filling missing values.
+    """
+    # Remove exact duplicates
+    initial_count = len(df)
+    df = df.drop_duplicates()
+    duplicates_removed = initial_count - len(df)
+    
+    # Standardize date format
+    if date_column in df.columns:
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            median_val = df[col].median()
+            df[col] = df[col].fillna(median_val)
+    
+    # Remove rows where ID is null
+    if id_column in df.columns:
+        df = df.dropna(subset=[id_column])
+    
+    # Reset index after cleaning
+    df = df.reset_index(drop=True)
+    
+    return df, duplicates_removed
+
+def validate_data(df, required_columns):
+    """
+    Validate that dataframe contains all required columns
+    and has no null values in key fields.
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    validation_report = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_counts': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    return validation_report
+
+def export_clean_data(df, output_path, format='csv'):
+    """
+    Export cleaned data to specified format.
+    """
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    if format == 'csv':
+        output_file = f"{output_path}/cleaned_data_{timestamp}.csv"
+        df.to_csv(output_file, index=False)
+    elif format == 'excel':
+        output_file = f"{output_path}/cleaned_data_{timestamp}.xlsx"
+        df.to_excel(output_file, index=False)
+    elif format == 'parquet':
+        output_file = f"{output_path}/cleaned_data_{timestamp}.parquet"
+        df.to_parquet(output_file, index=False)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    return output_file
+
+def main():
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, None],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-02', 'invalid', '2023-01-04', '2023-01-05'],
+        'value': [10.5, None, 15.3, 20.1, 25.7, 30.2],
+        'category': ['A', 'B', 'B', 'C', 'A', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data shape:", df.shape)
+    
+    # Clean the data
+    cleaned_df, removed = clean_dataframe(df)
+    print(f"Removed {removed} duplicate rows")
+    print("Cleaned data shape:", cleaned_df.shape)
+    
+    # Validate data
+    required_cols = ['id', 'date', 'value']
+    try:
+        report = validate_data(cleaned_df, required_cols)
+        print("Validation report:", report)
+    except ValueError as e:
+        print(f"Validation error: {e}")
+    
+    # Export cleaned data
+    output_path = './output'
+    exported_file = export_clean_data(cleaned_df, output_path, format='csv')
+    print(f"Data exported to: {exported_file}")
+
+if __name__ == "__main__":
+    main()
