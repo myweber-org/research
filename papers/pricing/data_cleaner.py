@@ -84,4 +84,86 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='median')
     print("\nCleaned DataFrame:")
-    print(cleaned)
+    print(cleaned)import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, strategy='mean', fill_value=None):
+    """
+    Load a CSV file and handle missing values based on specified strategy.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        strategy (str): Method for handling missing values. 
+                       Options: 'drop', 'mean', 'median', 'mode', 'constant'.
+        fill_value: Value to use when strategy is 'constant'.
+    
+    Returns:
+        pandas.DataFrame: Cleaned dataframe.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        if df.isnull().sum().sum() == 0:
+            print("No missing values found.")
+            return df
+        
+        print(f"Missing values before cleaning:\n{df.isnull().sum()}")
+        
+        if strategy == 'drop':
+            df_cleaned = df.dropna()
+        elif strategy == 'mean':
+            df_cleaned = df.fillna(df.mean(numeric_only=True))
+        elif strategy == 'median':
+            df_cleaned = df.fillna(df.median(numeric_only=True))
+        elif strategy == 'mode':
+            df_cleaned = df.fillna(df.mode().iloc[0])
+        elif strategy == 'constant':
+            if fill_value is None:
+                raise ValueError("fill_value must be provided for constant strategy")
+            df_cleaned = df.fillna(fill_value)
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        print(f"Missing values after cleaning:\n{df_cleaned.isnull().sum()}")
+        print(f"Final shape: {df_cleaned.shape}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV.
+    
+    Args:
+        df (pandas.DataFrame): Dataframe to save.
+        output_path (str): Path for output CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "sample_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    # Create sample data for demonstration
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 2, 3, 4, 5]
+    })
+    sample_data.to_csv(input_file, index=False)
+    
+    # Clean the data using mean imputation
+    cleaned_df = clean_csv_data(input_file, strategy='mean')
+    
+    if cleaned_df is not None:
+        save_cleaned_data(cleaned_df, output_file)
