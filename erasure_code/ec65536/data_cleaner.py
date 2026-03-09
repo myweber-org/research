@@ -172,3 +172,159 @@ def validate_data(data, required_columns=None, check_missing=True, check_duplica
             validation_results['issues'].append(f"Found {duplicate_count} duplicate rows")
     
     return validation_results
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using Interquartile Range method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values using specified strategy
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col].fillna(data[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col].fillna(data[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col].fillna(data[col].mode()[0], inplace=True)
+    elif strategy == 'drop':
+        data.dropna(inplace=True)
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+    
+    return data
+
+def detect_skewness(data, column, threshold=0.5):
+    """
+    Detect skewness in data column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    skewness = stats.skew(data[column].dropna())
+    is_skewed = abs(skewness) > threshold
+    
+    return skewness, is_skewed
+
+def log_transform(data, column):
+    """
+    Apply log transformation to reduce skewness
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if (data[column] <= 0).any():
+        shifted_data = data[column] - data[column].min() + 1
+        transformed = np.log(shifted_data)
+    else:
+        transformed = np.log(data[column])
+    
+    return transformed
+
+def create_cleaning_pipeline(data, config):
+    """
+    Create a data cleaning pipeline based on configuration
+    """
+    cleaned_data = data.copy()
+    report = {}
+    
+    for column in config.get('outlier_removal', []):
+        if column in cleaned_data.columns:
+            cleaned_data, removed = remove_outliers_iqr(cleaned_data, column)
+            report[f'{column}_outliers_removed'] = removed
+    
+    for column in config.get('normalize', []):
+        if column in cleaned_data.columns:
+            cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+    
+    for column in config.get('standardize', []):
+        if column in cleaned_data.columns:
+            cleaned_data[f'{column}_standardized'] = standardize_zscore(cleaned_data, column)
+    
+    if 'missing_values_strategy' in config:
+        cleaned_data = handle_missing_values(cleaned_data, config['missing_values_strategy'])
+    
+    for column in config.get('transform_skewed', []):
+        if column in cleaned_data.columns:
+            skewness, is_skewed = detect_skewness(cleaned_data, column)
+            if is_skewed:
+                cleaned_data[f'{column}_log_transformed'] = log_transform(cleaned_data, column)
+                report[f'{column}_skewness'] = skewness
+    
+    return cleaned_data, report
+
+def validate_dataframe(data):
+    """
+    Validate DataFrame structure and content
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if data.empty:
+        raise ValueError("DataFrame is empty")
+    
+    validation_report = {
+        'rows': len(data),
+        'columns': len(data.columns),
+        'missing_values': data.isnull().sum().sum(),
+        'duplicate_rows': data.duplicated().sum(),
+        'numeric_columns': list(data.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(data.select_dtypes(include=['object', 'category']).columns)
+    }
+    
+    return validation_report
