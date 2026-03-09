@@ -315,3 +315,66 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['id', 'value', 'category'], min_rows=3)
     print(f"\nDataset validation result: {is_valid}")
+import re
+import pandas as pd
+from typing import Optional, List, Dict, Any
+
+def remove_special_characters(text: str, keep_chars: str = "") -> str:
+    """
+    Remove special characters from a string, optionally keeping specified characters.
+    """
+    if not isinstance(text, str):
+        return text
+    pattern = f"[^a-zA-Z0-9\s{re.escape(keep_chars)}]"
+    return re.sub(pattern, '', text)
+
+def validate_email(email: str) -> bool:
+    """
+    Validate an email address format.
+    """
+    if not isinstance(email, str):
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def normalize_phone_number(phone: str, country_code: str = "+1") -> Optional[str]:
+    """
+    Normalize a phone number to a standard format.
+    """
+    if not isinstance(phone, str):
+        return None
+    digits = re.sub(r'\D', '', phone)
+    if len(digits) == 10:
+        return f"{country_code}{digits}"
+    elif len(digits) == 11 and digits.startswith('1'):
+        return f"+{digits}"
+    else:
+        return None
+
+def clean_dataframe(df: pd.DataFrame, text_columns: List[str] = None) -> pd.DataFrame:
+    """
+    Clean a DataFrame by removing special characters from specified text columns.
+    """
+    df_clean = df.copy()
+    if text_columns is None:
+        text_columns = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in text_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(lambda x: remove_special_characters(str(x)) if pd.notna(x) else x)
+    
+    return df_clean
+
+def check_missing_values(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Check for missing values in a DataFrame and return statistics.
+    """
+    missing_counts = df.isnull().sum()
+    missing_percentages = (missing_counts / len(df)) * 100
+    
+    return {
+        'missing_counts': missing_counts.to_dict(),
+        'missing_percentages': missing_percentages.to_dict(),
+        'total_missing': missing_counts.sum(),
+        'columns_with_missing': missing_counts[missing_counts > 0].index.tolist()
+    }
