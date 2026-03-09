@@ -593,3 +593,90 @@ def validate_dataset(df, required_columns=None):
 #     print("\nValidation results:")
 #     for key, value in validation.items():
 #         print(f"{key}: {value}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    column_mapping (dict): Optional dictionary to rename columns
+    drop_duplicates (bool): Whether to remove duplicate rows
+    normalize_text (bool): Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        text_columns = df_clean.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    df_clean = df_clean.replace(['nan', 'none', 'null', ''], np.nan)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, check_missing=True):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    check_missing (bool): Whether to check for missing values
+    
+    Returns:
+    dict: Dictionary with validation results
+    """
+    
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'missing_values': {},
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['missing_columns'] = missing_cols
+            validation_results['is_valid'] = False
+    
+    if check_missing:
+        missing_data = df.isnull().sum()
+        columns_with_missing = missing_data[missing_data > 0].to_dict()
+        if columns_with_missing:
+            validation_results['missing_values'] = columns_with_missing
+            validation_results['is_valid'] = False
+    
+    return validation_results
+
+def sample_data(df, sample_size=1000, random_state=42):
+    """
+    Create a random sample from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    sample_size (int): Number of rows to sample
+    random_state (int): Random seed for reproducibility
+    
+    Returns:
+    pd.DataFrame: Sampled DataFrame
+    """
+    
+    if len(df) <= sample_size:
+        return df.copy()
+    
+    return df.sample(n=min(sample_size, len(df)), random_state=random_state)
