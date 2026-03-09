@@ -748,3 +748,11 @@ def validate_cleaning(df_before, df_after, column):
         'max': df_after[column].max()
     }
     return {'before': stats_before, 'after': stats_after}
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
