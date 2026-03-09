@@ -243,3 +243,103 @@ if __name__ == "__main__":
     print("\nFilling missing values...")
     filled = cleaner.fill_missing_mean()
     print("Missing values filled")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None, fill_strategy='drop'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    text_columns (list): List of column names containing text data.
+    fill_strategy (str): Strategy for handling missing values ('drop', 'mean', 'median', 'mode').
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values
+    if fill_strategy == 'drop':
+        df_clean = df_clean.dropna()
+    elif fill_strategy in ['mean', 'median', 'mode']:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_strategy == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif fill_strategy == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif fill_strategy == 'mode':
+                df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+    
+    # Standardize text columns
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    # Reset index after cleaning
+    df_clean.reset_index(drop=True, inplace=True)
+    
+    return df_clean
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using IQR or Z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Outlier detection method ('iqr' or 'zscore').
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_clean = df.copy()
+    col_data = df_clean[column]
+    
+    if method == 'iqr':
+        Q1 = col_data.quantile(0.25)
+        Q3 = col_data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    elif method == 'zscore':
+        z_scores = np.abs((col_data - col_data.mean()) / col_data.std())
+        mask = z_scores <= threshold
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df_clean[mask]
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, None, 40, 150],
+        'score': [85.5, 92.0, 78.5, None, 95.5],
+        'city': ['New York', '  LONDON  ', 'Paris', 'TOKYO', 'Berlin']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, text_columns=['name', 'city'], fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    # Remove outliers from age column
+    filtered_df = remove_outliers(cleaned_df, 'age', method='iqr', threshold=1.5)
+    print("DataFrame after outlier removal:")
+    print(filtered_df)
