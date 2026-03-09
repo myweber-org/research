@@ -692,4 +692,92 @@ def main():
         print(f"Error during data cleaning: {e}")
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fillna_strategy='mean', columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fillna_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero').
+    columns_to_clean (list): Specific columns to apply cleaning. If None, all columns are cleaned.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.columns.tolist()
+    
+    if drop_duplicates:
+        initial_rows = df_clean.shape[0]
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - df_clean.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns:
+            if df_clean[col].dtype in ['int64', 'float64']:
+                if fillna_strategy == 'mean':
+                    fill_value = df_clean[col].mean()
+                elif fillna_strategy == 'median':
+                    fill_value = df_clean[col].median()
+                elif fillna_strategy == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0
+                df_clean[col].fillna(fill_value, inplace=True)
+            else:
+                df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 'Unknown', inplace=True)
+    
+    return df_clean
+
+def validate_dataset(df, check_nulls=True, check_types=True):
+    """
+    Validate dataset for common issues.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    check_nulls (bool): Check for null values.
+    check_types (bool): Check column data types.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_report = {}
+    
+    if check_nulls:
+        null_counts = df.isnull().sum()
+        validation_report['null_counts'] = null_counts[null_counts > 0].to_dict()
+    
+    if check_types:
+        dtypes = df.dtypes.to_dict()
+        validation_report['dtypes'] = dtypes
+    
+    validation_report['shape'] = df.shape
+    validation_report['columns'] = df.columns.tolist()
+    
+    return validation_report
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, np.nan, 5],
+        'B': [10, np.nan, 10, 40, 50],
+        'C': ['x', 'y', 'x', 'z', np.nan]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Report:")
+    print(validate_dataset(df))
+    
+    cleaned_df = clean_dataset(df, fillna_strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nCleaned Validation Report:")
+    print(validate_dataset(cleaned_df, check_nulls=True))
