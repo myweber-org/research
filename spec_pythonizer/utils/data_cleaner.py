@@ -132,3 +132,11 @@ if __name__ == "__main__":
     
     df_no_outliers = remove_outliers(cleaned_df, 'value', method='iqr')
     print(f"\nDataFrame after outlier removal: {len(df_no_outliers)} rows")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
