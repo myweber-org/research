@@ -45,4 +45,38 @@ if __name__ == "__main__":
     if data:
         display_user_info(data)
     else:
-        print(f"Failed to fetch data for user '{username}'.")
+        print(f"Failed to fetch data for user '{username}'.")import requests
+import sys
+
+def get_github_user(username):
+    """Fetch user information from GitHub API."""
+    url = f"https://api.github.com/users/{username}"
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Error: Unable to fetch user data. Status code: {response.status_code}")
+        return None
+
+def display_user_info(user_data):
+    """Display selected user information."""
+    if user_data:
+        print(f"Username: {user_data.get('login')}")
+        print(f"Name: {user_data.get('name', 'Not provided')}")
+        print(f"Bio: {user_data.get('bio', 'Not provided')}")
+        print(f"Public Repos: {user_data.get('public_repos')}")
+        print(f"Followers: {user_data.get('followers')}")
+        print(f"Following: {user_data.get('following')}")
+        print(f"Profile URL: {user_data.get('html_url')}")
+    else:
+        print("No user data to display.")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python fetch_github_user.py <username>")
+        sys.exit(1)
+    
+    username = sys.argv[1]
+    user_data = get_github_user(username)
+    display_user_info(user_data)
