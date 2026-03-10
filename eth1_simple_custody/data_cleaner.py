@@ -298,3 +298,168 @@ def validate_dataset(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "Dataset is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from specified column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in result_df.columns and np.issubdtype(result_df[col].dtype, np.number):
+            col_min = result_df[col].min()
+            col_max = result_df[col].max()
+            
+            if col_max != col_min:
+                result_df[col] = (result_df[col] - col_min) / (col_max - col_min)
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def standardize_zscore(dataframe, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    columns (list): List of column names to standardize
+    
+    Returns:
+    pd.DataFrame: Dataframe with standardized columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in result_df.columns and np.issubdtype(result_df[col].dtype, np.number):
+            mean_val = result_df[col].mean()
+            std_val = result_df[col].std()
+            
+            if std_val > 0:
+                result_df[col] = (result_df[col] - mean_val) / std_val
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process
+    
+    Returns:
+    pd.DataFrame: Dataframe with handled missing values
+    """
+    if columns is None:
+        columns = dataframe.columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in result_df.columns:
+            continue
+            
+        if result_df[col].isnull().any():
+            if strategy == 'drop':
+                result_df = result_df.dropna(subset=[col])
+            elif strategy == 'mean' and np.issubdtype(result_df[col].dtype, np.number):
+                result_df[col] = result_df[col].fillna(result_df[col].mean())
+            elif strategy == 'median' and np.issubdtype(result_df[col].dtype, np.number):
+                result_df[col] = result_df[col].fillna(result_df[col].median())
+            elif strategy == 'mode':
+                mode_val = result_df[col].mode()
+                if not mode_val.empty:
+                    result_df[col] = result_df[col].fillna(mode_val.iloc[0])
+            else:
+                result_df[col] = result_df[col].fillna(0)
+    
+    return result_df
+
+def get_data_summary(dataframe):
+    """
+    Generate comprehensive summary statistics for dataframe.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input dataframe
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    summary = {
+        'shape': dataframe.shape,
+        'columns': dataframe.columns.tolist(),
+        'dtypes': dataframe.dtypes.to_dict(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'numeric_summary': {},
+        'categorical_summary': {}
+    }
+    
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_summary'][col] = {
+            'mean': dataframe[col].mean(),
+            'median': dataframe[col].median(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max(),
+            'q1': dataframe[col].quantile(0.25),
+            'q3': dataframe[col].quantile(0.75)
+        }
+    
+    categorical_cols = dataframe.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        value_counts = dataframe[col].value_counts()
+        summary['categorical_summary'][col] = {
+            'unique_values': dataframe[col].nunique(),
+            'top_value': value_counts.index[0] if not value_counts.empty else None,
+            'top_count': value_counts.iloc[0] if not value_counts.empty else 0
+        }
+    
+    return summary
