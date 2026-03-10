@@ -241,3 +241,173 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean')
     print("Cleaned dataset:")
     print(cleaned_df)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to analyze
+        threshold: IQR multiplier for outlier detection
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    outliers_mask = (data[column] < lower_bound) | (data[column] > upper_bound)
+    cleaned_data = data[~outliers_mask].copy()
+    
+    return cleaned_data
+
+def detect_outliers_zscore(data, column, threshold=3):
+    """
+    Detect outliers using Z-score method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to analyze
+        threshold: Z-score threshold for outlier detection
+        
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    outliers_mask = z_scores > threshold
+    
+    cleaned_data = data[~outliers_mask].copy()
+    return cleaned_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data
+    
+    normalized_data = data.copy()
+    normalized_data[column] = (data[column] - min_val) / (max_val - min_val)
+    
+    return normalized_data
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data
+    
+    normalized_data = data.copy()
+    normalized_data[column] = (data[column] - mean_val) / std_val
+    
+    return normalized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of columns to process (None for all numeric columns)
+        
+    Returns:
+        DataFrame with handled missing values
+    """
+    data_copy = data.copy()
+    
+    if columns is None:
+        columns = data_copy.select_dtypes(include=[np.number]).columns
+    
+    for column in columns:
+        if column not in data_copy.columns:
+            continue
+            
+        if strategy == 'drop':
+            data_copy = data_copy.dropna(subset=[column])
+        elif strategy == 'mean':
+            data_copy[column] = data_copy[column].fillna(data_copy[column].mean())
+        elif strategy == 'median':
+            data_copy[column] = data_copy[column].fillna(data_copy[column].median())
+        elif strategy == 'mode':
+            data_copy[column] = data_copy[column].fillna(data_copy[column].mode()[0])
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return data_copy
+
+def clean_dataset(data, outlier_method='iqr', normalize_method=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        outlier_method: outlier detection method ('iqr', 'zscore', or None)
+        normalize_method: normalization method ('minmax', 'zscore', or None)
+        missing_strategy: missing value handling strategy
+        
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns
+    
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    if outlier_method:
+        for column in numeric_columns:
+            if outlier_method == 'iqr':
+                cleaned_data = detect_outliers_iqr(cleaned_data, column)
+            elif outlier_method == 'zscore':
+                cleaned_data = detect_outliers_zscore(cleaned_data, column)
+    
+    if normalize_method:
+        for column in numeric_columns:
+            if normalize_method == 'minmax':
+                cleaned_data = normalize_minmax(cleaned_data, column)
+            elif normalize_method == 'zscore':
+                cleaned_data = normalize_zscore(cleaned_data, column)
+    
+    return cleaned_data
