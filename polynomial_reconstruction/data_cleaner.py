@@ -190,3 +190,45 @@ def clean_dataset(df, columns_to_clean=None):
             print(f"Removed {removed_count} outliers from column '{column}'")
     
     return cleaned_df
+import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file, subset=None):
+    """
+    Reads a CSV file, removes duplicate rows, and saves the cleaned data.
+    If 'subset' is provided, only consider those columns for identifying duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+        final_count = len(df_cleaned)
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Successfully removed {initial_count - final_count} duplicate rows.")
+        print(f"Cleaned data saved to '{output_file}'.")
+        return df_cleaned
+    except FileNotFoundError:
+        print(f"Error: The file '{input_file}' was not found.")
+        sys.exit(1)
+    except pd.errors.EmptyDataError:
+        print(f"Error: The file '{input_file}' is empty.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python data_cleaner.py <input_csv> <output_csv> [subset_columns]")
+        print("Example: python data_cleaner.py raw_data.csv cleaned_data.csv")
+        print("Example with subset: python data_cleaner.py raw_data.csv cleaned_data.csv 'col1,col2'")
+        sys.exit(1)
+
+    input_csv = sys.argv[1]
+    output_csv = sys.argv[2]
+    subset_cols = None
+    if len(sys.argv) == 4:
+        subset_cols = sys.argv[3].split(',')
+        subset_cols = [col.strip() for col in subset_cols]
+
+    remove_duplicates(input_csv, output_csv, subset_cols)
