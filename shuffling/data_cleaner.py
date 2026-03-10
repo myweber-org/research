@@ -79,3 +79,76 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData validation passed: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing text columns to lowercase.
+    """
+    df_clean = df.copy()
+    
+    df_clean = df_clean.dropna()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+    
+    return df_clean
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a numeric column using the IQR method.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def validate_email_format(df, email_column):
+    """
+    Validate email addresses in a column using basic regex pattern.
+    """
+    import re
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    df['email_valid'] = df[email_column].apply(
+        lambda x: bool(re.match(pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', None, 'Bob Johnson'],
+        'email': ['john@example.com', 'invalid-email', 'bob@test.org', None],
+        'age': [25, 30, 35, 150],
+        'salary': [50000, 60000, None, 70000]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df, text_columns=['name'])
+    print("After cleaning:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    df_with_email_check = validate_email_format(cleaned_df, 'email')
+    print("With email validation:")
+    print(df_with_email_check[['email', 'email_valid']])
