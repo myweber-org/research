@@ -253,3 +253,93 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Error during data cleaning: {e}")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if self.file_path.suffix == '.csv':
+            self.df = pd.read_csv(self.file_path)
+        elif self.file_path.suffix in ['.xlsx', '.xls']:
+            self.df = pd.read_excel(self.file_path)
+        else:
+            raise ValueError("Unsupported file format")
+        return self
+    
+    def remove_duplicates(self):
+        if self.df is not None:
+            initial_rows = len(self.df)
+            self.df = self.df.drop_duplicates()
+            removed = initial_rows - len(self.df)
+            print(f"Removed {removed} duplicate rows")
+        return self
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is not None:
+            if columns is None:
+                columns = self.df.select_dtypes(include=[np.number]).columns
+            
+            for col in columns:
+                if col in self.df.columns:
+                    if strategy == 'mean':
+                        self.df[col].fillna(self.df[col].mean(), inplace=True)
+                    elif strategy == 'median':
+                        self.df[col].fillna(self.df[col].median(), inplace=True)
+                    elif strategy == 'mode':
+                        self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                    elif strategy == 'drop':
+                        self.df = self.df.dropna(subset=[col])
+                    else:
+                        raise ValueError("Invalid strategy")
+        return self
+    
+    def normalize_columns(self, columns=None):
+        if self.df is not None:
+            if columns is None:
+                columns = self.df.select_dtypes(include=[np.number]).columns
+            
+            for col in columns:
+                if col in self.df.columns:
+                    min_val = self.df[col].min()
+                    max_val = self.df[col].max()
+                    if max_val > min_val:
+                        self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        return self
+    
+    def save_cleaned_data(self, output_path):
+        if self.df is not None:
+            output_path = Path(output_path)
+            if output_path.suffix == '.csv':
+                self.df.to_csv(output_path, index=False)
+            elif output_path.suffix in ['.xlsx', '.xls']:
+                self.df.to_excel(output_path, index=False)
+            else:
+                raise ValueError("Unsupported output format")
+            print(f"Cleaned data saved to {output_path}")
+        return self
+    
+    def get_summary(self):
+        if self.df is not None:
+            summary = {
+                'rows': len(self.df),
+                'columns': len(self.df.columns),
+                'missing_values': self.df.isnull().sum().sum(),
+                'duplicates': self.df.duplicated().sum(),
+                'data_types': self.df.dtypes.to_dict()
+            }
+            return summary
+        return {}
+
+def clean_dataset(input_file, output_file):
+    cleaner = DataCleaner(input_file)
+    cleaner.load_data()
+    cleaner.remove_duplicates()
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.normalize_columns()
+    cleaner.save_cleaned_data(output_file)
+    return cleaner.get_summary()
