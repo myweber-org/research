@@ -906,3 +906,87 @@ def load_and_clean_data(filepath, cleaning_steps=None):
                 cleaner.normalize_data(**step.get('params', {}))
     
     return cleaner.get_cleaned_data()
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values and removing columns.
+    
+    Parameters:
+    file_path (str): Path to the CSV file
+    fill_method (str): Method to fill missing values ('mean', 'median', 'mode', 'zero')
+    drop_threshold (float): Threshold for dropping columns with too many missing values (0.0 to 1.0)
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    
+    # Drop columns with too many missing values
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    if len(columns_to_drop) > 0:
+        print(f"Dropped columns with >{drop_threshold*100}% missing values: {list(columns_to_drop)}")
+    
+    # Fill missing values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_method == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_method == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_method == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif fill_method == 'mode':
+        for col in numeric_cols:
+            mode_val = df[col].mode()
+            if not mode_val.empty:
+                df[col] = df[col].fillna(mode_val.iloc[0])
+    
+    # For non-numeric columns, fill with most frequent value
+    non_numeric_cols = df.select_dtypes(exclude=[np.number]).columns
+    for col in non_numeric_cols:
+        mode_val = df[col].mode()
+        if not mode_val.empty:
+            df[col] = df[col].fillna(mode_val.iloc[0])
+    
+    # Remove any remaining rows with missing values
+    df = df.dropna()
+    
+    final_shape = df.shape
+    print(f"Cleaned data shape: {final_shape}")
+    print(f"Removed {original_shape[0] - final_shape[0]} rows and {original_shape[1] - final_shape[1]} columns")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Parameters:
+    df (pandas.DataFrame): Cleaned DataFrame
+    output_path (str): Path to save the cleaned CSV file
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_method='median', drop_threshold=0.3)
+        save_cleaned_data(cleaned_df, output_file)
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
