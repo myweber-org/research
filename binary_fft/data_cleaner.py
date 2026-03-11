@@ -342,3 +342,90 @@ def validate_dataframe(dataframe, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None):
+    """
+    Clean CSV data by handling missing values and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        # Fill missing numeric values with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        removed_duplicates = initial_rows - len(df)
+        
+        print(f"Cleaned data shape: {df.shape}")
+        print(f"Removed duplicates: {removed_duplicates}")
+        print(f"Missing values after cleaning:\n{df.isnull().sum()}")
+        
+        # Save cleaned data
+        if output_path:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    """
+    if df is None or df.empty:
+        return False
+    
+    validation_results = {
+        'has_data': not df.empty,
+        'row_count': len(df),
+        'column_count': len(df.columns),
+        'has_duplicates': df.duplicated().any(),
+        'has_missing_values': df.isnull().any().any(),
+        'data_types': df.dtypes.to_dict()
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, output_file)
+    
+    if cleaned_df is not None:
+        validation = validate_dataframe(cleaned_df)
+        print(f"Data validation results: {validation}")
