@@ -100,4 +100,63 @@ def detect_missing_patterns(dataframe, threshold=0.3):
         'missing_percentage': missing_percent,
         'high_missing_columns': high_missing,
         'total_missing': dataframe.isnull().sum().sum()
-    }
+    }import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean a CSV file by handling missing values.
+    
+    Parameters:
+    filepath (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values.
+                         Options: 'mean', 'median', 'mode', 'zero'.
+    drop_threshold (float): Drop columns with missing ratio above this threshold.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found at {filepath}")
+    
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    
+    for col in categorical_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    
+    Parameters:
+    df (pd.DataFrame): Cleaned DataFrame.
+    output_path (str): Path to save the cleaned CSV.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+    save_cleaned_data(cleaned_df, output_file)
