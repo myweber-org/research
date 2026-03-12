@@ -81,4 +81,70 @@ def process_data_file(file_path, output_path=None):
             
     except Exception as e:
         print(f"Error processing file: {e}")
-        return None
+        return Noneimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers from a DataFrame column using Z-score method.
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize a column using Min-Max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def normalize_zscore(data, column):
+    """
+    Normalize a column using Z-score standardization.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def handle_missing_mean(data, column):
+    """
+    Fill missing values in a column with the mean of that column.
+    """
+    mean_val = data[column].mean()
+    data[column].fillna(mean_val, inplace=True)
+    return data
+
+def handle_missing_median(data, column):
+    """
+    Fill missing values in a column with the median of that column.
+    """
+    median_val = data[column].median()
+    data[column].fillna(median_val, inplace=True)
+    return data
+
+def validate_dataframe(data):
+    """
+    Basic validation of DataFrame structure and data types.
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    if data.empty:
+        raise ValueError("DataFrame is empty")
+    return True
