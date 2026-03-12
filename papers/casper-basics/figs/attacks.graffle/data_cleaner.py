@@ -482,3 +482,96 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (bool): Whether to fill missing values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].median())
+            elif cleaned_df[column].dtype == 'object':
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 'Unknown')
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+    
+    return validation_results
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Path to save the file
+    format (str): File format ('csv' or 'parquet')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'parquet':
+        df.to_parquet(output_path, index=False)
+    else:
+        raise ValueError("Unsupported format. Use 'csv' or 'parquet'")
+    
+    print(f"Data saved to {output_path}")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', None, 'Eve'],
+        'age': [25, 30, None, 35, 28, 32],
+        'score': [85.5, 92.0, 78.5, 78.5, 88.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data:")
+    print(df)
+    print("\nValidation results:")
+    print(validate_data(df))
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned data:")
+    print(cleaned_df)
+    print("\nCleaned validation results:")
+    print(validate_data(cleaned_df))
