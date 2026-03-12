@@ -189,3 +189,32 @@ if __name__ == "__main__":
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+
+def clean_dataset(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing text columns to lowercase.
+    """
+    df_clean = df.dropna().copy()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
