@@ -142,4 +142,31 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     print("\nCleaned data shape:", cleaned_df.shape)
-    print("Cleaned data columns:", list(cleaned_df.columns))
+    print("Cleaned data columns:", list(cleaned_df.columns))import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    print(f"Initial shape: {df.shape}")
+    
+    df = df.dropna()
+    print(f"After dropping NA: {df.shape}")
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    df = df[(z_scores < 3).all(axis=1)]
+    print(f"After removing outliers: {df.shape}")
+    
+    for col in numeric_cols:
+        df[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+    
+    return df
+
+def main():
+    cleaned_df = load_and_clean_data('sample_data.csv')
+    cleaned_df.to_csv('cleaned_data.csv', index=False)
+    print("Data cleaning completed. Saved to cleaned_data.csv")
+
+if __name__ == "__main__":
+    main()
