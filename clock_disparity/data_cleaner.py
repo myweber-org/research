@@ -680,3 +680,66 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values, duplicates,
+    and standardizing column names.
+    """
+    df_clean = df.copy()
+    
+    # Standardize column names if mapping provided
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    # Handle missing values
+    for col in df_clean.columns:
+        if df_clean[col].dtype in [np.float64, np.int64]:
+            if fill_missing == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif fill_missing == 'mode':
+                df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+        else:
+            df_clean[col].fillna('Unknown', inplace=True)
+    
+    # Remove leading/trailing whitespace from string columns
+    str_cols = df_clean.select_dtypes(include=['object']).columns
+    for col in str_cols:
+        df_clean[col] = df_clean[col].str.strip()
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows")
+    
+    return True
+
+def export_clean_data(df, output_path, format='csv'):
+    """
+    Export cleaned data to specified format.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
