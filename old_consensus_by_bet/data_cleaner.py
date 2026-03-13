@@ -426,4 +426,65 @@ def validate_data(df, required_columns=None, min_rows=1):
 #     print(cleaned)
 #     
 #     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=2)
-#     print(f"\nData validation passed: {is_valid}")
+#     print(f"\nData validation passed: {is_valid}")import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file=None, subset=None):
+    """
+    Remove duplicate rows from a CSV file.
+    
+    Args:
+        input_file (str): Path to the input CSV file.
+        output_file (str, optional): Path to save the cleaned CSV file.
+                                     If None, overwrites the input file.
+        subset (list, optional): List of column names to consider for duplicates.
+    
+    Returns:
+        int: Number of duplicate rows removed.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        initial_rows = len(df)
+        
+        if subset:
+            df_clean = df.drop_duplicates(subset=subset, keep='first')
+        else:
+            df_clean = df.drop_duplicates(keep='first')
+        
+        removed_count = initial_rows - len(df_clean)
+        
+        if output_file is None:
+            output_file = input_file
+        
+        df_clean.to_csv(output_file, index=False)
+        
+        print(f"Removed {removed_count} duplicate rows.")
+        print(f"Cleaned data saved to: {output_file}")
+        
+        return removed_count
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return -1
+    except pd.errors.EmptyDataError:
+        print(f"Error: Input file '{input_file}' is empty.")
+        return -1
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return -1
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python data_cleaner.py <input_file> [output_file]")
+        print("Example: python data_cleaner.py data.csv cleaned_data.csv")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    result = remove_duplicates(input_file, output_file)
+    
+    if result >= 0:
+        sys.exit(0)
+    else:
+        sys.exit(1)
