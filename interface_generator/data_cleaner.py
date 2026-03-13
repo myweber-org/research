@@ -192,4 +192,78 @@ def remove_duplicates_preserve_order(sequence):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_numeric_data(df, numeric_columns):
+    """
+    Clean numeric columns by removing outliers and filling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    return cleaned_df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Output file path
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100).tolist(),
+        'score': np.random.normal(50, 10, 100).tolist()
+    }
+    
+    sample_data['value'][10] = 500
+    sample_data['score'][20] = -100
+    
+    df = pd.DataFrame(sample_data)
+    print(f"Original data shape: {df.shape}")
+    
+    numeric_cols = ['value', 'score']
+    cleaned_df = clean_numeric_data(df, numeric_cols)
+    
+    print(f"Cleaned data shape: {cleaned_df.shape}")
+    print(f"Outliers removed: {len(df) - len(cleaned_df)}")
+    
+    save_cleaned_data(cleaned_df, 'cleaned_data.csv')
