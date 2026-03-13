@@ -1,96 +1,87 @@
+
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+def clean_csv_data(file_path, fill_strategy='mean', drop_threshold=0.5):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Load and clean CSV data by handling missing values.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-        fill_missing (str or dict): Method to fill missing values. Can be 'mean', 
-                                   'median', 'mode', or a dictionary of column:value pairs.
+    Parameters:
+    file_path (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values.
+                         Options: 'mean', 'median', 'mode', 'zero'.
+    drop_threshold (float): Drop columns with missing ratio above this threshold.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pandas.DataFrame: Cleaned DataFrame.
     """
-    cleaned_df = df.copy()
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
     
-    # Remove duplicate rows
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
     
-    # Handle missing values
-    if fill_missing is not None:
-        if isinstance(fill_missing, dict):
-            # Fill with specified values
-            cleaned_df = cleaned_df.fillna(fill_missing)
-        elif fill_missing == 'mean':
-            # Fill numeric columns with mean
-            numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
-                cleaned_df[numeric_cols].mean()
-            )
-        elif fill_missing == 'median':
-            # Fill numeric columns with median
-            numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
-                cleaned_df[numeric_cols].median()
-            )
-        elif fill_missing == 'mode':
-            # Fill with mode (most frequent value)
-            for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    mode_val = cleaned_df[col].mode()
-                    if not mode_val.empty:
-                        cleaned_df[col] = cleaned_df[col].fillna(mode_val[0])
+    # Calculate missing ratio per column
+    missing_ratio = df.isnull().sum() / len(df)
     
-    return cleaned_df
+    # Drop columns with high missing ratio
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    if len(columns_to_drop) > 0:
+        print(f"Dropped columns with >{drop_threshold*100}% missing values: {list(columns_to_drop)}")
+    
+    # Fill missing values based on strategy
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mean())
+    elif fill_strategy == 'median':
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].median())
+    elif fill_strategy == 'mode':
+        for col in df.columns:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    elif fill_strategy == 'zero':
+        df = df.fillna(0)
+    else:
+        raise ValueError(f"Unknown fill strategy: {fill_strategy}")
+    
+    # For categorical columns, fill with most frequent value
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df[col].isnull().any():
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    print(f"Cleaned data shape: {df.shape}")
+    print(f"Total missing values after cleaning: {df.isnull().sum().sum()}")
+    
+    return df
 
-def validate_dataframe(df, required_columns=None):
+def save_cleaned_data(df, output_path):
     """
-    Validate that a DataFrame meets basic requirements.
+    Save cleaned DataFrame to CSV.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-    
-    Returns:
-        tuple: (is_valid, error_message)
+    Parameters:
+    df (pandas.DataFrame): Cleaned DataFrame.
+    output_path (str): Path to save the cleaned CSV file.
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame is valid"
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
 
-# Example usage
 if __name__ == "__main__":
-    # Create sample data
-    data = {
-        'id': [1, 2, 2, 3, 4, 5],
-        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
-        'age': [25, 30, 30, None, 35, 40],
-        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
-    }
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    df = pd.DataFrame(data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nShape:", df.shape)
-    
-    # Clean the data
-    cleaned = clean_dataset(df, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    print("\nShape after cleaning:", cleaned.shape)
-    
-    # Validate the cleaned data
-    is_valid, message = validate_dataframe(cleaned, required_columns=['id', 'name', 'age'])
-    print(f"\nValidation: {message}")
+    try:
+        cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+        save_cleaned_data(cleaned_df, output_file)
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
