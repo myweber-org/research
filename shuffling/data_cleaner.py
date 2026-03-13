@@ -334,4 +334,96 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset(sample_data, numeric_cols, outlier_method='iqr', normalize_method='zscore')
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
-    print(cleaned_data.head())
+    print(cleaned_data.head())import pandas as pd
+import re
+
+def clean_dataframe(df, text_column, remove_duplicates=True, lowercase=True, strip_whitespace=True):
+    """
+    Clean a pandas DataFrame by processing text columns and removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    text_column (str): Name of the text column to clean
+    remove_duplicates (bool): Whether to remove duplicate rows
+    lowercase (bool): Whether to convert text to lowercase
+    strip_whitespace (bool): Whether to strip leading/trailing whitespace
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if text_column in cleaned_df.columns:
+        if lowercase:
+            cleaned_df[text_column] = cleaned_df[text_column].str.lower()
+        
+        if strip_whitespace:
+            cleaned_df[text_column] = cleaned_df[text_column].str.strip()
+        
+        cleaned_df[text_column] = cleaned_df[text_column].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x)) if pd.notnull(x) else x
+        )
+    
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Parameters:
+    email (str): Email address to validate
+    
+    Returns:
+    bool: True if email is valid, False otherwise
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email))) if pd.notnull(email) else False
+
+def standardize_phone_number(phone):
+    """
+    Standardize phone number format to digits only.
+    
+    Parameters:
+    phone (str): Phone number to standardize
+    
+    Returns:
+    str: Standardized phone number or original value if invalid
+    """
+    if pd.isnull(phone):
+        return phone
+    
+    phone_str = str(phone)
+    digits = re.sub(r'\D', '', phone_str)
+    
+    if len(digits) >= 10:
+        return digits
+    return phone_str
+
+def main():
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.net', 'alice@domain.co'],
+        'phone': ['(123) 456-7890', '555-1234', 'invalid', '+1-800-555-1234', '9876543210'],
+        'notes': ['  Important   Client  ', 'regular customer', '  VIP  ', 'new lead', 'existing account']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df, 'notes', remove_duplicates=True, lowercase=True, strip_whitespace=True)
+    
+    cleaned_df['email_valid'] = cleaned_df['email'].apply(validate_email)
+    cleaned_df['phone_standardized'] = cleaned_df['phone'].apply(standardize_phone_number)
+    
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    cleaned_data = main()
