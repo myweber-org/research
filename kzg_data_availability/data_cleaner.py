@@ -180,3 +180,97 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame validation passed"
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, missing_strategy='mean'):
+    """
+    Load a CSV file, clean missing values, and optionally save cleaned data.
+    
+    Parameters:
+    file_path (str): Path to input CSV file
+    output_path (str, optional): Path to save cleaned CSV file
+    missing_strategy (str): Strategy for handling missing values
+                           'mean', 'median', 'mode', or 'drop'
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values")
+            
+            if missing_strategy == 'mean':
+                df = df.fillna(df.mean(numeric_only=True))
+            elif missing_strategy == 'median':
+                df = df.fillna(df.median(numeric_only=True))
+            elif missing_strategy == 'mode':
+                df = df.fillna(df.mode().iloc[0])
+            elif missing_strategy == 'drop':
+                df = df.dropna()
+            else:
+                raise ValueError(f"Unknown strategy: {missing_strategy}")
+            
+            print(f"Missing values handled using '{missing_strategy}' strategy")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_numeric_columns(df, columns=None):
+    """
+    Validate that specified columns contain only numeric data.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate
+    columns (list, optional): List of column names to validate
+    
+    Returns:
+    dict: Validation results for each column
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    results = {}
+    for col in columns:
+        if col in df.columns:
+            non_numeric = pd.to_numeric(df[col], errors='coerce').isna().sum()
+            results[col] = {
+                'total_values': len(df[col]),
+                'non_numeric_count': non_numeric,
+                'is_valid': non_numeric == 0
+            }
+    
+    return results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10.5, np.nan, 30.2, 40.1, 50.0],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', 
+                               output_path='cleaned_data.csv',
+                               missing_strategy='mean')
+    
+    if cleaned_df is not None:
+        validation = validate_numeric_columns(cleaned_df)
+        print("Validation results:", validation)
