@@ -113,3 +113,77 @@ def validate_dataframe(df):
         if not check(df):
             raise ValueError(message)
     return True
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or array-like): The dataset containing the column to clean.
+    column (int or str): The index or name of the column to process.
+    
+    Returns:
+    tuple: A tuple containing:
+        - cleaned_data (list): Data with outliers removed.
+        - outlier_indices (list): Indices of removed outliers.
+    """
+    if isinstance(data, list):
+        data_array = np.array(data)
+    else:
+        data_array = data
+    
+    if isinstance(column, str):
+        raise ValueError("Column name handling requires pandas DataFrame. Use integer index for list/array data.")
+    
+    column_data = data_array[:, column] if data_array.ndim > 1 else data_array
+    
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    outlier_mask = (column_data < lower_bound) | (column_data > upper_bound)
+    outlier_indices = np.where(outlier_mask)[0].tolist()
+    
+    if data_array.ndim == 1:
+        cleaned_data = data_array[~outlier_mask].tolist()
+    else:
+        cleaned_data = data_array[~outlier_mask, :].tolist()
+    
+    return cleaned_data, outlier_indices
+
+def validate_data_range(data, min_val=None, max_val=None):
+    """
+    Validate that all values in data are within specified range.
+    
+    Parameters:
+    data (list or array): Data to validate.
+    min_val (float): Minimum allowed value.
+    max_val (float): Maximum allowed value.
+    
+    Returns:
+    bool: True if all values are within range, False otherwise.
+    """
+    data_array = np.array(data)
+    
+    if min_val is not None and np.any(data_array < min_val):
+        return False
+    if max_val is not None and np.any(data_array > max_val):
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [[1, 10.5], [2, 12.3], [3, 9.8], [4, 100.0], [5, 11.2]]
+    cleaned, outliers = remove_outliers_iqr(sample_data, 1)
+    
+    print(f"Original data: {sample_data}")
+    print(f"Cleaned data: {cleaned}")
+    print(f"Outlier indices: {outliers}")
+    
+    is_valid = validate_data_range([x[1] for x in cleaned], min_val=0, max_val=50)
+    print(f"Data validation result: {is_valid}")
