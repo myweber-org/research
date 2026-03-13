@@ -770,3 +770,46 @@ if __name__ == "__main__":
         print(f"Validation result: {validation_result}")
         print("\nCleaned DataFrame:")
         print(cleaned_df)
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list (list): Input list potentially containing duplicates.
+    
+    Returns:
+        list: List with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_data(values, threshold=None):
+    """
+    Clean numeric data by filtering out None values and optionally applying threshold.
+    
+    Args:
+        values (list): List of numeric values.
+        threshold (float, optional): Maximum allowed value.
+    
+    Returns:
+        list: Cleaned numeric list.
+    """
+    cleaned = [v for v in values if v is not None]
+    if threshold is not None:
+        cleaned = [v for v in cleaned if v <= threshold]
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    numeric_data = [10.5, None, 25.0, 100.2, None, 75.5]
+    numeric_cleaned = clean_numeric_data(numeric_data, threshold=80.0)
+    print(f"Numeric cleaned: {numeric_cleaned}")
