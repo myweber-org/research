@@ -187,3 +187,65 @@ if __name__ == "__main__":
     
     is_valid = validate_data_range([x[1] for x in cleaned], min_val=0, max_val=50)
     print(f"Data validation result: {is_valid}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a dataset using the Interquartile Range (IQR) method.
+    
+    Args:
+        data (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_summary_statistics(data, column):
+    """
+    Calculate summary statistics for a column.
+    
+    Args:
+        data (pd.DataFrame): Input DataFrame.
+        column (str): Column name to analyze.
+    
+    Returns:
+        dict: Dictionary containing mean, median, std, min, and max.
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max()
+    }
+    return stats
+
+def normalize_column(data, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        data (pd.DataFrame): Input DataFrame.
+        column (str): Column name to normalize.
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val - min_val != 0:
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    else:
+        data[column + '_normalized'] = 0
+    
+    return data
