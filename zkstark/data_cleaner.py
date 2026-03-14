@@ -56,3 +56,57 @@ def main():
 
 if __name__ == "__main__":
     main()
+import re
+import pandas as pd
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text in a DataFrame column: lowercase, strip whitespace, remove extra spaces.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x))
+    return df
+
+def remove_duplicate_rows(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+def example_usage():
+    # Example data
+    data = {
+        'name': ['  Alice  ', 'Bob', 'alice', '  CAROL  ', 'Bob   '],
+        'age': [25, 30, 25, 35, 30],
+        'city': ['New York', 'London', 'new york', 'Paris', 'london']
+    }
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean text in 'name' and 'city' columns
+    df = clean_text_column(df, 'name')
+    df = clean_text_column(df, 'city')
+    
+    # Remove duplicates based on 'name' and 'age'
+    df = remove_duplicate_rows(df, subset=['name', 'age'])
+    
+    print("\nCleaned DataFrame:")
+    print(df)
+    
+    # Save to file (optional)
+    # save_cleaned_data(df, 'cleaned_data.csv')
+
+if __name__ == "__main__":
+    example_usage()
