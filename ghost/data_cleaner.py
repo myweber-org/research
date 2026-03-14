@@ -293,4 +293,110 @@ def example_usage():
     print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'values'))
 
 if __name__ == "__main__":
-    example_usage()
+    example_usage()import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column]
+    
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns, outlier_factor=1.5, normalize_method='zscore'):
+    """
+    Main function to clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        df: input DataFrame
+        numeric_columns: list of numeric column names to process
+        outlier_factor: IQR factor for outlier removal
+        normalize_method: 'minmax' or 'zscore' normalization
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+            
+            if normalize_method == 'minmax':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif normalize_method == 'zscore':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_data(df, required_columns, min_rows=10):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if len(df) < min_rows:
+        return False, f"Dataset has fewer than {min_rows} rows"
+    
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataset is valid"
