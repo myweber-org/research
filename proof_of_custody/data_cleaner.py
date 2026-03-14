@@ -160,3 +160,108 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData valid: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns_to_check=None, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    df_clean = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean = df_clean.drop_duplicates()
+    removed_duplicates = initial_rows - df_clean.shape[0]
+    
+    # Handle missing values
+    if columns_to_check is None:
+        columns_to_check = df_clean.columns
+    
+    missing_counts = {}
+    for column in columns_to_check:
+        if column in df_clean.columns:
+            missing_count = df_clean[column].isnull().sum()
+            missing_counts[column] = missing_count
+            
+            if missing_count > 0:
+                if fill_strategy == 'mean' and pd.api.types.is_numeric_dtype(df_clean[column]):
+                    fill_value = df_clean[column].mean()
+                    df_clean[column].fillna(fill_value, inplace=True)
+                elif fill_strategy == 'median' and pd.api.types.is_numeric_dtype(df_clean[column]):
+                    fill_value = df_clean[column].median()
+                    df_clean[column].fillna(fill_value, inplace=True)
+                elif fill_strategy == 'mode':
+                    fill_value = df_clean[column].mode()[0] if not df_clean[column].mode().empty else None
+                    df_clean[column].fillna(fill_value, inplace=True)
+                elif fill_strategy == 'drop':
+                    df_clean = df_clean.dropna(subset=[column])
+                else:
+                    # Default: fill with a placeholder
+                    df_clean[column].fillna('MISSING', inplace=True)
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    # Print cleaning summary
+    print(f"Data cleaning completed:")
+    print(f"  - Removed {removed_duplicates} duplicate rows")
+    print(f"  - Missing values handled using '{fill_strategy}' strategy")
+    
+    if missing_counts:
+        print("  - Missing values per column:")
+        for column, count in missing_counts.items():
+            if count > 0:
+                print(f"    {column}: {count} missing values")
+    
+    print(f"  - Final dataset shape: {df_clean.shape}")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Eve', 'Eve', 'Frank'],
+        'age': [25, 30, None, 40, 50, 50, 35],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, fill_strategy='mean')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+        print("\nData validation passed!")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
